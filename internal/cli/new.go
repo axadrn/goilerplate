@@ -70,14 +70,18 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	if configuration.SessionToken == "" {
-		if err := a.login(ctx, nil); err != nil {
-			return err
+	authorizationToken := strings.TrimSpace(a.MachineToken)
+	if authorizationToken == "" {
+		if configuration.SessionToken == "" {
+			if err := a.login(ctx, nil); err != nil {
+				return err
+			}
+			configuration, err = a.Store.Load()
+			if err != nil {
+				return err
+			}
 		}
-		configuration, err = a.Store.Load()
-		if err != nil {
-			return err
-		}
+		authorizationToken = configuration.SessionToken
 	}
 	apiURL := configuration.APIURL
 	if apiURL == "" {
@@ -87,24 +91,26 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	activation, err := client.ActivationStatus(ctx, configuration.SessionToken)
-	if err != nil {
-		return err
-	}
-	switch activation.State {
-	case api.ActivationStateActive:
-	case api.ActivationStatePending:
-		fmt.Fprintln(a.Out, "Check your email to activate Free access. Waiting for confirmation...")
-		if err := a.waitForActivation(ctx, client, configuration.SessionToken); err != nil {
+	if strings.TrimSpace(a.MachineToken) == "" {
+		activation, err := client.ActivationStatus(ctx, authorizationToken)
+		if err != nil {
 			return err
 		}
-		fmt.Fprintln(a.Out, "Free access activated")
-	case api.ActivationStateResendRequired:
-		return errActivationResendRequired
-	case api.ActivationStateUnavailable:
-		return errActivationUnavailable
-	default:
-		return fmt.Errorf("unknown activation state %q", activation.State)
+		switch activation.State {
+		case api.ActivationStateActive:
+		case api.ActivationStatePending:
+			fmt.Fprintln(a.Out, "Check your email to activate Free access. Waiting for confirmation...")
+			if err := a.waitForActivation(ctx, client, authorizationToken); err != nil {
+				return err
+			}
+			fmt.Fprintln(a.Out, "Free access activated")
+		case api.ActivationStateResendRequired:
+			return errActivationResendRequired
+		case api.ActivationStateUnavailable:
+			return errActivationUnavailable
+		default:
+			return fmt.Errorf("unknown activation state %q", activation.State)
+		}
 	}
 	archive, err := os.CreateTemp("", "goilerplate-project-*.tar.gz")
 	if err != nil {
@@ -118,7 +124,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if a.Version != "" && a.Version != "dev" {
 		templateVersion = a.Version
 	}
-	generatedVersion, err := client.Generate(ctx, configuration.SessionToken, api.GenerateRequest{
+	generatedVersion, err := client.Generate(ctx, authorizationToken, api.GenerateRequest{
 		TemplateVersion: templateVersion,
 		Answers:         answers,
 	}, archive)
