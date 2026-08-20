@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/axadrn/goilerplate/internal/config"
 	"github.com/axadrn/goilerplate/internal/github"
 	"github.com/axadrn/goilerplate/internal/service"
+	"github.com/axadrn/goilerplate/internal/tui"
 )
 
 var (
@@ -24,6 +26,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	if err := run(ctx); err != nil {
+		if errors.Is(err, tui.ErrCancelled) {
+			return
+		}
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
@@ -55,5 +60,15 @@ func run(ctx context.Context) error {
 			return service.NewClient(baseURL, httpClient)
 		},
 	}
+	if isTerminal(os.Stdin) && isTerminal(os.Stdout) {
+		application.RunNewProjectWizard = func(ctx context.Context) ([]string, error) {
+			return tui.Run(ctx, os.Stdin, os.Stdout)
+		}
+	}
 	return application.Run(ctx, os.Args[1:])
+}
+
+func isTerminal(file *os.File) bool {
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
