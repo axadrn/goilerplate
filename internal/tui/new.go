@@ -192,7 +192,7 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			m.moveCursor(1)
 			return m, nil
-		case " ":
+		case " ", "space":
 			if m.isMultiStep() {
 				m.toggleCurrent()
 			}
@@ -227,8 +227,12 @@ func (m model) View() tea.View {
 	}
 
 	footer := m.footerView()
+	separator := "\n\n"
+	if m.width < 60 {
+		separator = "\n"
+	}
 	content := lipgloss.NewStyle().Width(contentWidth).Render(
-		header + "\n" + progress + "\n\n" + body + "\n\n" + footer,
+		header + "\n" + progress + separator + body + separator + footer,
 	)
 	view := tea.NewView(lipgloss.NewStyle().Padding(1, 2).Render(content))
 	view.AltScreen = true
@@ -238,7 +242,11 @@ func (m model) View() tea.View {
 
 func (m model) questionView() string {
 	title, hint := m.question()
-	parts := []string{titleStyle.Render(title), mutedStyle.Render(hint), ""}
+	parts := []string{titleStyle.Render(title)}
+	if m.width >= 60 {
+		parts = append(parts, mutedStyle.Render(hint))
+	}
+	parts = append(parts, "")
 	if m.isTextStep() {
 		parts = append(parts, m.currentInput().View())
 		return strings.Join(parts, "\n")
@@ -267,7 +275,7 @@ func (m model) questionView() string {
 			label = titleStyle.Render(option.label)
 		}
 		parts = append(parts, fmt.Sprintf("%s%s  %s", cursor, marker, label))
-		if index == m.cursor && option.description != "" {
+		if m.width >= 60 && index == m.cursor && option.description != "" {
 			parts = append(parts, "     "+mutedStyle.Render(option.description))
 		}
 	}
@@ -275,6 +283,23 @@ func (m model) questionView() string {
 }
 
 func (m model) reviewView() string {
+	if m.width < 60 {
+		rows := []string{
+			labelStyle.Render(shorten(strings.TrimSpace(m.inputs[2].Value()), 28)),
+			mutedStyle.Render("Module  " + shorten(strings.TrimSpace(m.inputs[1].Value()), 20)),
+			mutedStyle.Render("Folder  " + shorten(strings.TrimSpace(m.inputs[0].Value()), 20)),
+			"",
+		}
+		if m.edition == "free" {
+			return strings.Join(append(rows, valueStyle.Render("Free · SQLite · SMTP · htmx")), "\n")
+		}
+		return strings.Join(append(rows,
+			valueStyle.Render("Paid · "+displayValue(m.database)),
+			valueStyle.Render(displayValue(m.payment)+" · "+displayValue(m.mail)),
+			valueStyle.Render(fmt.Sprintf("Teams %s · OAuth %d", yesNo(m.teams), len(selectedKeys(m.oauth)))),
+			valueStyle.Render(fmt.Sprintf("Storage %s · Content %d · Example %s", yesNo(m.storage), len(selectedKeys(m.content)), yesNo(m.example))),
+		), "\n")
+	}
 	rows := []string{
 		labelStyle.Render(strings.TrimSpace(m.inputs[2].Value())),
 		mutedStyle.Render(strings.TrimSpace(m.inputs[1].Value()) + "  →  " + strings.TrimSpace(m.inputs[0].Value())),
@@ -324,6 +349,18 @@ func (m model) summaryView() string {
 }
 
 func (m model) footerView() string {
+	if m.width < 60 {
+		if m.isTextStep() {
+			return mutedStyle.Render("enter next · esc back · ctrl+c quit")
+		}
+		if m.step == stepReview {
+			return mutedStyle.Render("enter generate · esc back · q quit")
+		}
+		if m.isMultiStep() {
+			return mutedStyle.Render("↑↓ move · space toggle · enter next")
+		}
+		return mutedStyle.Render("↑↓ choose · enter next · esc back")
+	}
 	if m.isTextStep() {
 		return mutedStyle.Render("enter continue   esc back   ctrl+c quit")
 	}
@@ -628,4 +665,12 @@ func selectedKeys(values map[string]bool) []string {
 		}
 	}
 	return selected
+}
+
+func shorten(value string, limit int) string {
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit-1]) + "…"
 }

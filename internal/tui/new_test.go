@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 func TestFreeArgumentsUseTheStableNewCommand(t *testing.T) {
@@ -82,6 +83,20 @@ func TestPaidDefaultsIncludeBothOAuthProviders(t *testing.T) {
 	}
 }
 
+func TestMultiSelectTogglesWithoutLeavingQuestion(t *testing.T) {
+	selection := newModel()
+	selection.setStep(stepOAuth)
+
+	updated, _ := selection.Update(tea.KeyPressMsg{Text: " ", Code: ' '})
+	result := updated.(model)
+	if result.oauth["google"] || !result.oauth["github"] {
+		t.Fatalf("OAuth selection = %#v", result.oauth)
+	}
+	if result.step != stepOAuth {
+		t.Fatalf("step = %d, want OAuth", result.step)
+	}
+}
+
 func TestEscapeOnFirstQuestionCancels(t *testing.T) {
 	selection := newModel()
 	updated, command := selection.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -97,5 +112,36 @@ func TestViewExplainsThatExistingCommandGenerates(t *testing.T) {
 	view := model.View()
 	if !strings.Contains(view.Content, "existing CLI command") || !strings.Contains(view.Content, "performs the actual generation") {
 		t.Fatalf("view = %q", view.Content)
+	}
+}
+
+func TestReviewFitsStandardAndNarrowTerminals(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		width int
+	}{
+		{name: "standard", width: 80},
+		{name: "narrow", width: 40},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			selection := newModel()
+			selection.width = test.width
+			selection.height = 24
+			selection.edition = "paid"
+			selection.teams = true
+			selection.storage = true
+			selection.content["blog"] = true
+			selection.content["docs"] = true
+			selection.example = true
+			selection.setStep(stepReview)
+
+			content := selection.View().Content
+			if width := lipgloss.Width(content); width > test.width {
+				t.Fatalf("view width = %d, terminal width = %d", width, test.width)
+			}
+			if height := lipgloss.Height(content); height > 24 {
+				t.Fatalf("view height = %d, terminal height = 24", height)
+			}
+		})
 	}
 }
