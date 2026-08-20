@@ -11,6 +11,8 @@ const (
 	PathGenerate         = "/v1/generate"
 	PathActivation       = "/v1/license/activation"
 	PathActivationResend = "/v1/license/activation/resend"
+	PathAccountDelete    = "/v1/account"
+	PathLicenses         = "/v1/licenses/"
 )
 
 type ErrorResponse struct {
@@ -85,6 +87,58 @@ const (
 	LicenseRoleOwner  LicenseRole = "owner"
 	LicenseRoleMember LicenseRole = "member"
 )
+
+type LicenseMembersResponse struct {
+	Members     []LicenseMember     `json:"members"`
+	Invitations []LicenseInvitation `json:"invitations"`
+}
+
+type LicenseMember struct {
+	UserID      string      `json:"user_id"`
+	GitHubLogin string      `json:"github_login"`
+	Email       string      `json:"email"`
+	Role        LicenseRole `json:"role"`
+}
+
+type LicenseInvitation struct {
+	ID        string      `json:"id"`
+	Email     string      `json:"email"`
+	Role      LicenseRole `json:"role"`
+	ExpiresAt time.Time   `json:"expires_at"`
+}
+
+type InviteLicenseMemberRequest struct {
+	Email string      `json:"email"`
+	Role  LicenseRole `json:"role"`
+}
+
+type InviteLicenseMemberResponse struct {
+	Joined bool `json:"joined"`
+}
+
+type CreateLicenseTokenRequest struct {
+	Name string `json:"name"`
+}
+
+type CreateLicenseTokenResponse struct {
+	Token LicenseToken `json:"token"`
+	Value string       `json:"value"`
+}
+
+type LicenseTokensResponse struct {
+	Tokens []LicenseToken `json:"tokens"`
+}
+
+type LicenseToken struct {
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	RevokedAt *time.Time `json:"revoked_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+type DeleteAccountRequest struct {
+	ConfirmGitHubLogin string `json:"confirm_github_login"`
+}
 
 type GenerateRequest struct {
 	TemplateVersion string            `json:"template_version,omitempty"`

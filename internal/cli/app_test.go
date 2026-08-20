@@ -105,7 +105,7 @@ func TestWhoAmIShowsEffectiveLicense(t *testing.T) {
 	if err := app.Run(context.Background(), []string{"whoami"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "* paid  active  member") {
+	if !strings.Contains(output.String(), "* paid  paid  active  member") {
 		t.Fatalf("output = %q", output.String())
 	}
 }
@@ -134,6 +134,44 @@ func TestLogoutPreservesTokenWhenRevocationFails(t *testing.T) {
 	}
 	if store.configuration.SessionToken != "session" {
 		t.Fatalf("session token = %q, want preserved token", store.configuration.SessionToken)
+	}
+}
+
+func TestLicenseAndTokenCommandsUseExplicitLicenseIDs(t *testing.T) {
+	output := &bytes.Buffer{}
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{
+		members: api.LicenseMembersResponse{Members: []api.LicenseMember{{
+			UserID: "user-1", GitHubLogin: "developer", Email: "developer@example.com", Role: api.LicenseRoleMember,
+		}}},
+		createdToken: api.CreateLicenseTokenResponse{
+			Token: api.LicenseToken{ID: "token-1", Name: "deploy"}, Value: "gok_secret",
+		},
+	}
+	app := testApp(output, store, &fakeDevice{}, service)
+	if err := app.Run(context.Background(), []string{"license", "members", "license-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Run(context.Background(), []string{"token", "create", "license-1", "deploy"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "@developer") || !strings.Contains(output.String(), "gok_secret") || !strings.Contains(output.String(), "shown only once") {
+		t.Fatalf("output = %q", output.String())
+	}
+}
+
+func TestAccountDeleteRequiresConfirmationAndClearsLocalSession(t *testing.T) {
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{}
+	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+	if err := app.Run(context.Background(), []string{"account", "delete"}); err == nil {
+		t.Fatal("account delete accepted no confirmation")
+	}
+	if err := app.Run(context.Background(), []string{"account", "delete", "--confirm", "axadrn"}); err != nil {
+		t.Fatal(err)
+	}
+	if service.deletedAccount != "axadrn" || store.configuration.SessionToken != "" {
+		t.Fatalf("confirmation = %q, configuration = %#v", service.deletedAccount, store.configuration)
 	}
 }
 
@@ -166,6 +204,21 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "Created Acme") {
 		t.Fatalf("output = %q", output.String())
+	}
+}
+
+func TestNewUsesMachineTokenWithoutPersonalLoginOrActivation(t *testing.T) {
+	store := &memoryStore{}
+	service := &fakeService{generatedVersion: "v3.0.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
+	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+	app.MachineToken = "gok_machine"
+	if err := app.Run(context.Background(), []string{
+		"new", "--module", "example.com/acme", filepath.Join(t.TempDir(), "acme"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if service.generateToken != "gok_machine" || service.activationChecks != 0 || service.receivedGitHubToken != "" {
+		t.Fatalf("generate token = %q, activation checks = %d, GitHub token = %q", service.generateToken, service.activationChecks, service.receivedGitHubToken)
 	}
 }
 
@@ -305,6 +358,13 @@ type fakeService struct {
 	activationUnavailable    bool
 	activationResendRequired bool
 	activationResent         bool
+	members                  api.LicenseMembersResponse
+	tokens                   api.LicenseTokensResponse
+	createdToken             api.CreateLicenseTokenResponse
+	invited                  api.InviteLicenseMemberResponse
+	removedMember            string
+	revokedToken             string
+	deletedAccount           string
 }
 
 func (s *fakeService) LoginWithGitHub(_ context.Context, token string) (api.GitHubLoginResponse, error) {
@@ -349,6 +409,37 @@ func (s *fakeService) ResendActivation(context.Context, string) (api.ActivationS
 	s.activationUnavailable = false
 	s.activationResendRequired = false
 	return api.ActivationStatusResponse{State: api.ActivationStatePending}, nil
+}
+
+func (s *fakeService) LicenseMembers(context.Context, string, string) (api.LicenseMembersResponse, error) {
+	return s.members, nil
+}
+
+func (s *fakeService) InviteLicenseMember(context.Context, string, string, api.InviteLicenseMemberRequest) (api.InviteLicenseMemberResponse, error) {
+	return s.invited, nil
+}
+
+func (s *fakeService) RemoveLicenseMember(_ context.Context, _ string, _ string, userID string) error {
+	s.removedMember = userID
+	return nil
+}
+
+func (s *fakeService) CreateLicenseToken(context.Context, string, string, string) (api.CreateLicenseTokenResponse, error) {
+	return s.createdToken, nil
+}
+
+func (s *fakeService) LicenseTokens(context.Context, string, string) (api.LicenseTokensResponse, error) {
+	return s.tokens, nil
+}
+
+func (s *fakeService) RevokeLicenseToken(_ context.Context, _ string, _ string, tokenID string) error {
+	s.revokedToken = tokenID
+	return nil
+}
+
+func (s *fakeService) DeleteAccount(_ context.Context, _ string, confirmation string) error {
+	s.deletedAccount = confirmation
+	return nil
 }
 
 func cliTestArchive(t *testing.T, name, content string) []byte {

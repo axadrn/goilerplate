@@ -93,6 +93,63 @@ func TestClientRejectsInsecureRemoteURL(t *testing.T) {
 	}
 }
 
+func TestClientLicenseManagementPaths(t *testing.T) {
+	requests := make([]string, 0)
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer personal-session" {
+			t.Fatalf("Authorization = %q", request.Header.Get("Authorization"))
+		}
+		requests = append(requests, request.Method+" "+request.URL.Path)
+		response.Header().Set("Content-Type", "application/json")
+		switch request.Method + " " + request.URL.Path {
+		case "GET /v1/licenses/license-1/members":
+			json.NewEncoder(response).Encode(api.LicenseMembersResponse{})
+		case "POST /v1/licenses/license-1/invitations":
+			json.NewEncoder(response).Encode(api.InviteLicenseMemberResponse{})
+		case "POST /v1/licenses/license-1/tokens":
+			json.NewEncoder(response).Encode(api.CreateLicenseTokenResponse{Value: "gok_secret"})
+		case "GET /v1/licenses/license-1/tokens":
+			json.NewEncoder(response).Encode(api.LicenseTokensResponse{})
+		case "DELETE /v1/licenses/license-1/access/user-1",
+			"DELETE /v1/licenses/license-1/tokens/token-1",
+			"DELETE /v1/account":
+			response.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(response, request)
+		}
+	}))
+	t.Cleanup(server.Close)
+	client, err := NewClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if _, err := client.LicenseMembers(ctx, "personal-session", "license-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.InviteLicenseMember(ctx, "personal-session", "license-1", api.InviteLicenseMemberRequest{Email: "dev@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.RemoveLicenseMember(ctx, "personal-session", "license-1", "user-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.CreateLicenseToken(ctx, "personal-session", "license-1", "deploy"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.LicenseTokens(ctx, "personal-session", "license-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.RevokeLicenseToken(ctx, "personal-session", "license-1", "token-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.DeleteAccount(ctx, "personal-session", "axadrn"); err != nil {
+		t.Fatal(err)
+	}
+	if len(requests) != 7 {
+		t.Fatalf("requests = %#v", requests)
+	}
+}
+
 func TestClientBoundsAndReportsErrors(t *testing.T) {
 	t.Run("API error", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
