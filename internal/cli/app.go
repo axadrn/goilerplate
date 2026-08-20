@@ -37,6 +37,7 @@ type ServiceClient interface {
 	RevokeLicenseToken(context.Context, string, string, string) error
 	DeleteAccount(context.Context, string, string) error
 	Generate(context.Context, string, api.GenerateRequest, io.Writer) (string, error)
+	UpdateTree(context.Context, string, api.GenerateRequest, io.Writer) (string, error)
 }
 
 type App struct {
@@ -48,6 +49,7 @@ type App struct {
 	DefaultAPIURL          string
 	MachineToken           string
 	Version                string
+	WorkingDirectory       string
 	ActivationPollInterval time.Duration
 }
 
@@ -78,6 +80,8 @@ func (a *App) Run(ctx context.Context, arguments []string) error {
 	switch arguments[0] {
 	case "new":
 		return a.newProject(ctx, arguments[1:])
+	case "update":
+		return a.updateProject(ctx, arguments[1:])
 	case "login":
 		return a.login(ctx, arguments[1:])
 	case "whoami":
@@ -232,6 +236,7 @@ func (a *App) printUsage() {
 	fmt.Fprintln(a.Out)
 	fmt.Fprintln(a.Out, "Commands:")
 	fmt.Fprintln(a.Out, "  new      Generate a new project")
+	fmt.Fprintln(a.Out, "  update   Update a generated project on a new Git branch")
 	fmt.Fprintln(a.Out, "  login    Sign in with GitHub")
 	fmt.Fprintln(a.Out, "  activation resend  Send a new Free activation email")
 	fmt.Fprintln(a.Out, "  whoami   Show the current account and licenses")

@@ -9,6 +9,7 @@ const (
 	PathLogout           = "/v1/auth/logout"
 	PathWhoAmI           = "/v1/account"
 	PathGenerate         = "/v1/generate"
+	PathUpdate           = "/v1/update"
 	PathActivation       = "/v1/license/activation"
 	PathActivationResend = "/v1/license/activation/resend"
 	PathAccountDelete    = "/v1/account"
@@ -142,6 +143,14 @@ type DeleteAccountRequest struct {
 
 type GenerateRequest struct {
 	TemplateVersion string            `json:"template_version,omitempty"`
+	Answers         GenerationAnswers `json:"answers"`
+}
+
+const LockSchemaVersion = 1
+
+type ProjectLock struct {
+	SchemaVersion   int               `json:"schema_version"`
+	TemplateVersion string            `json:"template_version"`
 	Answers         GenerationAnswers `json:"answers"`
 }
 
