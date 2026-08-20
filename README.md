@@ -11,6 +11,7 @@ goilerplate login
 goilerplate whoami
 goilerplate activation resend
 goilerplate new --module example.com/acme ./acme
+goilerplate update
 goilerplate logout
 ```
 
@@ -67,4 +68,34 @@ Paid selections stay explicit and composable:
 goilerplate new --edition paid --module example.com/acme --database postgres --teams --oauth google,github ./acme
 ```
 
-The update command, interactive interface, and release installation flow will land in later packages.
+## Update an existing project
+
+Run this inside a generated project:
+
+```text
+goilerplate update
+```
+
+The short version:
+
+1. Your project contains `goilerplate.lock`. It says which template version and answers created the project.
+2. goilerplate downloads that old generated tree and the newest generated tree.
+3. Git compares the old tree, your current project, and the new tree.
+4. goilerplate creates a new branch such as `goilerplate-update-v3.1.0`.
+5. Your current branch and working files stay untouched.
+
+If Git finds no conflicts, switch to the new branch and review it. If Git finds conflicts, the new branch contains normal conflict markers. Resolve them exactly like any other Git merge.
+
+```text
+git switch goilerplate-update-v3.1.0
+```
+
+To abandon the update, stay on your original branch and delete the update branch.
+
+```text
+git branch -D goilerplate-update-v3.1.0
+```
+
+`goilerplate update` requires a clean Git worktree and Paid license access. Your source code never leaves your machine. The service receives only the answers already stored in `goilerplate.lock` and returns generated template trees.
+
+The interactive interface and release installation flow will land in later packages.

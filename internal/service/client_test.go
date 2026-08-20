@@ -216,6 +216,38 @@ func TestClientDownloadsGeneratedProject(t *testing.T) {
 	}
 }
 
+func TestClientDownloadsUpdateTree(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != api.PathUpdate || r.Method != http.MethodPost {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		var request api.GenerateRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if request.TemplateVersion != "v3.0.0" {
+			t.Fatalf("request = %#v", request)
+		}
+		w.Header().Set("X-Goilerplate-Version", "v3.0.0")
+		_, _ = w.Write([]byte("old-tree"))
+	}))
+	t.Cleanup(server.Close)
+	client, err := NewClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var destination bytes.Buffer
+	version, err := client.UpdateTree(context.Background(), "session-token", api.GenerateRequest{
+		TemplateVersion: "v3.0.0",
+	}, &destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != "v3.0.0" || destination.String() != "old-tree" {
+		t.Fatalf("version = %q, archive = %q", version, destination.String())
+	}
+}
+
 func TestClientRejectsGeneratedProjectWithoutVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte("archive-bytes"))

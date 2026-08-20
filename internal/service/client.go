@@ -161,6 +161,25 @@ func (c *Client) Generate(
 	requestBody api.GenerateRequest,
 	destination io.Writer,
 ) (string, error) {
+	return c.downloadProject(ctx, api.PathGenerate, sessionToken, requestBody, destination)
+}
+
+func (c *Client) UpdateTree(
+	ctx context.Context,
+	sessionToken string,
+	requestBody api.GenerateRequest,
+	destination io.Writer,
+) (string, error) {
+	return c.downloadProject(ctx, api.PathUpdate, sessionToken, requestBody, destination)
+}
+
+func (c *Client) downloadProject(
+	ctx context.Context,
+	requestPath string,
+	sessionToken string,
+	requestBody api.GenerateRequest,
+	destination io.Writer,
+) (string, error) {
 	if strings.TrimSpace(sessionToken) == "" {
 		return "", errors.New("goilerplate session token is required")
 	}
@@ -168,7 +187,7 @@ func (c *Client) Generate(
 	if err != nil {
 		return "", fmt.Errorf("encode generation request: %w", err)
 	}
-	endpoint := c.baseURL.ResolveReference(&url.URL{Path: api.PathGenerate})
+	endpoint := c.baseURL.ResolveReference(&url.URL{Path: requestPath})
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(encoded))
 	if err != nil {
 		return "", err

@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -236,6 +238,62 @@ func TestNewRejectsPaidModulesForFreeBeforeCallingService(t *testing.T) {
 	}
 }
 
+func TestUpdateCreatesGitBranchFromLockedAnswers(t *testing.T) {
+	lock := api.ProjectLock{
+		SchemaVersion:   api.LockSchemaVersion,
+		TemplateVersion: "v3.0.0",
+		Answers: api.GenerationAnswers{
+			ProjectName: "Acme", ModulePath: "example.com/acme", Edition: "paid",
+			Framework: "htmx", Database: "sqlite", Payment: "stripe", Mail: "smtp",
+		},
+	}
+	lockBytes, err := json.MarshalIndent(lock, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockBytes = append(lockBytes, '\n')
+	oldFiles := map[string]string{"app.txt": "old\n", "goilerplate.lock": string(lockBytes)}
+	repository := t.TempDir()
+	writeCLIFiles(t, repository, oldFiles)
+	runCLIGit(t, repository, "init", "-b", "main")
+	runCLIGit(t, repository, "config", "user.name", "Test User")
+	runCLIGit(t, repository, "config", "user.email", "test@example.com")
+	runCLIGit(t, repository, "add", ".")
+	runCLIGit(t, repository, "commit", "-m", "Generated project")
+
+	newLock := lock
+	newLock.TemplateVersion = "v3.1.0"
+	newLockBytes, err := json.MarshalIndent(newLock, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	newLockBytes = append(newLockBytes, '\n')
+	service := &fakeService{
+		oldUpdateArchive: cliTestArchiveFiles(t, oldFiles),
+		newUpdateArchive: cliTestArchiveFiles(t, map[string]string{"app.txt": "new\n", "goilerplate.lock": string(newLockBytes)}),
+		updateVersion:    "v3.1.0",
+	}
+	output := &bytes.Buffer{}
+	app := testApp(output, &memoryStore{configuration: config.Config{SessionToken: "session"}}, &fakeDevice{}, service)
+	app.WorkingDirectory = repository
+
+	if err := app.Run(context.Background(), []string{"update"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(service.updateRequests) != 2 || service.updateRequests[0].TemplateVersion != "v3.0.0" || service.updateRequests[1].TemplateVersion != "" {
+		t.Fatalf("update requests = %#v", service.updateRequests)
+	}
+	if content := runCLIGit(t, repository, "show", "goilerplate-update-v3.1.0:app.txt"); content != "new\n" {
+		t.Fatalf("updated app = %q", content)
+	}
+	if branch := strings.TrimSpace(runCLIGit(t, repository, "branch", "--show-current")); branch != "main" {
+		t.Fatalf("current branch = %q", branch)
+	}
+	if !strings.Contains(output.String(), "Created goilerplate-update-v3.1.0") {
+		t.Fatalf("output = %q", output.String())
+	}
+}
+
 func TestNewResumesPendingFreeActivation(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
@@ -352,6 +410,10 @@ type fakeService struct {
 	generateToken            string
 	generatedVersion         string
 	archive                  []byte
+	oldUpdateArchive         []byte
+	newUpdateArchive         []byte
+	updateVersion            string
+	updateRequests           []api.GenerateRequest
 	generateCalled           bool
 	activationChecks         int
 	activationActiveAfter    int
@@ -389,6 +451,21 @@ func (s *fakeService) Generate(_ context.Context, token string, request api.Gene
 		return "", err
 	}
 	return s.generatedVersion, nil
+}
+
+func (s *fakeService) UpdateTree(_ context.Context, token string, request api.GenerateRequest, destination io.Writer) (string, error) {
+	s.generateToken = token
+	s.updateRequests = append(s.updateRequests, request)
+	archive := s.newUpdateArchive
+	version := s.updateVersion
+	if request.TemplateVersion != "" {
+		archive = s.oldUpdateArchive
+		version = request.TemplateVersion
+	}
+	if _, err := destination.Write(archive); err != nil {
+		return "", err
+	}
+	return version, nil
 }
 
 func (s *fakeService) ActivationStatus(context.Context, string) (api.ActivationStatusResponse, error) {
@@ -443,15 +520,21 @@ func (s *fakeService) DeleteAccount(_ context.Context, _ string, confirmation st
 }
 
 func cliTestArchive(t *testing.T, name, content string) []byte {
+	return cliTestArchiveFiles(t, map[string]string{name: content})
+}
+
+func cliTestArchiveFiles(t *testing.T, files map[string]string) []byte {
 	t.Helper()
 	var archive bytes.Buffer
 	gzipWriter := gzip.NewWriter(&archive)
 	tarWriter := tar.NewWriter(gzipWriter)
-	if err := tarWriter.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(content)), Typeflag: tar.TypeReg}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tarWriter.Write([]byte(content)); err != nil {
-		t.Fatal(err)
+	for name, content := range files {
+		if err := tarWriter.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(content)), Typeflag: tar.TypeReg}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tarWriter.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := tarWriter.Close(); err != nil {
 		t.Fatal(err)
@@ -460,4 +543,28 @@ func cliTestArchive(t *testing.T, name, content string) []byte {
 		t.Fatal(err)
 	}
 	return archive.Bytes()
+}
+
+func writeCLIFiles(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for name, content := range files {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func runCLIGit(t *testing.T, directory string, arguments ...string) string {
+	t.Helper()
+	command := exec.Command("git", arguments...)
+	command.Dir = directory
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), err, output)
+	}
+	return string(output)
 }
