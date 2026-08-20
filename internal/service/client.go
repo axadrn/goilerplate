@@ -101,6 +101,60 @@ func (c *Client) ResendActivation(ctx context.Context, sessionToken string) (api
 	return response, nil
 }
 
+func (c *Client) LicenseMembers(ctx context.Context, sessionToken, licenseID string) (api.LicenseMembersResponse, error) {
+	var response api.LicenseMembersResponse
+	path := licensePath(licenseID) + "/members"
+	if err := c.doJSON(ctx, http.MethodGet, path, sessionToken, nil, &response); err != nil {
+		return api.LicenseMembersResponse{}, err
+	}
+	return response, nil
+}
+
+func (c *Client) InviteLicenseMember(ctx context.Context, sessionToken, licenseID string, request api.InviteLicenseMemberRequest) (api.InviteLicenseMemberResponse, error) {
+	var response api.InviteLicenseMemberResponse
+	path := licensePath(licenseID) + "/invitations"
+	if err := c.doJSON(ctx, http.MethodPost, path, sessionToken, request, &response); err != nil {
+		return api.InviteLicenseMemberResponse{}, err
+	}
+	return response, nil
+}
+
+func (c *Client) RemoveLicenseMember(ctx context.Context, sessionToken, licenseID, userID string) error {
+	path := licensePath(licenseID) + "/access/" + url.PathEscape(userID)
+	return c.doJSON(ctx, http.MethodDelete, path, sessionToken, nil, nil)
+}
+
+func (c *Client) CreateLicenseToken(ctx context.Context, sessionToken, licenseID, name string) (api.CreateLicenseTokenResponse, error) {
+	var response api.CreateLicenseTokenResponse
+	path := licensePath(licenseID) + "/tokens"
+	if err := c.doJSON(ctx, http.MethodPost, path, sessionToken, api.CreateLicenseTokenRequest{Name: name}, &response); err != nil {
+		return api.CreateLicenseTokenResponse{}, err
+	}
+	return response, nil
+}
+
+func (c *Client) LicenseTokens(ctx context.Context, sessionToken, licenseID string) (api.LicenseTokensResponse, error) {
+	var response api.LicenseTokensResponse
+	path := licensePath(licenseID) + "/tokens"
+	if err := c.doJSON(ctx, http.MethodGet, path, sessionToken, nil, &response); err != nil {
+		return api.LicenseTokensResponse{}, err
+	}
+	return response, nil
+}
+
+func (c *Client) RevokeLicenseToken(ctx context.Context, sessionToken, licenseID, tokenID string) error {
+	path := licensePath(licenseID) + "/tokens/" + url.PathEscape(tokenID)
+	return c.doJSON(ctx, http.MethodDelete, path, sessionToken, nil, nil)
+}
+
+func (c *Client) DeleteAccount(ctx context.Context, sessionToken, confirmation string) error {
+	return c.doJSON(ctx, http.MethodDelete, api.PathAccountDelete, sessionToken, api.DeleteAccountRequest{ConfirmGitHubLogin: confirmation}, nil)
+}
+
+func licensePath(licenseID string) string {
+	return api.PathLicenses + url.PathEscape(strings.TrimSpace(licenseID))
+}
+
 func (c *Client) Generate(
 	ctx context.Context,
 	sessionToken string,

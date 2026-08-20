@@ -49,6 +49,7 @@ func run(ctx context.Context) error {
 		Device:         github.NewDeviceClient(httpClient),
 		GitHubClientID: clientID,
 		DefaultAPIURL:  apiURL,
+		MachineToken:   strings.TrimSpace(os.Getenv("GOILERPLATE_TOKEN")),
 		Version:        version,
 		NewService: func(baseURL string) (cli.ServiceClient, error) {
 			return service.NewClient(baseURL, httpClient)
