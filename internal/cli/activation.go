@@ -9,7 +9,8 @@ import (
 	"github.com/axadrn/goilerplate/api"
 )
 
-var errActivationUnavailable = errors.New("Free activation is not pending. Run goilerplate activation resend")
+var errActivationResendRequired = errors.New("Free activation needs a new email. Run goilerplate activation resend")
+var errActivationUnavailable = errors.New("no active license is available for this account")
 
 func (a *App) waitForActivation(ctx context.Context, client ServiceClient, sessionToken string) error {
 	interval := a.ActivationPollInterval
@@ -27,6 +28,8 @@ func (a *App) waitForActivation(ctx context.Context, client ServiceClient, sessi
 		case api.ActivationStateActive:
 			return nil
 		case api.ActivationStatePending:
+		case api.ActivationStateResendRequired:
+			return errActivationResendRequired
 		case api.ActivationStateUnavailable:
 			return errActivationUnavailable
 		default:
@@ -68,6 +71,8 @@ func (a *App) activation(ctx context.Context, arguments []string) error {
 		fmt.Fprintln(a.Out, "Free access is already active")
 		return nil
 	case api.ActivationStatePending:
+	case api.ActivationStateResendRequired:
+		return errActivationResendRequired
 	case api.ActivationStateUnavailable:
 		return errActivationUnavailable
 	default:

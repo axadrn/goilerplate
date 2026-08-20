@@ -36,9 +36,10 @@ type ActivationStatusResponse struct {
 type ActivationState string
 
 const (
-	ActivationStatePending     ActivationState = "pending"
-	ActivationStateActive      ActivationState = "active"
-	ActivationStateUnavailable ActivationState = "unavailable"
+	ActivationStatePending        ActivationState = "pending"
+	ActivationStateActive         ActivationState = "active"
+	ActivationStateResendRequired ActivationState = "resend_required"
+	ActivationStateUnavailable    ActivationState = "unavailable"
 )
 
 type WhoAmIResponse struct {

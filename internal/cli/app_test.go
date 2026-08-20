@@ -217,6 +217,17 @@ func TestNewDoesNotWaitWithoutPendingActivation(t *testing.T) {
 	}
 }
 
+func TestNewGuidesExpiredActivationToResend(t *testing.T) {
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{activationResendRequired: true}
+	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+
+	err := app.Run(context.Background(), []string{"new", "--module", "example.com/acme", filepath.Join(t.TempDir(), "acme")})
+	if !errors.Is(err, errActivationResendRequired) {
+		t.Fatalf("new error = %v, want resend guidance", err)
+	}
+}
+
 func TestActivationResendSendsAndWaits(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
@@ -279,20 +290,21 @@ func (d *fakeDevice) Wait(context.Context, string, github.DeviceAuthorization) (
 }
 
 type fakeService struct {
-	login                 api.GitHubLoginResponse
-	who                   api.WhoAmIResponse
-	receivedGitHubToken   string
-	loggedOut             bool
-	logoutError           error
-	generateRequest       api.GenerateRequest
-	generateToken         string
-	generatedVersion      string
-	archive               []byte
-	generateCalled        bool
-	activationChecks      int
-	activationActiveAfter int
-	activationUnavailable bool
-	activationResent      bool
+	login                    api.GitHubLoginResponse
+	who                      api.WhoAmIResponse
+	receivedGitHubToken      string
+	loggedOut                bool
+	logoutError              error
+	generateRequest          api.GenerateRequest
+	generateToken            string
+	generatedVersion         string
+	archive                  []byte
+	generateCalled           bool
+	activationChecks         int
+	activationActiveAfter    int
+	activationUnavailable    bool
+	activationResendRequired bool
+	activationResent         bool
 }
 
 func (s *fakeService) LoginWithGitHub(_ context.Context, token string) (api.GitHubLoginResponse, error) {
@@ -324,6 +336,8 @@ func (s *fakeService) ActivationStatus(context.Context, string) (api.ActivationS
 	state := api.ActivationStatePending
 	if s.activationUnavailable {
 		state = api.ActivationStateUnavailable
+	} else if s.activationResendRequired {
+		state = api.ActivationStateResendRequired
 	} else if s.activationActiveAfter == 0 || s.activationChecks >= s.activationActiveAfter {
 		state = api.ActivationStateActive
 	}
@@ -333,6 +347,7 @@ func (s *fakeService) ActivationStatus(context.Context, string) (api.ActivationS
 func (s *fakeService) ResendActivation(context.Context, string) (api.ActivationStatusResponse, error) {
 	s.activationResent = true
 	s.activationUnavailable = false
+	s.activationResendRequired = false
 	return api.ActivationStatusResponse{State: api.ActivationStatePending}, nil
 }
 

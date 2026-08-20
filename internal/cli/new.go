@@ -99,6 +99,8 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 			return err
 		}
 		fmt.Fprintln(a.Out, "Free access activated")
+	case api.ActivationStateResendRequired:
+		return errActivationResendRequired
 	case api.ActivationStateUnavailable:
 		return errActivationUnavailable
 	default:
