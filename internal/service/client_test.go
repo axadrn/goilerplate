@@ -38,6 +38,11 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 				Licenses:           []api.License{{ID: "license-1", Tier: api.LicenseTierPaid, Status: api.LicenseStatusActive, Role: api.LicenseRoleOwner}},
 				EffectiveLicenseID: "license-1",
 			})
+		case api.PathActivation:
+			if request.Header.Get("Authorization") != "Bearer session-token" {
+				t.Fatalf("Authorization = %q", request.Header.Get("Authorization"))
+			}
+			json.NewEncoder(response).Encode(api.ActivationStatusResponse{Active: true})
 		case api.PathLogout:
 			if request.Header.Get("Authorization") != "Bearer session-token" {
 				t.Fatalf("Authorization = %q", request.Header.Get("Authorization"))
@@ -63,6 +68,10 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 	}
 	if who.Account.GitHubLogin != "axadrn" || who.EffectiveLicenseID != "license-1" {
 		t.Fatalf("whoami = %#v", who)
+	}
+	activation, err := client.ActivationStatus(context.Background(), login.SessionToken)
+	if err != nil || !activation.Active {
+		t.Fatalf("activation = %#v, %v", activation, err)
 	}
 	if err := client.Logout(context.Background(), login.SessionToken); err != nil {
 		t.Fatal(err)

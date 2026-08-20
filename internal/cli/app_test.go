@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/axadrn/goilerplate/api"
 	"github.com/axadrn/goilerplate/internal/config"
@@ -40,6 +41,31 @@ func TestLoginStoresOnlyGoilerplateSession(t *testing.T) {
 	}
 	if strings.Contains(output.String(), "temporary-github-token") || strings.Contains(output.String(), "goilerplate-session") {
 		t.Fatalf("secret appeared in output: %q", output.String())
+	}
+}
+
+func TestLoginWaitsForFreeActivation(t *testing.T) {
+	output := &bytes.Buffer{}
+	store := &memoryStore{}
+	service := &fakeService{
+		login: api.GitHubLoginResponse{
+			SessionToken:       "goilerplate-session",
+			Account:            api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
+			ActivationRequired: true,
+		},
+		activationActiveAfter: 2,
+	}
+	app := testApp(output, store, &fakeDevice{githubToken: "temporary-github-token"}, service)
+	app.ActivationPollInterval = time.Millisecond
+
+	if err := app.Run(context.Background(), []string{"login"}); err != nil {
+		t.Fatal(err)
+	}
+	if service.activationChecks != 2 {
+		t.Fatalf("activation checks = %d, want 2", service.activationChecks)
+	}
+	if !strings.Contains(output.String(), "Free access activated") {
+		t.Fatalf("output = %q", output.String())
 	}
 }
 
@@ -201,16 +227,18 @@ func (d *fakeDevice) Wait(context.Context, string, github.DeviceAuthorization) (
 }
 
 type fakeService struct {
-	login               api.GitHubLoginResponse
-	who                 api.WhoAmIResponse
-	receivedGitHubToken string
-	loggedOut           bool
-	logoutError         error
-	generateRequest     api.GenerateRequest
-	generateToken       string
-	generatedVersion    string
-	archive             []byte
-	generateCalled      bool
+	login                 api.GitHubLoginResponse
+	who                   api.WhoAmIResponse
+	receivedGitHubToken   string
+	loggedOut             bool
+	logoutError           error
+	generateRequest       api.GenerateRequest
+	generateToken         string
+	generatedVersion      string
+	archive               []byte
+	generateCalled        bool
+	activationChecks      int
+	activationActiveAfter int
 }
 
 func (s *fakeService) LoginWithGitHub(_ context.Context, token string) (api.GitHubLoginResponse, error) {
@@ -235,6 +263,11 @@ func (s *fakeService) Generate(_ context.Context, token string, request api.Gene
 		return "", err
 	}
 	return s.generatedVersion, nil
+}
+
+func (s *fakeService) ActivationStatus(context.Context, string) (api.ActivationStatusResponse, error) {
+	s.activationChecks++
+	return api.ActivationStatusResponse{Active: s.activationChecks >= s.activationActiveAfter}, nil
 }
 
 func cliTestArchive(t *testing.T, name, content string) []byte {

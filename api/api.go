@@ -9,6 +9,7 @@ const (
 	PathLogout      = "/v1/auth/logout"
 	PathWhoAmI      = "/v1/account"
 	PathGenerate    = "/v1/generate"
+	PathActivation  = "/v1/license/activation"
 )
 
 type ErrorResponse struct {
@@ -21,9 +22,14 @@ type GitHubLoginRequest struct {
 }
 
 type GitHubLoginResponse struct {
-	SessionToken string    `json:"session_token"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	Account      Account   `json:"account"`
+	SessionToken       string    `json:"session_token"`
+	ExpiresAt          time.Time `json:"expires_at"`
+	Account            Account   `json:"account"`
+	ActivationRequired bool      `json:"activation_required"`
+}
+
+type ActivationStatusResponse struct {
+	Active bool `json:"active"`
 }
 
 type WhoAmIResponse struct {

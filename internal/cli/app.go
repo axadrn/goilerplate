@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/axadrn/goilerplate/api"
 	"github.com/axadrn/goilerplate/internal/config"
@@ -26,17 +27,19 @@ type ServiceClient interface {
 	LoginWithGitHub(context.Context, string) (api.GitHubLoginResponse, error)
 	WhoAmI(context.Context, string) (api.WhoAmIResponse, error)
 	Logout(context.Context, string) error
+	ActivationStatus(context.Context, string) (api.ActivationStatusResponse, error)
 	Generate(context.Context, string, api.GenerateRequest, io.Writer) (string, error)
 }
 
 type App struct {
-	Out            io.Writer
-	Store          ConfigStore
-	Device         DeviceAuthorizer
-	NewService     func(string) (ServiceClient, error)
-	GitHubClientID string
-	DefaultAPIURL  string
-	Version        string
+	Out                    io.Writer
+	Store                  ConfigStore
+	Device                 DeviceAuthorizer
+	NewService             func(string) (ServiceClient, error)
+	GitHubClientID         string
+	DefaultAPIURL          string
+	Version                string
+	ActivationPollInterval time.Duration
 }
 
 func (a *App) Run(ctx context.Context, arguments []string) error {
@@ -100,6 +103,13 @@ func (a *App) login(ctx context.Context, arguments []string) error {
 	if err := a.Store.Save(configuration); err != nil {
 		_ = client.Logout(ctx, login.SessionToken)
 		return err
+	}
+	if login.ActivationRequired {
+		fmt.Fprintln(a.Out, "Check your email to activate Free access. Waiting for confirmation...")
+		if err := a.waitForActivation(ctx, client, login.SessionToken); err != nil {
+			return err
+		}
+		fmt.Fprintln(a.Out, "Free access activated")
 	}
 	fmt.Fprintf(a.Out, "Signed in as @%s\n", login.Account.GitHubLogin)
 	return nil
