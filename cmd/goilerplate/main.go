@@ -15,6 +15,7 @@ import (
 	"github.com/axadrn/goilerplate/internal/github"
 	"github.com/axadrn/goilerplate/internal/service"
 	"github.com/axadrn/goilerplate/internal/tui"
+	"github.com/charmbracelet/x/term"
 )
 
 var (
@@ -69,6 +70,5 @@ func run(ctx context.Context) error {
 }
 
 func isTerminal(file *os.File) bool {
-	info, err := file.Stat()
-	return err == nil && info.Mode()&os.ModeCharDevice != 0
+	return term.IsTerminal(file.Fd())
 }

@@ -127,6 +127,9 @@ func TestReviewFitsStandardAndNarrowTerminals(t *testing.T) {
 			selection := newModel()
 			selection.width = test.width
 			selection.height = 24
+			selection.inputs[0].SetValue(strings.Repeat("d", 240))
+			selection.inputs[1].SetValue(strings.Repeat("m", 240))
+			selection.inputs[2].SetValue(strings.Repeat("n", 100))
 			selection.edition = "paid"
 			selection.teams = true
 			selection.storage = true
@@ -143,6 +146,46 @@ func TestReviewFitsStandardAndNarrowTerminals(t *testing.T) {
 				t.Fatalf("view height = %d, terminal height = 24", height)
 			}
 		})
+	}
+}
+
+func TestWideSummaryFitsWithMaximumInputLengths(t *testing.T) {
+	selection := newModel()
+	selection.width = 100
+	selection.height = 24
+	selection.inputs[0].SetValue(strings.Repeat("d", 240))
+	selection.inputs[1].SetValue(strings.Repeat("m", 240))
+	selection.inputs[2].SetValue(strings.Repeat("n", 100))
+	selection.edition = "paid"
+	selection.teams = true
+	selection.storage = true
+	selection.content["blog"] = true
+	selection.content["docs"] = true
+	selection.example = true
+	selection.setStep(stepExample)
+
+	content := selection.View().Content
+	if width := lipgloss.Width(content); width > 100 {
+		t.Fatalf("view width = %d, terminal width = 100", width)
+	}
+	if height := lipgloss.Height(content); height > 24 {
+		t.Fatalf("view height = %d, terminal height = 24", height)
+	}
+}
+
+func TestBackgroundMessageSelectsReadableLightTheme(t *testing.T) {
+	selection := newModel()
+	darkBrand := selection.styles.brand.Render("goilerplate")
+
+	updated, _ := selection.Update(tea.BackgroundColorMsg{Color: lipgloss.Color("#FFFFFF")})
+	light := updated.(model)
+	lightBrand := light.styles.brand.Render("goilerplate")
+
+	if darkBrand == lightBrand {
+		t.Fatal("light background kept the dark-terminal accent palette")
+	}
+	if value := light.styles.value.Render("Value"); value != "Value" {
+		t.Fatalf("value style overrides the terminal foreground: %q", value)
 	}
 }
 

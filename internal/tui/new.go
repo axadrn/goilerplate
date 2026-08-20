@@ -38,6 +38,17 @@ type option struct {
 	value       string
 }
 
+type styles struct {
+	title   lipgloss.Style
+	brand   lipgloss.Style
+	label   lipgloss.Style
+	muted   lipgloss.Style
+	value   lipgloss.Style
+	success lipgloss.Style
+	active  lipgloss.Style
+	panel   lipgloss.Style
+}
+
 type model struct {
 	step      step
 	inputs    [3]textinput.Model
@@ -55,31 +66,36 @@ type model struct {
 	example   bool
 	submitted bool
 	cancelled bool
+	styles    styles
 }
 
-var (
-	purple = lipgloss.Color("#8B5CF6")
-	cyan   = lipgloss.Color("#22D3EE")
-	green  = lipgloss.Color("#34D399")
-	white  = lipgloss.Color("#FAFAFA")
-	muted  = lipgloss.Color("#71717A")
-	border = lipgloss.Color("#3F3F46")
+func newStyles(isDark bool) styles {
+	color := lipgloss.LightDark(isDark)
+	muted := color(lipgloss.Color("#52525B"), lipgloss.Color("#A1A1AA"))
+	purple := color(lipgloss.Color("#6D28D9"), lipgloss.Color("#A78BFA"))
+	cyan := color(lipgloss.Color("#0369A1"), lipgloss.Color("#67E8F9"))
+	green := color(lipgloss.Color("#047857"), lipgloss.Color("#34D399"))
+	border := color(lipgloss.Color("#A1A1AA"), lipgloss.Color("#52525B"))
+	activeText := color(lipgloss.Color("#4C1D95"), lipgloss.Color("#FAFAFA"))
+	activeBackground := color(lipgloss.Color("#EDE9FE"), lipgloss.Color("#312E81"))
 
-	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(white)
-	brandStyle  = lipgloss.NewStyle().Bold(true).Foreground(purple)
-	labelStyle  = lipgloss.NewStyle().Bold(true).Foreground(cyan)
-	mutedStyle  = lipgloss.NewStyle().Foreground(muted)
-	valueStyle  = lipgloss.NewStyle().Foreground(white)
-	greenStyle  = lipgloss.NewStyle().Foreground(green)
-	activeStyle = lipgloss.NewStyle().
-			Foreground(white).
-			Background(lipgloss.Color("#312E81")).
-			Padding(0, 1)
-	panelStyle = lipgloss.NewStyle().
+	return styles{
+		title:   lipgloss.NewStyle().Bold(true),
+		brand:   lipgloss.NewStyle().Bold(true).Foreground(purple),
+		label:   lipgloss.NewStyle().Bold(true).Foreground(cyan),
+		muted:   lipgloss.NewStyle().Foreground(muted),
+		value:   lipgloss.NewStyle(),
+		success: lipgloss.NewStyle().Foreground(green),
+		active: lipgloss.NewStyle().
+			Foreground(activeText).
+			Background(activeBackground).
+			Padding(0, 1),
+		panel: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(border).
-			Padding(1, 2)
-)
+			Padding(1, 2),
+	}
+}
 
 func Run(ctx context.Context, input io.Reader, output io.Writer) ([]string, error) {
 	program := tea.NewProgram(
@@ -135,15 +151,23 @@ func newModel() model {
 		mail:     "smtp",
 		oauth:    map[string]bool{"google": true, "github": true},
 		content:  map[string]bool{},
+		styles:   newStyles(true),
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(textinput.Blink, tea.RequestBackgroundColor)
 }
 
 func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch message := message.(type) {
+	case tea.BackgroundColorMsg:
+		isDark := message.IsDark()
+		m.styles = newStyles(isDark)
+		for index := range m.inputs {
+			m.inputs[index].SetStyles(textinput.DefaultStyles(isDark))
+		}
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = message.Width
 		m.height = message.Height
@@ -217,25 +241,25 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() tea.View {
 	if m.width < 40 || m.height < 20 {
 		view := tea.NewView(strings.Join([]string{
-			brandStyle.Render("goilerplate"),
+			m.styles.brand.Render("goilerplate"),
 			"",
 			"Terminal too small.",
 			"Resize to at least 40 × 20.",
 			"",
-			mutedStyle.Render("ctrl+c quit"),
+			m.styles.muted.Render("ctrl+c quit"),
 		}, "\n"))
 		view.AltScreen = true
 		view.WindowTitle = "goilerplate new"
 		return view
 	}
 	contentWidth := min(96, max(36, m.width-4))
-	header := brandStyle.Render("goilerplate") + "  " + mutedStyle.Render("NEW PROJECT")
-	progress := mutedStyle.Render(m.progress())
+	header := m.styles.brand.Render("goilerplate") + "  " + m.styles.muted.Render("NEW PROJECT")
+	progress := m.styles.muted.Render(m.progress())
 
-	question := panelStyle.Width(min(56, contentWidth-6)).Render(m.questionView())
+	question := m.styles.panel.Width(min(56, contentWidth-6)).Render(m.questionView())
 	body := question
 	if m.width >= 92 && m.step != stepReview {
-		summary := panelStyle.Width(28).Render(m.summaryView())
+		summary := m.styles.panel.Width(28).Render(m.summaryView())
 		body = lipgloss.JoinHorizontal(lipgloss.Top, question, "  ", summary)
 	}
 
@@ -255,9 +279,9 @@ func (m model) View() tea.View {
 
 func (m model) questionView() string {
 	title, hint := m.question()
-	parts := []string{titleStyle.Render(title)}
+	parts := []string{m.styles.title.Render(title)}
 	if m.width >= 60 {
-		parts = append(parts, mutedStyle.Render(hint))
+		parts = append(parts, m.styles.muted.Render(hint))
 	}
 	parts = append(parts, "")
 	if m.isTextStep() {
@@ -265,31 +289,31 @@ func (m model) questionView() string {
 		return strings.Join(parts, "\n")
 	}
 	if m.step == stepReview {
-		parts = append(parts, m.reviewView(), "", activeStyle.Render("Generate project"))
+		parts = append(parts, m.reviewView(), "", m.styles.active.Render("Generate project"))
 		return strings.Join(parts, "\n")
 	}
 	for index, option := range m.options() {
 		cursor := "  "
 		if index == m.cursor {
-			cursor = labelStyle.Render("› ")
+			cursor = m.styles.label.Render("› ")
 		}
 		marker := "○"
 		if m.optionSelected(option.value) {
-			marker = greenStyle.Render("●")
+			marker = m.styles.success.Render("●")
 		}
 		if m.isMultiStep() {
 			marker = "[ ]"
 			if m.optionSelected(option.value) {
-				marker = greenStyle.Render("[x]")
+				marker = m.styles.success.Render("[x]")
 			}
 		}
-		label := valueStyle.Render(option.label)
+		label := m.styles.value.Render(option.label)
 		if index == m.cursor {
-			label = titleStyle.Render(option.label)
+			label = m.styles.title.Render(option.label)
 		}
 		parts = append(parts, fmt.Sprintf("%s%s  %s", cursor, marker, label))
 		if m.width >= 60 && index == m.cursor && option.description != "" {
-			parts = append(parts, "     "+mutedStyle.Render(option.description))
+			parts = append(parts, "     "+m.styles.muted.Render(option.description))
 		}
 	}
 	return strings.Join(parts, "\n")
@@ -298,65 +322,62 @@ func (m model) questionView() string {
 func (m model) reviewView() string {
 	if m.width < 60 {
 		rows := []string{
-			labelStyle.Render(shorten(strings.TrimSpace(m.inputs[2].Value()), 28)),
-			mutedStyle.Render("Module  " + shorten(strings.TrimSpace(m.inputs[1].Value()), 20)),
-			mutedStyle.Render("Folder  " + shorten(strings.TrimSpace(m.inputs[0].Value()), 20)),
+			m.styles.label.Render(shorten(strings.TrimSpace(m.inputs[2].Value()), 20)),
+			m.styles.muted.Render("Module  " + shorten(strings.TrimSpace(m.inputs[1].Value()), 20)),
+			m.styles.muted.Render("Folder  " + shorten(strings.TrimSpace(m.inputs[0].Value()), 20)),
 			"",
 		}
 		if m.edition == "free" {
-			return strings.Join(append(rows, valueStyle.Render("Free · SQLite · SMTP · htmx")), "\n")
+			return strings.Join(append(rows, m.styles.value.Render("Free · SQLite · SMTP · htmx")), "\n")
 		}
 		return strings.Join(append(rows,
-			valueStyle.Render("Paid · "+displayValue(m.database)),
-			valueStyle.Render(displayValue(m.payment)+" · "+displayValue(m.mail)),
-			valueStyle.Render(fmt.Sprintf("Teams %s · OAuth %d", yesNo(m.teams), len(selectedKeys(m.oauth)))),
-			valueStyle.Render(fmt.Sprintf("Storage %s · Content %d · Example %s", yesNo(m.storage), len(selectedKeys(m.content)), yesNo(m.example))),
+			m.styles.value.Render("Paid · "+displayValue(m.database)),
+			m.styles.value.Render(displayValue(m.payment)+" · "+displayValue(m.mail)),
+			m.styles.value.Render(fmt.Sprintf("Teams %s · OAuth %d", yesNo(m.teams), len(selectedKeys(m.oauth)))),
+			m.styles.value.Render(fmt.Sprintf("Storage %s · Content %d · Example %s", yesNo(m.storage), len(selectedKeys(m.content)), yesNo(m.example))),
 		), "\n")
 	}
 	rows := []string{
-		labelStyle.Render(strings.TrimSpace(m.inputs[2].Value())),
-		mutedStyle.Render(strings.TrimSpace(m.inputs[1].Value()) + "  →  " + strings.TrimSpace(m.inputs[0].Value())),
+		m.styles.label.Render(shorten(strings.TrimSpace(m.inputs[2].Value()), 46)),
+		m.styles.muted.Render("Module  " + shorten(strings.TrimSpace(m.inputs[1].Value()), 38)),
+		m.styles.muted.Render("Folder  " + shorten(strings.TrimSpace(m.inputs[0].Value()), 38)),
 		"",
 	}
 	if m.edition == "free" {
 		return strings.Join(append(rows,
-			valueStyle.Render("Free  ·  SQLite  ·  SMTP  ·  htmx"),
-			mutedStyle.Render("No paid modules. No hidden choices."),
+			m.styles.value.Render("Free  ·  SQLite  ·  SMTP  ·  htmx"),
+			m.styles.muted.Render("No paid modules. No hidden choices."),
 		), "\n")
 	}
 	return strings.Join(append(rows,
-		valueStyle.Render("Paid  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail)),
-		valueStyle.Render("Teams "+yesNo(m.teams)+"  ·  OAuth "+selectedValues(m.oauth)),
-		valueStyle.Render("Storage "+yesNo(m.storage)+"  ·  Content "+selectedValues(m.content)+"  ·  Example "+yesNo(m.example)),
+		m.styles.value.Render("Paid  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail)),
+		m.styles.value.Render("Teams "+yesNo(m.teams)+"  ·  OAuth "+selectedValues(m.oauth)),
+		m.styles.value.Render("Storage "+yesNo(m.storage)+"  ·  Content "+selectedValues(m.content)+"  ·  Example "+yesNo(m.example)),
 	), "\n")
 }
 
 func (m model) summaryView() string {
 	rows := []string{
-		labelStyle.Render("Your project"),
+		m.styles.label.Render("Your project"),
 		"",
-		summaryRow("Name", strings.TrimSpace(m.inputs[2].Value())),
-		summaryRow("Folder", strings.TrimSpace(m.inputs[0].Value())),
-		summaryRow("Module", strings.TrimSpace(m.inputs[1].Value())),
-		summaryRow("Edition", displayValue(m.edition)),
+		m.styles.value.Render(shorten(strings.TrimSpace(m.inputs[2].Value()), 20)),
+		m.styles.muted.Render(shorten(strings.TrimSpace(m.inputs[1].Value()), 20)),
+		m.styles.muted.Render(shorten(strings.TrimSpace(m.inputs[0].Value()), 20)),
+		m.summaryRow("Edition", displayValue(m.edition)),
 	}
 	if m.edition == "free" {
 		rows = append(rows,
 			"",
-			mutedStyle.Render("SQLite · SMTP · htmx"),
-			mutedStyle.Render("A clean foundation with no paid modules."),
+			m.styles.muted.Render("SQLite · SMTP · htmx"),
+			m.styles.muted.Render("No paid modules."),
 		)
 		return strings.Join(rows, "\n")
 	}
 	rows = append(rows,
-		summaryRow("Database", displayValue(m.database)),
-		summaryRow("Payment", displayValue(m.payment)),
-		summaryRow("Mail", displayValue(m.mail)),
-		summaryRow("Teams", yesNo(m.teams)),
-		summaryRow("OAuth", selectedValues(m.oauth)),
-		summaryRow("Storage", yesNo(m.storage)),
-		summaryRow("Content", selectedValues(m.content)),
-		summaryRow("Example", yesNo(m.example)),
+		m.styles.value.Render(displayValue(m.database)+" · "+displayValue(m.payment)),
+		m.styles.value.Render(displayValue(m.mail)+" · Teams "+yesNo(m.teams)),
+		m.styles.value.Render(fmt.Sprintf("OAuth %d · Storage %s", len(selectedKeys(m.oauth)), yesNo(m.storage))),
+		m.styles.value.Render(fmt.Sprintf("Content %d · Example %s", len(selectedKeys(m.content)), yesNo(m.example))),
 	)
 	return strings.Join(rows, "\n")
 }
@@ -364,26 +385,26 @@ func (m model) summaryView() string {
 func (m model) footerView() string {
 	if m.width < 60 {
 		if m.isTextStep() {
-			return mutedStyle.Render("enter next · esc back · ctrl+c quit")
+			return m.styles.muted.Render("enter next · esc back · ctrl+c quit")
 		}
 		if m.step == stepReview {
-			return mutedStyle.Render("enter generate · esc back · q quit")
+			return m.styles.muted.Render("enter generate · esc back · q quit")
 		}
 		if m.isMultiStep() {
-			return mutedStyle.Render("↑↓ move · space toggle · enter next")
+			return m.styles.muted.Render("↑↓ move · space toggle · enter next")
 		}
-		return mutedStyle.Render("↑↓ choose · enter next · esc back")
+		return m.styles.muted.Render("↑↓ choose · enter next · esc back")
 	}
 	if m.isTextStep() {
-		return mutedStyle.Render("enter continue   esc back   ctrl+c quit")
+		return m.styles.muted.Render("enter continue   esc back   ctrl+c quit")
 	}
 	if m.step == stepReview {
-		return mutedStyle.Render("enter generate   esc back   q quit")
+		return m.styles.muted.Render("enter generate   esc back   q quit")
 	}
 	if m.isMultiStep() {
-		return mutedStyle.Render("↑↓ move   space toggle   enter continue   esc back")
+		return m.styles.muted.Render("↑↓ move   space toggle   enter continue   esc back")
 	}
-	return mutedStyle.Render("↑↓ choose   enter continue   esc back   q quit")
+	return m.styles.muted.Render("↑↓ choose   enter continue   esc back   q quit")
 }
 
 func (m model) question() (string, string) {
@@ -611,11 +632,11 @@ func (m model) progress() string {
 	return strings.TrimSpace(filled+empty) + fmt.Sprintf("   %d/%d", min(completed, total), total)
 }
 
-func summaryRow(label, value string) string {
+func (m model) summaryRow(label, value string) string {
 	if strings.TrimSpace(value) == "" {
 		value = "None"
 	}
-	return mutedStyle.Render(label+":") + " " + valueStyle.Render(value)
+	return m.styles.muted.Render(label+":") + " " + m.styles.value.Render(value)
 }
 
 func yesNo(value bool) string {
