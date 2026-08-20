@@ -1,5 +1,5 @@
 // Package api defines the stable JSON contract shared by the public CLI and
-// the private Goilerplate service.
+// the private goilerplate service.
 package api
 
 import "time"

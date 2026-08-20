@@ -1,6 +1,6 @@
-# Goilerplate
+# goilerplate
 
-The public CLI for Goilerplate.
+The public CLI for goilerplate.
 
 Development is in progress. The CLI signs in through GitHub, generates projects,
 and manages account access. It requests only GitHub's `user:email` scope. It never
@@ -37,7 +37,7 @@ goilerplate token list <license-id>
 goilerplate token revoke <license-id> <token-id>
 ```
 
-A new CI key is shown once. Store it in the CI provider's secret store. If a developer leaves, remove the member. Goilerplate revokes the company's CI keys so the Owner can create clean replacements.
+A new CI key is shown once. Store it in the CI provider's secret store. If a developer leaves, remove the member. goilerplate revokes the company's CI keys so the Owner can create clean replacements.
 
 In CI, expose the key only to the command that needs it:
 
@@ -57,7 +57,7 @@ A company license always keeps at least one Owner. The final Owner must add anot
 
 ### Why can one account show more than one license?
 
-Access belongs to the license, not to the login. A developer can work for two companies, so one personal login can access both company licenses. A personal Free license can also remain beside a Paid company license. Goilerplate marks the best active license with `*` and uses it automatically. If the developer leaves the company later, their personal Free access still works.
+Access belongs to the license, not to the login. A developer can work for two companies, so one personal login can access both company licenses. A personal Free license can also remain beside a Paid company license. goilerplate marks the best active license with `*` and uses it automatically. If the developer leaves the company later, their personal Free access still works.
 
 This does not create duplicate billing. Each Paid license still belongs to exactly one company.
 

@@ -54,7 +54,7 @@ func (a *App) license(ctx context.Context, arguments []string) error {
 			return err
 		}
 		if response.Joined {
-			fmt.Fprintln(a.Out, "Access added. The developer already has a Goilerplate account.")
+			fmt.Fprintln(a.Out, "Access added. The developer already has a goilerplate account.")
 		} else {
 			fmt.Fprintln(a.Out, "Invitation sent. Access connects when the developer runs goilerplate login.")
 		}
