@@ -28,6 +28,7 @@ type ServiceClient interface {
 	WhoAmI(context.Context, string) (api.WhoAmIResponse, error)
 	Logout(context.Context, string) error
 	ActivationStatus(context.Context, string) (api.ActivationStatusResponse, error)
+	ResendActivation(context.Context, string) (api.ActivationStatusResponse, error)
 	Generate(context.Context, string, api.GenerateRequest, io.Writer) (string, error)
 }
 
@@ -56,6 +57,8 @@ func (a *App) Run(ctx context.Context, arguments []string) error {
 		return a.whoAmI(ctx, arguments[1:])
 	case "logout":
 		return a.logout(ctx, arguments[1:])
+	case "activation":
+		return a.activation(ctx, arguments[1:])
 	case "version":
 		return a.version(arguments[1:])
 	case "help", "-h", "--help":
@@ -196,6 +199,7 @@ func (a *App) printUsage() {
 	fmt.Fprintln(a.Out, "Commands:")
 	fmt.Fprintln(a.Out, "  new      Generate a new project")
 	fmt.Fprintln(a.Out, "  login    Sign in with GitHub")
+	fmt.Fprintln(a.Out, "  activation resend  Send a new Free activation email")
 	fmt.Fprintln(a.Out, "  whoami   Show the current account and licenses")
 	fmt.Fprintln(a.Out, "  logout   Revoke the current session")
 	fmt.Fprintln(a.Out, "  version  Show the CLI version")

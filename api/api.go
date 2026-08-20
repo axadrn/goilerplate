@@ -5,11 +5,12 @@ package api
 import "time"
 
 const (
-	PathGitHubLogin = "/v1/auth/github"
-	PathLogout      = "/v1/auth/logout"
-	PathWhoAmI      = "/v1/account"
-	PathGenerate    = "/v1/generate"
-	PathActivation  = "/v1/license/activation"
+	PathGitHubLogin      = "/v1/auth/github"
+	PathLogout           = "/v1/auth/logout"
+	PathWhoAmI           = "/v1/account"
+	PathGenerate         = "/v1/generate"
+	PathActivation       = "/v1/license/activation"
+	PathActivationResend = "/v1/license/activation/resend"
 )
 
 type ErrorResponse struct {
@@ -29,8 +30,16 @@ type GitHubLoginResponse struct {
 }
 
 type ActivationStatusResponse struct {
-	Active bool `json:"active"`
+	State ActivationState `json:"state"`
 }
+
+type ActivationState string
+
+const (
+	ActivationStatePending     ActivationState = "pending"
+	ActivationStateActive      ActivationState = "active"
+	ActivationStateUnavailable ActivationState = "unavailable"
+)
 
 type WhoAmIResponse struct {
 	Account            Account   `json:"account"`

@@ -91,12 +91,18 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	if !activation.Active {
+	switch activation.State {
+	case api.ActivationStateActive:
+	case api.ActivationStatePending:
 		fmt.Fprintln(a.Out, "Check your email to activate Free access. Waiting for confirmation...")
 		if err := a.waitForActivation(ctx, client, configuration.SessionToken); err != nil {
 			return err
 		}
 		fmt.Fprintln(a.Out, "Free access activated")
+	case api.ActivationStateUnavailable:
+		return errActivationUnavailable
+	default:
+		return fmt.Errorf("unknown activation state %q", activation.State)
 	}
 	archive, err := os.CreateTemp("", "goilerplate-project-*.tar.gz")
 	if err != nil {

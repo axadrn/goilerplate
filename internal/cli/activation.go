@@ -2,8 +2,14 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
+
+	"github.com/axadrn/goilerplate/api"
 )
+
+var errActivationUnavailable = errors.New("Free activation is not pending. Run goilerplate activation resend")
 
 func (a *App) waitForActivation(ctx context.Context, client ServiceClient, sessionToken string) error {
 	interval := a.ActivationPollInterval
@@ -17,8 +23,14 @@ func (a *App) waitForActivation(ctx context.Context, client ServiceClient, sessi
 		if err != nil {
 			return err
 		}
-		if status.Active {
+		switch status.State {
+		case api.ActivationStateActive:
 			return nil
+		case api.ActivationStatePending:
+		case api.ActivationStateUnavailable:
+			return errActivationUnavailable
+		default:
+			return fmt.Errorf("unknown activation state %q", status.State)
 		}
 		select {
 		case <-ctx.Done():
@@ -26,4 +38,45 @@ func (a *App) waitForActivation(ctx context.Context, client ServiceClient, sessi
 		case <-ticker.C:
 		}
 	}
+}
+
+func (a *App) activation(ctx context.Context, arguments []string) error {
+	if len(arguments) != 1 || arguments[0] != "resend" {
+		return errors.New("usage: goilerplate activation resend")
+	}
+	configuration, err := a.Store.Load()
+	if err != nil {
+		return err
+	}
+	if configuration.SessionToken == "" {
+		return errors.New("not signed in. Run goilerplate login")
+	}
+	apiURL := configuration.APIURL
+	if apiURL == "" {
+		apiURL = a.DefaultAPIURL
+	}
+	client, err := a.NewService(apiURL)
+	if err != nil {
+		return err
+	}
+	status, err := client.ResendActivation(ctx, configuration.SessionToken)
+	if err != nil {
+		return err
+	}
+	switch status.State {
+	case api.ActivationStateActive:
+		fmt.Fprintln(a.Out, "Free access is already active")
+		return nil
+	case api.ActivationStatePending:
+	case api.ActivationStateUnavailable:
+		return errActivationUnavailable
+	default:
+		return fmt.Errorf("unknown activation state %q", status.State)
+	}
+	fmt.Fprintln(a.Out, "Activation email sent. Waiting for confirmation...")
+	if err := a.waitForActivation(ctx, client, configuration.SessionToken); err != nil {
+		return err
+	}
+	fmt.Fprintln(a.Out, "Free access activated")
+	return nil
 }

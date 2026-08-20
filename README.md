@@ -10,6 +10,7 @@ temporary GitHub OAuth token.
 ```text
 goilerplate login
 goilerplate whoami
+goilerplate activation resend
 goilerplate new --module example.com/acme ./acme
 goilerplate logout
 ```

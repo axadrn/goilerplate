@@ -90,6 +90,17 @@ func (c *Client) ActivationStatus(ctx context.Context, sessionToken string) (api
 	return response, nil
 }
 
+func (c *Client) ResendActivation(ctx context.Context, sessionToken string) (api.ActivationStatusResponse, error) {
+	if strings.TrimSpace(sessionToken) == "" {
+		return api.ActivationStatusResponse{}, errors.New("Goilerplate session token is required")
+	}
+	var response api.ActivationStatusResponse
+	if err := c.doJSON(ctx, http.MethodPost, api.PathActivationResend, sessionToken, nil, &response); err != nil {
+		return api.ActivationStatusResponse{}, err
+	}
+	return response, nil
+}
+
 func (c *Client) Generate(
 	ctx context.Context,
 	sessionToken string,

@@ -42,7 +42,12 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 			if request.Header.Get("Authorization") != "Bearer session-token" {
 				t.Fatalf("Authorization = %q", request.Header.Get("Authorization"))
 			}
-			json.NewEncoder(response).Encode(api.ActivationStatusResponse{Active: true})
+			json.NewEncoder(response).Encode(api.ActivationStatusResponse{State: api.ActivationStateActive})
+		case api.PathActivationResend:
+			if request.Header.Get("Authorization") != "Bearer session-token" {
+				t.Fatalf("Authorization = %q", request.Header.Get("Authorization"))
+			}
+			json.NewEncoder(response).Encode(api.ActivationStatusResponse{State: api.ActivationStatePending})
 		case api.PathLogout:
 			if request.Header.Get("Authorization") != "Bearer session-token" {
 				t.Fatalf("Authorization = %q", request.Header.Get("Authorization"))
@@ -70,8 +75,12 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 		t.Fatalf("whoami = %#v", who)
 	}
 	activation, err := client.ActivationStatus(context.Background(), login.SessionToken)
-	if err != nil || !activation.Active {
+	if err != nil || activation.State != api.ActivationStateActive {
 		t.Fatalf("activation = %#v, %v", activation, err)
+	}
+	resent, err := client.ResendActivation(context.Background(), login.SessionToken)
+	if err != nil || resent.State != api.ActivationStatePending {
+		t.Fatalf("resend activation = %#v, %v", resent, err)
 	}
 	if err := client.Logout(context.Background(), login.SessionToken); err != nil {
 		t.Fatal(err)
