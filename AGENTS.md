@@ -4,6 +4,11 @@
 
 This repository contains the public goilerplate CLI and the shared API contract. It never contains the private project template.
 
+## Brand
+
+- Always write the product name as `goilerplate` in lowercase, including at the start of sentences and headings.
+- Keep technical identifiers such as `GOILERPLATE_TOKEN` and `X-Goilerplate-Version` unchanged.
+
 ## Engineering
 
 - Prefer the Go standard library.
