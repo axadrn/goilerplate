@@ -226,7 +226,7 @@ func (a *App) version(arguments []string) error {
 }
 
 func (a *App) printUsage() {
-	fmt.Fprintln(a.Out, "Goilerplate")
+	fmt.Fprintln(a.Out, "goilerplate")
 	fmt.Fprintln(a.Out)
 	fmt.Fprintln(a.Out, "Usage: goilerplate <command>")
 	fmt.Fprintln(a.Out)

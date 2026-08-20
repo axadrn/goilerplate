@@ -63,7 +63,7 @@ func (c *Client) LoginWithGitHub(ctx context.Context, githubToken string) (api.G
 
 func (c *Client) WhoAmI(ctx context.Context, sessionToken string) (api.WhoAmIResponse, error) {
 	if strings.TrimSpace(sessionToken) == "" {
-		return api.WhoAmIResponse{}, errors.New("Goilerplate session token is required")
+		return api.WhoAmIResponse{}, errors.New("goilerplate session token is required")
 	}
 	var response api.WhoAmIResponse
 	if err := c.doJSON(ctx, http.MethodGet, api.PathWhoAmI, sessionToken, nil, &response); err != nil {
@@ -74,14 +74,14 @@ func (c *Client) WhoAmI(ctx context.Context, sessionToken string) (api.WhoAmIRes
 
 func (c *Client) Logout(ctx context.Context, sessionToken string) error {
 	if strings.TrimSpace(sessionToken) == "" {
-		return errors.New("Goilerplate session token is required")
+		return errors.New("goilerplate session token is required")
 	}
 	return c.doJSON(ctx, http.MethodPost, api.PathLogout, sessionToken, nil, nil)
 }
 
 func (c *Client) ActivationStatus(ctx context.Context, sessionToken string) (api.ActivationStatusResponse, error) {
 	if strings.TrimSpace(sessionToken) == "" {
-		return api.ActivationStatusResponse{}, errors.New("Goilerplate session token is required")
+		return api.ActivationStatusResponse{}, errors.New("goilerplate session token is required")
 	}
 	var response api.ActivationStatusResponse
 	if err := c.doJSON(ctx, http.MethodGet, api.PathActivation, sessionToken, nil, &response); err != nil {
@@ -92,7 +92,7 @@ func (c *Client) ActivationStatus(ctx context.Context, sessionToken string) (api
 
 func (c *Client) ResendActivation(ctx context.Context, sessionToken string) (api.ActivationStatusResponse, error) {
 	if strings.TrimSpace(sessionToken) == "" {
-		return api.ActivationStatusResponse{}, errors.New("Goilerplate session token is required")
+		return api.ActivationStatusResponse{}, errors.New("goilerplate session token is required")
 	}
 	var response api.ActivationStatusResponse
 	if err := c.doJSON(ctx, http.MethodPost, api.PathActivationResend, sessionToken, nil, &response); err != nil {
@@ -162,7 +162,7 @@ func (c *Client) Generate(
 	destination io.Writer,
 ) (string, error) {
 	if strings.TrimSpace(sessionToken) == "" {
-		return "", errors.New("Goilerplate session token is required")
+		return "", errors.New("goilerplate session token is required")
 	}
 	encoded, err := json.Marshal(requestBody)
 	if err != nil {
@@ -179,7 +179,7 @@ func (c *Client) Generate(
 	request.Header.Set("User-Agent", "goilerplate")
 	response, err := c.httpClient.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("call Goilerplate service: %w", err)
+		return "", fmt.Errorf("call goilerplate service: %w", err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
@@ -223,15 +223,15 @@ func (c *Client) doJSON(ctx context.Context, method, requestPath, sessionToken s
 	}
 	response, err := c.httpClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("call Goilerplate service: %w", err)
+		return fmt.Errorf("call goilerplate service: %w", err)
 	}
 	defer response.Body.Close()
 	content, err := io.ReadAll(io.LimitReader(response.Body, maxResponseSize+1))
 	if err != nil {
-		return fmt.Errorf("read Goilerplate response: %w", err)
+		return fmt.Errorf("read goilerplate response: %w", err)
 	}
 	if len(content) > maxResponseSize {
-		return errors.New("Goilerplate response exceeds the size limit")
+		return errors.New("goilerplate response exceeds the size limit")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return apiErrorFromContent(response.StatusCode, content)
@@ -240,7 +240,7 @@ func (c *Client) doJSON(ctx context.Context, method, requestPath, sessionToken s
 		return nil
 	}
 	if err := json.Unmarshal(content, destination); err != nil {
-		return fmt.Errorf("decode Goilerplate response: %w", err)
+		return fmt.Errorf("decode goilerplate response: %w", err)
 	}
 	return nil
 }
@@ -248,10 +248,10 @@ func (c *Client) doJSON(ctx context.Context, method, requestPath, sessionToken s
 func responseError(response *http.Response) error {
 	content, err := io.ReadAll(io.LimitReader(response.Body, maxResponseSize+1))
 	if err != nil {
-		return fmt.Errorf("read Goilerplate response: %w", err)
+		return fmt.Errorf("read goilerplate response: %w", err)
 	}
 	if len(content) > maxResponseSize {
-		return errors.New("Goilerplate response exceeds the size limit")
+		return errors.New("goilerplate response exceeds the size limit")
 	}
 	return apiErrorFromContent(response.StatusCode, content)
 }
@@ -259,7 +259,7 @@ func responseError(response *http.Response) error {
 func apiErrorFromContent(status int, content []byte) error {
 	var apiError api.ErrorResponse
 	if json.Unmarshal(content, &apiError) == nil && apiError.Message != "" {
-		return fmt.Errorf("Goilerplate service: %s", apiError.Message)
+		return fmt.Errorf("goilerplate service: %s", apiError.Message)
 	}
-	return fmt.Errorf("Goilerplate service returned HTTP %d", status)
+	return fmt.Errorf("goilerplate service returned HTTP %d", status)
 }
