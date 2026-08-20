@@ -47,7 +47,7 @@ GOILERPLATE_TOKEN="$GOILERPLATE_TOKEN" goilerplate new --module example.com/acme
 
 `GOILERPLATE_TOKEN` works only for generation and later update commands. Account and license management still require a personal Owner login.
 
-Account deletion requires the exact GitHub login as confirmation:
+Account deletion requires your GitHub login as confirmation. Capitalization and a leading `@` do not matter:
 
 ```text
 goilerplate account delete --confirm axadrn

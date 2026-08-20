@@ -61,7 +61,7 @@ func (a *App) license(ctx context.Context, arguments []string) error {
 		return nil
 	case "remove":
 		if len(arguments) != 3 {
-			return errors.New("usage: goilerplate license remove <license-id> <user-id>")
+			return errors.New("usage: goilerplate license remove <license-id> <user-or-invitation-id>")
 		}
 		client, token, err := a.signedInClient()
 		if err != nil {
