@@ -183,6 +183,26 @@ func TestNewRejectsPaidModulesForFreeBeforeCallingService(t *testing.T) {
 	}
 }
 
+func TestNewResumesPendingFreeActivation(t *testing.T) {
+	output := &bytes.Buffer{}
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{
+		activationActiveAfter: 2,
+		generatedVersion:      "v3.0.0",
+		archive:               cliTestArchive(t, "go.mod", "module example.com/acme"),
+	}
+	app := testApp(output, store, &fakeDevice{}, service)
+	app.ActivationPollInterval = time.Millisecond
+	destination := filepath.Join(t.TempDir(), "acme")
+
+	if err := app.Run(context.Background(), []string{"new", "--module", "example.com/acme", destination}); err != nil {
+		t.Fatal(err)
+	}
+	if service.activationChecks != 2 || !service.generateCalled {
+		t.Fatalf("activation checks = %d, generated = %v", service.activationChecks, service.generateCalled)
+	}
+}
+
 func testApp(output *bytes.Buffer, store *memoryStore, device *fakeDevice, service *fakeService) *App {
 	return &App{
 		Out:            output,

@@ -87,6 +87,17 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
+	activation, err := client.ActivationStatus(ctx, configuration.SessionToken)
+	if err != nil {
+		return err
+	}
+	if !activation.Active {
+		fmt.Fprintln(a.Out, "Check your email to activate Free access. Waiting for confirmation...")
+		if err := a.waitForActivation(ctx, client, configuration.SessionToken); err != nil {
+			return err
+		}
+		fmt.Fprintln(a.Out, "Free access activated")
+	}
 	archive, err := os.CreateTemp("", "goilerplate-project-*.tar.gz")
 	if err != nil {
 		return fmt.Errorf("create project download: %w", err)
