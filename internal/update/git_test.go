@@ -21,7 +21,7 @@ func TestMergeCreatesUpdateBranchWithoutTouchingCurrentWorktree(t *testing.T) {
 		"custom.txt": "customer file\n",
 	})
 	runTestGit(t, repositoryRoot, "add", ".")
-	runTestGit(t, repositoryRoot, "commit", "-m", "Customer changes")
+	runTestGit(t, repositoryRoot, "-c", "user.name=Test User", "-c", "user.email=test@example.com", "commit", "-m", "Customer changes")
 	oldRoot := testTree(t, map[string]string{
 		"app.txt":          "title\nkeep one\nkeep two\nkeep three\ncustom: default\nfooter\n",
 		"goilerplate.lock": "old lock\n",
@@ -57,6 +57,9 @@ func TestMergeCreatesUpdateBranchWithoutTouchingCurrentWorktree(t *testing.T) {
 	if branch := strings.TrimSpace(runTestGit(t, repositoryRoot, "branch", "--show-current")); branch != "main" {
 		t.Fatalf("current branch = %q", branch)
 	}
+	if author := strings.TrimSpace(runTestGit(t, repositoryRoot, "show", "-s", "--format=%an <%ae>", result.Branch)); author != "goilerplate <updates@goilerplate.com>" {
+		t.Fatalf("update author = %q", author)
+	}
 	if content := runTestGit(t, repositoryRoot, "show", result.Branch+":app.txt"); content != "new title\nkeep one\nkeep two\nkeep three\ncustom: customer\nfooter\n" {
 		t.Fatalf("merged app.txt = %q", content)
 	}
@@ -74,7 +77,7 @@ func TestMergeWritesGitConflictMarkersOnNewBranch(t *testing.T) {
 	repositoryRoot := testRepository(t, map[string]string{"app.txt": "color: red\n", "goilerplate.lock": "old\n"})
 	writeFiles(t, repositoryRoot, map[string]string{"app.txt": "color: blue\n"})
 	runTestGit(t, repositoryRoot, "add", ".")
-	runTestGit(t, repositoryRoot, "commit", "-m", "Customer color")
+	runTestGit(t, repositoryRoot, "-c", "user.name=Test User", "-c", "user.email=test@example.com", "commit", "-m", "Customer color")
 	oldRoot := testTree(t, map[string]string{"app.txt": "color: red\n", "goilerplate.lock": "old\n"})
 	newRoot := testTree(t, map[string]string{"app.txt": "color: green\n", "goilerplate.lock": "new\n"})
 
@@ -106,14 +109,36 @@ func TestOpenRejectsDirtyWorktree(t *testing.T) {
 	}
 }
 
+func TestMergePreservesExistingInternalRef(t *testing.T) {
+	repositoryRoot := testRepository(t, map[string]string{"app.txt": "old\n"})
+	original := strings.TrimSpace(runTestGit(t, repositoryRoot, "rev-parse", "HEAD"))
+	runTestGit(t, repositoryRoot, "update-ref", "refs/goilerplate/update-import", original)
+	repository, err := Open(context.Background(), repositoryRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Merge(context.Background(), repository,
+		testTree(t, map[string]string{"app.txt": "old\n"}),
+		testTree(t, map[string]string{"app.txt": "new\n"}),
+		"v3.1.0",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Branch == "" {
+		t.Fatal("no update branch was created")
+	}
+	if current := strings.TrimSpace(runTestGit(t, repositoryRoot, "rev-parse", "refs/goilerplate/update-import")); current != original {
+		t.Fatalf("existing internal ref changed from %s to %s", original, current)
+	}
+}
+
 func testRepository(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := testTree(t, files)
 	runTestGit(t, root, "init", "-b", "main")
-	runTestGit(t, root, "config", "user.name", "Test User")
-	runTestGit(t, root, "config", "user.email", "test@example.com")
 	runTestGit(t, root, "add", ".")
-	runTestGit(t, root, "commit", "-m", "Initial project")
+	runTestGit(t, root, "-c", "user.name=Test User", "-c", "user.email=test@example.com", "commit", "-m", "Initial project")
 	return root
 }
 

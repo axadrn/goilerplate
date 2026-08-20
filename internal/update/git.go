@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -83,6 +85,10 @@ func Merge(ctx context.Context, repository Repository, oldRoot, newRoot, targetV
 }
 
 func importTemplates(ctx context.Context, repositoryRoot, oldRoot, newRoot string) (string, string, error) {
+	importRef, err := temporaryImportRef()
+	if err != nil {
+		return "", "", err
+	}
 	oldFiles, err := treeFiles(oldRoot)
 	if err != nil {
 		return "", "", err
@@ -103,7 +109,7 @@ func importTemplates(ctx context.Context, repositoryRoot, oldRoot, newRoot strin
 	if err := command.Start(); err != nil {
 		return "", "", fmt.Errorf("start Git template import: %w", err)
 	}
-	writeErr := writeTemplateCommits(stdin, oldRoot, oldFiles, newRoot, newFiles)
+	writeErr := writeTemplateCommits(stdin, importRef, oldRoot, oldFiles, newRoot, newFiles)
 	closeErr := stdin.Close()
 	waitErr := command.Wait()
 	if writeErr != nil {
@@ -122,21 +128,21 @@ func importTemplates(ctx context.Context, repositoryRoot, oldRoot, newRoot strin
 	return marks[0], marks[1], nil
 }
 
-func writeTemplateCommits(destination io.Writer, oldRoot string, oldFiles []string, newRoot string, newFiles []string) error {
+func writeTemplateCommits(destination io.Writer, importRef, oldRoot string, oldFiles []string, newRoot string, newFiles []string) error {
 	writer := bufio.NewWriter(destination)
-	_, _ = io.WriteString(writer, "feature done\nreset refs/goilerplate/update-import\n\n")
-	if err := writeTemplateCommit(writer, oldRoot, oldFiles, ":1", "", "old goilerplate template"); err != nil {
+	_, _ = io.WriteString(writer, "feature done\n")
+	if err := writeTemplateCommit(writer, importRef, oldRoot, oldFiles, ":1", "", "old goilerplate template"); err != nil {
 		return err
 	}
-	if err := writeTemplateCommit(writer, newRoot, newFiles, ":2", ":1", "new goilerplate template"); err != nil {
+	if err := writeTemplateCommit(writer, importRef, newRoot, newFiles, ":2", ":1", "new goilerplate template"); err != nil {
 		return err
 	}
-	_, _ = io.WriteString(writer, "get-mark :1\nget-mark :2\nreset refs/goilerplate/update-import\n\ndone\n")
+	fmt.Fprintf(writer, "get-mark :1\nget-mark :2\nreset %s\n\ndone\n", importRef)
 	return writer.Flush()
 }
 
-func writeTemplateCommit(writer *bufio.Writer, root string, files []string, mark, parent, message string) error {
-	fmt.Fprintln(writer, "commit refs/goilerplate/update-import")
+func writeTemplateCommit(writer *bufio.Writer, importRef, root string, files []string, mark, parent, message string) error {
+	fmt.Fprintln(writer, "commit", importRef)
 	fmt.Fprintln(writer, "mark", mark)
 	fmt.Fprintln(writer, "author goilerplate <noreply@goilerplate.com> 0 +0000")
 	fmt.Fprintln(writer, "committer goilerplate <noreply@goilerplate.com> 0 +0000")
@@ -161,6 +167,14 @@ func writeTemplateCommit(writer *bufio.Writer, root string, files []string, mark
 	}
 	fmt.Fprintln(writer)
 	return nil
+}
+
+func temporaryImportRef() (string, error) {
+	random := make([]byte, 16)
+	if _, err := rand.Read(random); err != nil {
+		return "", fmt.Errorf("create temporary Git ref: %w", err)
+	}
+	return "refs/goilerplate/internal/update-import-" + hex.EncodeToString(random), nil
 }
 
 func mergeTree(ctx context.Context, root, customerCommit, newCommit string) (string, []string, error) {
@@ -315,6 +329,7 @@ func runGit(ctx context.Context, directory string, input io.Reader, arguments ..
 	command := exec.CommandContext(ctx, "git", arguments...)
 	command.Dir = directory
 	command.Stdin = input
+	command.Env = gitEnvironment()
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -326,4 +341,21 @@ func runGit(ctx context.Context, directory string, input io.Reader, arguments ..
 		return "", errors.New(message)
 	}
 	return stdout.String(), nil
+}
+
+func gitEnvironment() []string {
+	environment := make([]string, 0, len(os.Environ())+4)
+	for _, value := range os.Environ() {
+		if strings.HasPrefix(value, "GIT_AUTHOR_NAME=") || strings.HasPrefix(value, "GIT_AUTHOR_EMAIL=") ||
+			strings.HasPrefix(value, "GIT_COMMITTER_NAME=") || strings.HasPrefix(value, "GIT_COMMITTER_EMAIL=") {
+			continue
+		}
+		environment = append(environment, value)
+	}
+	return append(environment,
+		"GIT_AUTHOR_NAME=goilerplate",
+		"GIT_AUTHOR_EMAIL=updates@goilerplate.com",
+		"GIT_COMMITTER_NAME=goilerplate",
+		"GIT_COMMITTER_EMAIL=updates@goilerplate.com",
+	)
 }
