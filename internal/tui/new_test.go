@@ -145,3 +145,20 @@ func TestReviewFitsStandardAndNarrowTerminals(t *testing.T) {
 		})
 	}
 }
+
+func TestTinyTerminalShowsResizeMessage(t *testing.T) {
+	selection := newModel()
+	selection.width = 30
+	selection.height = 12
+
+	content := selection.View().Content
+	if !strings.Contains(content, "Terminal too small") {
+		t.Fatalf("view = %q", content)
+	}
+	if width := lipgloss.Width(content); width > 30 {
+		t.Fatalf("view width = %d, terminal width = 30", width)
+	}
+	if height := lipgloss.Height(content); height > 12 {
+		t.Fatalf("view height = %d, terminal height = 12", height)
+	}
+}

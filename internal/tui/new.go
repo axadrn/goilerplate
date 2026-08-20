@@ -215,6 +215,19 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
+	if m.width < 40 || m.height < 20 {
+		view := tea.NewView(strings.Join([]string{
+			brandStyle.Render("goilerplate"),
+			"",
+			"Terminal too small.",
+			"Resize to at least 40 × 20.",
+			"",
+			mutedStyle.Render("ctrl+c quit"),
+		}, "\n"))
+		view.AltScreen = true
+		view.WindowTitle = "goilerplate new"
+		return view
+	}
 	contentWidth := min(96, max(36, m.width-4))
 	header := brandStyle.Render("goilerplate") + "  " + mutedStyle.Render("NEW PROJECT")
 	progress := mutedStyle.Render(m.progress())
