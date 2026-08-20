@@ -1,9 +1,14 @@
 package cli
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -106,6 +111,52 @@ func TestLogoutPreservesTokenWhenRevocationFails(t *testing.T) {
 	}
 }
 
+func TestNewGeneratesAndExtractsProject(t *testing.T) {
+	output := &bytes.Buffer{}
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{generatedVersion: "v3.0.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
+	app := testApp(output, store, &fakeDevice{}, service)
+	destination := filepath.Join(t.TempDir(), "acme")
+
+	err := app.Run(context.Background(), []string{
+		"new",
+		"--name", "Acme",
+		"--module", "example.com/acme",
+		"--edition", "paid",
+		"--database", "postgres",
+		"--teams",
+		"--oauth", "google,github",
+		destination,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(filepath.Join(destination, "go.mod"))
+	if err != nil || string(content) != "module example.com/acme" {
+		t.Fatalf("go.mod = %q, %v", content, err)
+	}
+	if service.generateToken != "session" || service.generateRequest.Answers.Payment != "stripe" || !service.generateRequest.Answers.Teams {
+		t.Fatalf("generation request = %#v", service.generateRequest)
+	}
+	if !strings.Contains(output.String(), "Created Acme") {
+		t.Fatalf("output = %q", output.String())
+	}
+}
+
+func TestNewRejectsPaidModulesForFreeBeforeCallingService(t *testing.T) {
+	service := &fakeService{}
+	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+	err := app.Run(context.Background(), []string{
+		"new", "--module", "example.com/acme", "--teams", filepath.Join(t.TempDir(), "acme"),
+	})
+	if err == nil || !strings.Contains(err.Error(), "Free uses SQLite") {
+		t.Fatalf("new error = %v", err)
+	}
+	if service.generateCalled {
+		t.Fatal("service was called for an invalid selection")
+	}
+}
+
 func testApp(output *bytes.Buffer, store *memoryStore, device *fakeDevice, service *fakeService) *App {
 	return &App{
 		Out:            output,
@@ -155,6 +206,11 @@ type fakeService struct {
 	receivedGitHubToken string
 	loggedOut           bool
 	logoutError         error
+	generateRequest     api.GenerateRequest
+	generateToken       string
+	generatedVersion    string
+	archive             []byte
+	generateCalled      bool
 }
 
 func (s *fakeService) LoginWithGitHub(_ context.Context, token string) (api.GitHubLoginResponse, error) {
@@ -169,4 +225,34 @@ func (s *fakeService) WhoAmI(context.Context, string) (api.WhoAmIResponse, error
 func (s *fakeService) Logout(context.Context, string) error {
 	s.loggedOut = true
 	return s.logoutError
+}
+
+func (s *fakeService) Generate(_ context.Context, token string, request api.GenerateRequest, destination io.Writer) (string, error) {
+	s.generateCalled = true
+	s.generateToken = token
+	s.generateRequest = request
+	if _, err := destination.Write(s.archive); err != nil {
+		return "", err
+	}
+	return s.generatedVersion, nil
+}
+
+func cliTestArchive(t *testing.T, name, content string) []byte {
+	t.Helper()
+	var archive bytes.Buffer
+	gzipWriter := gzip.NewWriter(&archive)
+	tarWriter := tar.NewWriter(gzipWriter)
+	if err := tarWriter.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(content)), Typeflag: tar.TypeReg}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tarWriter.Write([]byte(content)); err != nil {
+		t.Fatal(err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return archive.Bytes()
 }

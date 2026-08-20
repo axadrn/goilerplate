@@ -26,6 +26,7 @@ type ServiceClient interface {
 	LoginWithGitHub(context.Context, string) (api.GitHubLoginResponse, error)
 	WhoAmI(context.Context, string) (api.WhoAmIResponse, error)
 	Logout(context.Context, string) error
+	Generate(context.Context, string, api.GenerateRequest, io.Writer) (string, error)
 }
 
 type App struct {
@@ -44,6 +45,8 @@ func (a *App) Run(ctx context.Context, arguments []string) error {
 		return nil
 	}
 	switch arguments[0] {
+	case "new":
+		return a.newProject(ctx, arguments[1:])
 	case "login":
 		return a.login(ctx, arguments[1:])
 	case "whoami":
@@ -181,6 +184,7 @@ func (a *App) printUsage() {
 	fmt.Fprintln(a.Out, "Usage: goilerplate <command>")
 	fmt.Fprintln(a.Out)
 	fmt.Fprintln(a.Out, "Commands:")
+	fmt.Fprintln(a.Out, "  new      Generate a new project")
 	fmt.Fprintln(a.Out, "  login    Sign in with GitHub")
 	fmt.Fprintln(a.Out, "  whoami   Show the current account and licenses")
 	fmt.Fprintln(a.Out, "  logout   Revoke the current session")

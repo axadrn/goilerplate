@@ -1,8 +1,10 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -102,4 +104,53 @@ func TestClientBoundsAndReportsErrors(t *testing.T) {
 			t.Fatal("oversized response was accepted")
 		}
 	})
+}
+
+func TestClientDownloadsGeneratedProject(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != api.PathGenerate || r.Method != http.MethodPost {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer session-token" {
+			t.Fatalf("Authorization = %q", r.Header.Get("Authorization"))
+		}
+		var request api.GenerateRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if request.Answers.ModulePath != "example.com/project" {
+			t.Fatalf("request = %#v", request)
+		}
+		w.Header().Set("X-Goilerplate-Version", "v3.0.0")
+		w.Write([]byte("archive-bytes"))
+	}))
+	t.Cleanup(server.Close)
+	client, err := NewClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var destination bytes.Buffer
+	version, err := client.Generate(context.Background(), "session-token", api.GenerateRequest{
+		Answers: api.GenerationAnswers{ModulePath: "example.com/project"},
+	}, &destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != "v3.0.0" || destination.String() != "archive-bytes" {
+		t.Fatalf("version = %q, archive = %q", version, destination.String())
+	}
+}
+
+func TestClientRejectsGeneratedProjectWithoutVersion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte("archive-bytes"))
+	}))
+	t.Cleanup(server.Close)
+	client, err := NewClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Generate(context.Background(), "session-token", api.GenerateRequest{}, io.Discard); err == nil {
+		t.Fatal("missing template version was accepted")
+	}
 }

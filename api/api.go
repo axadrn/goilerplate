@@ -8,6 +8,7 @@ const (
 	PathGitHubLogin = "/v1/auth/github"
 	PathLogout      = "/v1/auth/logout"
 	PathWhoAmI      = "/v1/account"
+	PathGenerate    = "/v1/generate"
 )
 
 type ErrorResponse struct {
@@ -68,3 +69,23 @@ const (
 	LicenseRoleOwner  LicenseRole = "owner"
 	LicenseRoleMember LicenseRole = "member"
 )
+
+type GenerateRequest struct {
+	TemplateVersion string            `json:"template_version,omitempty"`
+	Answers         GenerationAnswers `json:"answers"`
+}
+
+type GenerationAnswers struct {
+	ProjectName string   `json:"project_name"`
+	ModulePath  string   `json:"module_path"`
+	Edition     string   `json:"edition"`
+	Framework   string   `json:"framework"`
+	Database    string   `json:"database"`
+	Payment     string   `json:"payment"`
+	Mail        string   `json:"mail"`
+	Teams       bool     `json:"teams"`
+	OAuth       []string `json:"oauth"`
+	Storage     bool     `json:"storage"`
+	Content     []string `json:"content"`
+	Example     bool     `json:"example"`
+}
