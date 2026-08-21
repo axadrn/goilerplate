@@ -28,6 +28,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	name := flags.String("name", "", "project name")
 	modulePath := flags.String("module", "", "Go module path")
 	edition := flags.String("edition", "free", "free or paid")
+	framework := flags.String("framework", "htmx", "htmx or datastar")
 	database := flags.String("database", "sqlite", "sqlite or postgres")
 	payment := flags.String("payment", "", "stripe, polar, or lemon_squeezy")
 	mail := flags.String("mail", "smtp", "smtp or resend")
@@ -60,7 +61,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 		ProjectName: strings.TrimSpace(*name),
 		ModulePath:  strings.TrimSpace(*modulePath),
 		Edition:     strings.TrimSpace(*edition),
-		Framework:   "htmx",
+		Framework:   strings.TrimSpace(*framework),
 		Database:    strings.TrimSpace(*database),
 		Payment:     strings.TrimSpace(*payment),
 		Mail:        strings.TrimSpace(*mail),
@@ -165,10 +166,13 @@ func splitList(value string) []string {
 }
 
 func validateEditionSelection(answers api.GenerationAnswers) error {
+	if answers.Framework != "htmx" && answers.Framework != "datastar" {
+		return fmt.Errorf("unsupported framework %q", answers.Framework)
+	}
 	switch answers.Edition {
 	case "free":
-		if answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Teams || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 || answers.Example {
-			return errors.New("Free uses SQLite, SMTP, and no paid modules")
+		if answers.Framework != "htmx" || answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Teams || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 || answers.Example {
+			return errors.New("Free uses SQLite, SMTP, htmx, and no paid modules")
 		}
 	case "paid":
 		if answers.Payment == "none" {

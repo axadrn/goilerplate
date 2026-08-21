@@ -59,14 +59,14 @@ Prefer flags for scripts and repeatable builds:
 
 ```text
 goilerplate new --name Acme --module example.com/acme ./acme
-goilerplate new --edition paid --module example.com/acme --database postgres --teams --oauth google,github ./acme
+goilerplate new --edition paid --module example.com/acme --framework datastar --database postgres --teams --oauth google,github ./acme
 ```
 
 When input or output is redirected, `goilerplate new` requires these flags and
 never tries to open an interactive screen.
 
-Free always uses SQLite, SMTP, and the htmx foundation. Paid shows every
-optional module. The interactive setup does not contain the private template
+Free always uses SQLite, SMTP, and the htmx foundation. Paid lets you choose
+htmx or Datastar alongside every optional module. The interactive setup does not contain the private template
 and your source code never leaves your machine.
 
 ## One company, one license, one login per developer
