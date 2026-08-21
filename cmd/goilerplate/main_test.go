@@ -41,9 +41,9 @@ func TestIsTerminalRejectsNonTerminalFiles(t *testing.T) {
 
 func TestBuildVersionUsesInjectedReleaseVersion(t *testing.T) {
 	previous := version
-	version = "3.0.0-beta.1"
+	version = "v3.0.0-beta.1"
 	t.Cleanup(func() { version = previous })
-	if got := buildVersion(); got != "3.0.0-beta.1" {
+	if got := buildVersion(); got != "v3.0.0-beta.1" {
 		t.Fatalf("buildVersion() = %q", got)
 	}
 }
