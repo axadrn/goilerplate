@@ -10,10 +10,45 @@ asks for repository access and never stores the temporary GitHub OAuth token.
 goilerplate login
 goilerplate whoami
 goilerplate activation resend
-goilerplate new --module example.com/acme ./acme
+goilerplate new
 goilerplate update
 goilerplate logout
 ```
+
+## Create a project
+
+Run one command:
+
+```text
+goilerplate new
+```
+
+The interactive setup asks where the project should live, what its Go module
+path is, and which features you want. Use the arrow keys to move, Space to
+toggle multiple choices, and Enter to continue. Nothing is downloaded until
+you review the choices and select Generate.
+
+The setup is intentionally thin. It builds the same arguments as the regular
+command and hands them to the same validation and generation code. There is one
+generation path, whether you use the interactive setup, copy a command from the
+website, or run goilerplate in CI.
+
+Repeatedly pressing Enter creates the standard Free project in `./my-app` with
+module path `example.com/my-app`. Change those two values for a real project.
+
+Prefer flags for scripts and repeatable builds:
+
+```text
+goilerplate new --name Acme --module example.com/acme ./acme
+goilerplate new --edition paid --module example.com/acme --database postgres --teams --oauth google,github ./acme
+```
+
+When input or output is redirected, `goilerplate new` requires these flags and
+never tries to open an interactive screen.
+
+Free always uses SQLite, SMTP, and the htmx foundation. Paid shows every
+optional module. The interactive setup does not contain the private template
+and your source code never leaves your machine.
 
 ## One company, one license, one login per developer
 
@@ -98,4 +133,4 @@ git branch -D goilerplate-update-v3.1.0
 
 `goilerplate update` requires a clean Git worktree and Paid license access. Your source code never leaves your machine. The service receives only the answers already stored in `goilerplate.lock` and returns generated template trees.
 
-The interactive interface and release installation flow will land in later packages.
+The release installation flow will land in a later package.
