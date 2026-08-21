@@ -21,6 +21,7 @@ const (
 	stepModule
 	stepName
 	stepEdition
+	stepFramework
 	stepDatabase
 	stepPayment
 	stepMail
@@ -56,6 +57,7 @@ type model struct {
 	width     int
 	height    int
 	edition   string
+	framework string
 	database  string
 	payment   string
 	mail      string
@@ -142,16 +144,17 @@ func newModel() model {
 	name.SetWidth(48)
 
 	return model{
-		inputs:   [3]textinput.Model{destination, module, name},
-		width:    80,
-		height:   24,
-		edition:  "free",
-		database: "sqlite",
-		payment:  "stripe",
-		mail:     "smtp",
-		oauth:    map[string]bool{"google": true, "github": true},
-		content:  map[string]bool{},
-		styles:   newStyles(true),
+		inputs:    [3]textinput.Model{destination, module, name},
+		width:     80,
+		height:    24,
+		edition:   "free",
+		framework: "htmx",
+		database:  "sqlite",
+		payment:   "stripe",
+		mail:      "smtp",
+		oauth:     map[string]bool{"google": true, "github": true},
+		content:   map[string]bool{},
+		styles:    newStyles(true),
 	}
 }
 
@@ -331,7 +334,7 @@ func (m model) reviewView() string {
 			return strings.Join(append(rows, m.styles.value.Render("Free · SQLite · SMTP · htmx")), "\n")
 		}
 		return strings.Join(append(rows,
-			m.styles.value.Render("Paid · "+displayValue(m.database)),
+			m.styles.value.Render("Paid · "+displayValue(m.framework)+" · "+displayValue(m.database)),
 			m.styles.value.Render(displayValue(m.payment)+" · "+displayValue(m.mail)),
 			m.styles.value.Render(fmt.Sprintf("Teams %s · OAuth %d", yesNo(m.teams), len(selectedKeys(m.oauth)))),
 			m.styles.value.Render(fmt.Sprintf("Storage %s · Content %d · Example %s", yesNo(m.storage), len(selectedKeys(m.content)), yesNo(m.example))),
@@ -350,7 +353,7 @@ func (m model) reviewView() string {
 		), "\n")
 	}
 	return strings.Join(append(rows,
-		m.styles.value.Render("Paid  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail)),
+		m.styles.value.Render("Paid  ·  "+displayValue(m.framework)+"  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail)),
 		m.styles.value.Render("Teams "+yesNo(m.teams)+"  ·  OAuth "+selectedValues(m.oauth)),
 		m.styles.value.Render("Storage "+yesNo(m.storage)+"  ·  Content "+selectedValues(m.content)+"  ·  Example "+yesNo(m.example)),
 	), "\n")
@@ -374,8 +377,8 @@ func (m model) summaryView() string {
 		return strings.Join(rows, "\n")
 	}
 	rows = append(rows,
-		m.styles.value.Render(displayValue(m.database)+" · "+displayValue(m.payment)),
-		m.styles.value.Render(displayValue(m.mail)+" · Teams "+yesNo(m.teams)),
+		m.styles.value.Render(displayValue(m.framework)+" · "+displayValue(m.database)),
+		m.styles.value.Render(displayValue(m.payment)+" · "+displayValue(m.mail)+" · Teams "+yesNo(m.teams)),
 		m.styles.value.Render(fmt.Sprintf("OAuth %d · Storage %s", len(selectedKeys(m.oauth)), yesNo(m.storage))),
 		m.styles.value.Render(fmt.Sprintf("Content %d · Example %s", len(selectedKeys(m.content)), yesNo(m.example))),
 	)
@@ -417,6 +420,8 @@ func (m model) question() (string, string) {
 		return "What should the app be called?", "This is the human-readable product name."
 	case stepEdition:
 		return "Choose your edition", "Free is the complete foundation. Paid unlocks every product module and updates."
+	case stepFramework:
+		return "Choose a frontend", "htmx is the default. Datastar uses server-sent events and fine-grained patches."
 	case stepDatabase:
 		return "Choose a database", "SQLite is simple. PostgreSQL is ready for distributed deployments."
 	case stepPayment:
@@ -445,6 +450,11 @@ func (m model) options() []option {
 			{label: "Free", value: "free", description: "SQLite, SMTP, htmx, auth, security, and the app foundation."},
 			{label: "Paid", value: "paid", description: "All generator choices, commercial modules, and updates."},
 		}
+	case stepFramework:
+		return []option{
+			{label: "htmx", value: "htmx", description: "Small, stable, and the default goilerplate frontend."},
+			{label: "Datastar", value: "datastar", description: "Server-sent events with a reactive HTML-first client."},
+		}
 	case stepDatabase:
 		return []option{{label: "SQLite", value: "sqlite"}, {label: "PostgreSQL", value: "postgres"}}
 	case stepPayment:
@@ -470,6 +480,7 @@ func (m model) arguments() []string {
 	}
 	if m.edition == "paid" {
 		arguments = append(arguments,
+			"--framework", m.framework,
 			"--database", m.database,
 			"--payment", m.payment,
 			"--mail", m.mail,
@@ -558,6 +569,8 @@ func (m *model) selectCurrent() {
 	switch m.step {
 	case stepEdition:
 		m.edition = value
+	case stepFramework:
+		m.framework = value
 	case stepDatabase:
 		m.database = value
 	case stepPayment:
@@ -591,6 +604,8 @@ func (m model) optionSelected(value string) bool {
 	switch m.step {
 	case stepEdition:
 		return m.edition == value
+	case stepFramework:
+		return m.framework == value
 	case stepDatabase:
 		return m.database == value
 	case stepPayment:
@@ -652,6 +667,10 @@ func displayValue(value string) string {
 		return "Free"
 	case "paid":
 		return "Paid"
+	case "htmx":
+		return "htmx"
+	case "datastar":
+		return "Datastar"
 	case "sqlite":
 		return "SQLite"
 	case "postgres":

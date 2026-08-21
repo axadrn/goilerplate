@@ -285,6 +285,7 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 		"--name", "Acme",
 		"--module", "example.com/acme",
 		"--edition", "paid",
+		"--framework", "datastar",
 		"--database", "postgres",
 		"--teams",
 		"--oauth", "google,github",
@@ -297,7 +298,7 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	if err != nil || string(content) != "module example.com/acme" {
 		t.Fatalf("go.mod = %q, %v", content, err)
 	}
-	if service.generateToken != "session" || service.generateRequest.Answers.Payment != "stripe" || !service.generateRequest.Answers.Teams {
+	if service.generateToken != "session" || service.generateRequest.Answers.Framework != "datastar" || service.generateRequest.Answers.Payment != "stripe" || !service.generateRequest.Answers.Teams {
 		t.Fatalf("generation request = %#v", service.generateRequest)
 	}
 	if !strings.Contains(output.String(), "Created Acme") {
@@ -390,6 +391,20 @@ func TestNewRejectsPaidModulesForFreeBeforeCallingService(t *testing.T) {
 	}
 	if service.generateCalled {
 		t.Fatal("service was called for an invalid selection")
+	}
+}
+
+func TestNewRejectsDatastarForFreeBeforeCallingService(t *testing.T) {
+	service := &fakeService{}
+	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+	err := app.Run(context.Background(), []string{
+		"new", "--module", "example.com/acme", "--framework", "datastar", filepath.Join(t.TempDir(), "acme"),
+	})
+	if err == nil || !strings.Contains(err.Error(), "Free uses SQLite") {
+		t.Fatalf("new error = %v", err)
+	}
+	if service.generateCalled {
+		t.Fatal("service was called for an invalid Free frontend")
 	}
 }
 

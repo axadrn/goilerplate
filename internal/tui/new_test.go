@@ -32,6 +32,7 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 	model.inputs[1].SetValue("github.com/acme/rocket")
 	model.inputs[2].SetValue("Rocket")
 	model.edition = "paid"
+	model.framework = "datastar"
 	model.database = "postgres"
 	model.payment = "lemon_squeezy"
 	model.mail = "resend"
@@ -44,6 +45,7 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 		"--name", "Rocket",
 		"--module", "github.com/acme/rocket",
 		"--edition", "paid",
+		"--framework", "datastar",
 		"--database", "postgres",
 		"--payment", "lemon_squeezy",
 		"--mail", "resend",
@@ -79,6 +81,21 @@ func TestPaidDefaultsIncludeBothOAuthProviders(t *testing.T) {
 	model.edition = "paid"
 	arguments := strings.Join(model.arguments(), " ")
 	if !strings.Contains(arguments, "--oauth google,github") {
+		t.Fatalf("arguments = %q", arguments)
+	}
+}
+
+func TestPaidFrontendSelectionBuildsTheFrameworkFlag(t *testing.T) {
+	model := newModel()
+	model.edition = "paid"
+	model.setStep(stepFramework)
+	model.moveCursor(1)
+	model.selectCurrent()
+
+	if model.framework != "datastar" {
+		t.Fatalf("framework = %q", model.framework)
+	}
+	if arguments := strings.Join(model.arguments(), " "); !strings.Contains(arguments, "--framework datastar") {
 		t.Fatalf("arguments = %q", arguments)
 	}
 }
