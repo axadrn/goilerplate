@@ -18,10 +18,9 @@ import (
 	"github.com/charmbracelet/x/term"
 )
 
-var (
-	version        = "dev"
-	githubClientID = ""
-)
+const githubClientID = "Ov23liBIZFEy7FHommLT"
+
+var version = "dev"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -41,10 +40,6 @@ func run(ctx context.Context) error {
 		return err
 	}
 	httpClient := &http.Client{Timeout: 30 * time.Second}
-	clientID := strings.TrimSpace(os.Getenv("GOILERPLATE_GITHUB_CLIENT_ID"))
-	if clientID == "" {
-		clientID = githubClientID
-	}
 	apiURL := strings.TrimSpace(os.Getenv("GOILERPLATE_API_URL"))
 	if apiURL == "" {
 		apiURL = "https://goilerplate.com"
@@ -53,7 +48,7 @@ func run(ctx context.Context) error {
 		Out:            os.Stdout,
 		Store:          store,
 		Device:         github.NewDeviceClient(httpClient),
-		GitHubClientID: clientID,
+		GitHubClientID: githubClientID,
 		DefaultAPIURL:  apiURL,
 		MachineToken:   strings.TrimSpace(os.Getenv("GOILERPLATE_TOKEN")),
 		Version:        version,
