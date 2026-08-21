@@ -197,6 +197,13 @@ func TestClaimStartsAndConfirmsPurchaseEmailProof(t *testing.T) {
 	}
 }
 
+func TestClaimValidatesArgumentsBeforeLogin(t *testing.T) {
+	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	if err := app.Run(context.Background(), []string{"claim"}); err == nil || !strings.Contains(err.Error(), "usage:") {
+		t.Fatalf("claim error = %v", err)
+	}
+}
+
 func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}

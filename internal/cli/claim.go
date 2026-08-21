@@ -16,22 +16,24 @@ func (a *App) claim(ctx context.Context, arguments []string) error {
 	if err := flags.Parse(arguments); err != nil {
 		return claimUsage()
 	}
+	normalizedCode := strings.ToUpper(strings.TrimSpace(*code))
+	if normalizedCode != "" {
+		if flags.NArg() != 0 {
+			return claimUsage()
+		}
+	} else if flags.NArg() != 1 {
+		return claimUsage()
+	}
 	client, sessionToken, err := a.signedInClient()
 	if err != nil {
 		return err
 	}
-	if normalizedCode := strings.ToUpper(strings.TrimSpace(*code)); normalizedCode != "" {
-		if flags.NArg() != 0 {
-			return claimUsage()
-		}
+	if normalizedCode != "" {
 		if err := client.ConfirmLicenseClaim(ctx, sessionToken, normalizedCode); err != nil {
 			return err
 		}
 		fmt.Fprintln(a.Out, "License claimed. Run goilerplate whoami to see it")
 		return nil
-	}
-	if flags.NArg() != 1 {
-		return claimUsage()
 	}
 	if err := client.BeginLicenseClaim(ctx, sessionToken, flags.Arg(0)); err != nil {
 		return err
