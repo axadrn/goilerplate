@@ -91,6 +91,15 @@ goilerplate account delete --confirm axadrn
 
 A company license always keeps at least one Owner. The final Owner must add another Owner before deleting their account.
 
+Bought with a different email than the verified email on GitHub? Prove access to the purchase inbox with one short code:
+
+```text
+goilerplate claim buyer@example.com
+goilerplate claim --code ABCD1234EF
+```
+
+This works only while the purchase is still unclaimed. A removed developer cannot use an old purchase address to add themselves back.
+
 ### Why can one account show more than one license?
 
 Access belongs to the license, not to the login. A developer can work for two companies, so one personal login can access both company licenses. A personal Free license can also remain beside a Paid company license. goilerplate marks the best active license with `*` and uses it automatically. If the developer leaves the company later, their personal Free access still works.

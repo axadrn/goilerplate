@@ -177,6 +177,26 @@ func TestAccountDeleteRequiresConfirmationAndClearsLocalSession(t *testing.T) {
 	}
 }
 
+func TestClaimStartsAndConfirmsPurchaseEmailProof(t *testing.T) {
+	output := &bytes.Buffer{}
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{}
+	app := testApp(output, store, &fakeDevice{}, service)
+
+	if err := app.Run(context.Background(), []string{"claim", "buyer@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	if service.claimEmail != "buyer@example.com" || !strings.Contains(output.String(), "claim code") {
+		t.Fatalf("email = %q, output = %q", service.claimEmail, output.String())
+	}
+	if err := app.Run(context.Background(), []string{"claim", "--code", "ab12cd34ef"}); err != nil {
+		t.Fatal(err)
+	}
+	if service.claimCode != "AB12CD34EF" || !strings.Contains(output.String(), "License claimed") {
+		t.Fatalf("code = %q, output = %q", service.claimCode, output.String())
+	}
+}
+
 func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
@@ -486,6 +506,8 @@ type fakeService struct {
 	removedMember            string
 	revokedToken             string
 	deletedAccount           string
+	claimEmail               string
+	claimCode                string
 }
 
 func (s *fakeService) LoginWithGitHub(_ context.Context, token string) (api.GitHubLoginResponse, error) {
@@ -545,6 +567,16 @@ func (s *fakeService) ResendActivation(context.Context, string) (api.ActivationS
 	s.activationUnavailable = false
 	s.activationResendRequired = false
 	return api.ActivationStatusResponse{State: api.ActivationStatePending}, nil
+}
+
+func (s *fakeService) BeginLicenseClaim(_ context.Context, _ string, email string) error {
+	s.claimEmail = email
+	return nil
+}
+
+func (s *fakeService) ConfirmLicenseClaim(_ context.Context, _ string, code string) error {
+	s.claimCode = code
+	return nil
 }
 
 func (s *fakeService) LicenseMembers(context.Context, string, string) (api.LicenseMembersResponse, error) {

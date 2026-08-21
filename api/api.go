@@ -12,6 +12,8 @@ const (
 	PathUpdate           = "/v1/update"
 	PathActivation       = "/v1/license/activation"
 	PathActivationResend = "/v1/license/activation/resend"
+	PathLicenseClaim     = "/v1/license/claim"
+	PathLicenseClaimCode = "/v1/license/claim/code"
 	PathAccountDelete    = "/v1/account"
 	PathLicenses         = "/v1/licenses/"
 )
@@ -34,6 +36,14 @@ type GitHubLoginResponse struct {
 
 type ActivationStatusResponse struct {
 	State ActivationState `json:"state"`
+}
+
+type BeginLicenseClaimRequest struct {
+	PurchaseEmail string `json:"purchase_email"`
+}
+
+type ConfirmLicenseClaimRequest struct {
+	Code string `json:"code"`
 }
 
 type ActivationState string
