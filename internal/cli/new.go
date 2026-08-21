@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/axadrn/goilerplate/api"
-	"github.com/axadrn/goilerplate/internal/project"
+	"github.com/axadrn/goilerplate/v3/api"
+	"github.com/axadrn/goilerplate/v3/internal/project"
 )
 
 func (a *App) newProject(ctx context.Context, arguments []string) error {

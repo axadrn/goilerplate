@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/axadrn/goilerplate/api"
+	"github.com/axadrn/goilerplate/v3/api"
 )
 
 func (a *App) license(ctx context.Context, arguments []string) error {

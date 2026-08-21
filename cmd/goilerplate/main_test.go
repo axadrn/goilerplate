@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +36,24 @@ func TestIsTerminalRejectsNonTerminalFiles(t *testing.T) {
 				t.Fatalf("%s was classified as a terminal", name)
 			}
 		})
+	}
+}
+
+func TestBuildVersionUsesInjectedReleaseVersion(t *testing.T) {
+	previous := version
+	version = "3.0.0-beta.1"
+	t.Cleanup(func() { version = previous })
+	if got := buildVersion(); got != "3.0.0-beta.1" {
+		t.Fatalf("buildVersion() = %q", got)
+	}
+}
+
+func TestModuleUsesV3Path(t *testing.T) {
+	content, err := os.ReadFile("../../go.mod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(content), "module github.com/axadrn/goilerplate/v3\n") {
+		t.Fatalf("go.mod = %q", content)
 	}
 }

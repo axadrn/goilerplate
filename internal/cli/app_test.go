@@ -15,9 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/goilerplate/api"
-	"github.com/axadrn/goilerplate/internal/config"
-	"github.com/axadrn/goilerplate/internal/github"
+	"github.com/axadrn/goilerplate/v3/api"
+	"github.com/axadrn/goilerplate/v3/internal/config"
+	"github.com/axadrn/goilerplate/v3/internal/doctor"
+	"github.com/axadrn/goilerplate/v3/internal/github"
 )
 
 func TestLoginStoresOnlyGoilerplateSession(t *testing.T) {
@@ -201,6 +202,71 @@ func TestClaimValidatesArgumentsBeforeLogin(t *testing.T) {
 	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, &fakeService{})
 	if err := app.Run(context.Background(), []string{"claim"}); err == nil || !strings.Contains(err.Error(), "usage:") {
 		t.Fatalf("claim error = %v", err)
+	}
+}
+
+func TestHelpCoversEveryCommand(t *testing.T) {
+	for _, command := range []string{"new", "update", "login", "whoami", "logout", "activation", "claim", "license", "token", "account", "changelog", "doctor", "version"} {
+		t.Run(command, func(t *testing.T) {
+			output := &bytes.Buffer{}
+			app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+			if err := app.Run(context.Background(), []string{"help", command}); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(output.String(), "goilerplate "+command) {
+				t.Fatalf("output = %q", output.String())
+			}
+		})
+	}
+}
+
+func TestUnknownCommandPrintsUsage(t *testing.T) {
+	output := &bytes.Buffer{}
+	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	if err := app.Run(context.Background(), []string{"wat"}); err == nil {
+		t.Fatal("unknown command succeeded")
+	}
+	if !strings.Contains(output.String(), "Usage: goilerplate <command>") {
+		t.Fatalf("output = %q", output.String())
+	}
+}
+
+func TestChangelogPrintsPublishedReleaseNotes(t *testing.T) {
+	output := &bytes.Buffer{}
+	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	app.FetchReleases = func(context.Context) ([]github.Release, error) {
+		return []github.Release{{Tag: "v3.0.0", Name: "Launch", Body: "Everything you need.", PublishedAt: time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)}}, nil
+	}
+	if err := app.Run(context.Background(), []string{"changelog"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := output.String(); !strings.Contains(got, "v3.0.0: Launch") || !strings.Contains(got, "2026-08-21") || !strings.Contains(got, "Everything you need.") {
+		t.Fatalf("output = %q", got)
+	}
+}
+
+func TestDoctorPrintsChecksAndFailsOnErrors(t *testing.T) {
+	output := &bytes.Buffer{}
+	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	app.WorkingDirectory = "/project"
+	app.RunDoctor = func(_ context.Context, directory string) doctor.Report {
+		if directory != "/project" {
+			t.Fatalf("directory = %q", directory)
+		}
+		return doctor.Report{
+			Checks: []doctor.Check{
+				{Name: "go", Message: "1.25.7", Level: doctor.LevelOK},
+				{Name: ".env", Message: "missing", Level: doctor.LevelWarning},
+				{Name: "git", Message: "too old", Level: doctor.LevelError},
+			},
+			Errors: 1,
+		}
+	}
+	if err := app.Run(context.Background(), []string{"doctor"}); err == nil {
+		t.Fatal("doctor accepted failed report")
+	}
+	if got := output.String(); !strings.Contains(got, "[OK] go") || !strings.Contains(got, "[WARN] .env") || !strings.Contains(got, "[FAIL] git") {
+		t.Fatalf("output = %q", got)
 	}
 }
 

@@ -1,0 +1,67 @@
+version: 2
+
+project_name: goilerplate
+
+builds:
+  - id: goilerplate
+    main: ./cmd/goilerplate
+    binary: goilerplate
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: goilerplate
+    ids:
+      - goilerplate
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
+
+release:
+  prerelease: auto
+
+homebrew_casks:
+  - name: goilerplate
+    ids:
+      - goilerplate
+    binaries:
+      - goilerplate
+    homepage: https://goilerplate.com
+    description: Production-ready Go SaaS projects from one command
+    license: MIT
+    skip_upload: auto
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/goilerplate"]
+          end
+    repository:
+      owner: axadrn
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: Axel Adrian
+      email: hello@axeladrian.com

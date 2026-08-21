@@ -6,12 +6,31 @@ Development is in progress. The CLI signs in through GitHub, generates projects,
 and manages account access. It requests only GitHub's `user:email` scope. It never
 asks for repository access and never stores the temporary GitHub OAuth token.
 
+## Install
+
+Homebrew is the shortest path on macOS:
+
+```text
+brew install --cask axadrn/tap/goilerplate
+```
+
+With Go installed:
+
+```text
+go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest
+```
+
+The `/v3` segment is Go's required module version. The command is still simply
+`goilerplate`.
+
 ```text
 goilerplate login
 goilerplate whoami
 goilerplate activation resend
 goilerplate new
 goilerplate update
+goilerplate doctor
+goilerplate changelog
 goilerplate logout
 ```
 
@@ -142,4 +161,20 @@ git branch -D goilerplate-update-v3.1.0
 
 `goilerplate update` requires a clean Git worktree and Paid license access. Your source code never leaves your machine. The service receives only the answers already stored in `goilerplate.lock` and returns generated template trees.
 
-The release installation flow will land in a later package.
+## Check your setup
+
+Inside a generated project, run:
+
+```text
+goilerplate doctor
+```
+
+It checks the lock file, Go module, Go and Git versions, Task, Tailwind CSS,
+and the local tools required by your selected database and mail setup. It does
+not change or repair anything. Every failed check includes the concrete fix.
+
+Read the latest published release notes without opening a browser:
+
+```text
+goilerplate changelog
+```

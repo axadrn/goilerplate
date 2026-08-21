@@ -7,14 +7,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"time"
 
-	"github.com/axadrn/goilerplate/internal/cli"
-	"github.com/axadrn/goilerplate/internal/config"
-	"github.com/axadrn/goilerplate/internal/github"
-	"github.com/axadrn/goilerplate/internal/service"
-	"github.com/axadrn/goilerplate/internal/tui"
+	"github.com/axadrn/goilerplate/v3/internal/cli"
+	"github.com/axadrn/goilerplate/v3/internal/config"
+	"github.com/axadrn/goilerplate/v3/internal/doctor"
+	"github.com/axadrn/goilerplate/v3/internal/github"
+	"github.com/axadrn/goilerplate/v3/internal/service"
+	"github.com/axadrn/goilerplate/v3/internal/tui"
 	"github.com/charmbracelet/x/term"
 )
 
@@ -51,7 +53,11 @@ func run(ctx context.Context) error {
 		GitHubClientID: githubClientID,
 		DefaultAPIURL:  apiURL,
 		MachineToken:   strings.TrimSpace(os.Getenv("GOILERPLATE_TOKEN")),
-		Version:        version,
+		Version:        buildVersion(),
+		FetchReleases: func(ctx context.Context) ([]github.Release, error) {
+			return github.ListReleases(ctx, httpClient)
+		},
+		RunDoctor: doctor.Inspect,
 		NewService: func(baseURL string) (cli.ServiceClient, error) {
 			return service.NewClient(baseURL, httpClient)
 		},
@@ -66,4 +72,15 @@ func run(ctx context.Context) error {
 
 func isTerminal(file *os.File) bool {
 	return term.IsTerminal(file.Fd())
+}
+
+func buildVersion() string {
+	if version != "dev" {
+		return version
+	}
+	info, ok := debug.ReadBuildInfo()
+	if ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return "dev"
 }

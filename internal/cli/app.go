@@ -8,9 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/goilerplate/api"
-	"github.com/axadrn/goilerplate/internal/config"
-	"github.com/axadrn/goilerplate/internal/github"
+	"github.com/axadrn/goilerplate/v3/api"
+	"github.com/axadrn/goilerplate/v3/internal/config"
+	"github.com/axadrn/goilerplate/v3/internal/doctor"
+	"github.com/axadrn/goilerplate/v3/internal/github"
 )
 
 type ConfigStore interface {
@@ -54,6 +55,8 @@ type App struct {
 	WorkingDirectory       string
 	ActivationPollInterval time.Duration
 	RunNewProjectWizard    func(context.Context) ([]string, error)
+	FetchReleases          func(context.Context) ([]github.Release, error)
+	RunDoctor              func(context.Context, string) doctor.Report
 }
 
 func (a *App) signedInClient() (ServiceClient, string, error) {
@@ -101,14 +104,53 @@ func (a *App) Run(ctx context.Context, arguments []string) error {
 		return a.token(ctx, arguments[1:])
 	case "account":
 		return a.account(ctx, arguments[1:])
+	case "changelog":
+		return a.changelog(ctx, arguments[1:])
+	case "doctor":
+		return a.doctor(ctx, arguments[1:])
 	case "version":
 		return a.version(arguments[1:])
-	case "help", "-h", "--help":
-		a.printUsage()
-		return nil
+	case "help":
+		return a.help(arguments[1:])
+	case "-h", "--help":
+		return a.help(nil)
 	default:
+		a.printUsage()
 		return fmt.Errorf("unknown command %q", arguments[0])
 	}
+}
+
+func (a *App) help(arguments []string) error {
+	if len(arguments) == 0 {
+		a.printUsage()
+		return nil
+	}
+	if len(arguments) != 1 {
+		return errors.New("usage: goilerplate help [command]")
+	}
+	usage := map[string][]string{
+		"new":        {"goilerplate new [options] <directory>", "Run without options in a terminal to open interactive setup."},
+		"update":     {"goilerplate update", "Create a Git branch containing the new generated template."},
+		"login":      {"goilerplate login", "Sign in through GitHub's device flow."},
+		"whoami":     {"goilerplate whoami", "Show the current account and available licenses."},
+		"logout":     {"goilerplate logout", "Revoke the current goilerplate session."},
+		"activation": {"goilerplate activation resend", "Send a new Free activation email."},
+		"claim":      {"goilerplate claim <purchase-email>", "goilerplate claim --code <code>"},
+		"license":    {"goilerplate license members|invite|remove ...", "Manage people on a company license."},
+		"token":      {"goilerplate token create|list|revoke ...", "Manage generation-only CI keys."},
+		"account":    {"goilerplate account delete --confirm <github-login>", "Delete the current account."},
+		"changelog":  {"goilerplate changelog", "Show published GitHub release notes."},
+		"doctor":     {"goilerplate doctor", "Check tools and configuration for a generated project."},
+		"version":    {"goilerplate version", "Show the CLI version."},
+	}
+	lines, ok := usage[arguments[0]]
+	if !ok {
+		return fmt.Errorf("unknown command %q", arguments[0])
+	}
+	for _, line := range lines {
+		fmt.Fprintln(a.Out, line)
+	}
+	return nil
 }
 
 func (a *App) login(ctx context.Context, arguments []string) error {
@@ -249,6 +291,8 @@ func (a *App) printUsage() {
 	fmt.Fprintln(a.Out, "  license  Invite, list, or remove license members")
 	fmt.Fprintln(a.Out, "  token    Create, list, or revoke CI keys")
 	fmt.Fprintln(a.Out, "  account delete  Delete the current account")
+	fmt.Fprintln(a.Out, "  changelog  Show published release notes")
+	fmt.Fprintln(a.Out, "  doctor   Check a generated project's local tools")
 	fmt.Fprintln(a.Out, "  logout   Revoke the current session")
 	fmt.Fprintln(a.Out, "  version  Show the CLI version")
 }
