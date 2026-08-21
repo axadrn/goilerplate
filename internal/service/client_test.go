@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/goilerplate/api"
+	"github.com/axadrn/goilerplate/v3/api"
 )
 
 func TestClientLoginAndWhoAmI(t *testing.T) {

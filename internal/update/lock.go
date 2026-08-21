@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/axadrn/goilerplate/api"
+	"github.com/axadrn/goilerplate/v3/api"
 )
 
 const maxLockSize = 64 << 10

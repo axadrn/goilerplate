@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/axadrn/goilerplate/api"
+	"github.com/axadrn/goilerplate/v3/api"
 )
 
 var errActivationResendRequired = errors.New("Free activation needs a new email. Run goilerplate activation resend")
