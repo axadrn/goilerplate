@@ -95,7 +95,7 @@ Bought with a different email than the verified email on GitHub? Prove access to
 
 ```text
 goilerplate claim buyer@example.com
-goilerplate claim --code ABCD1234EF
+goilerplate claim --code ABCD2345EF
 ```
 
 This works only while the purchase is still unclaimed. A removed developer cannot use an old purchase address to add themselves back.

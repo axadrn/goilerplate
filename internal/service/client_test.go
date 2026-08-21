@@ -62,7 +62,7 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
 				t.Fatal(err)
 			}
-			if input.Code != "AB12CD34EF" {
+			if input.Code != "ABCD2345EF" {
 				t.Fatalf("claim code = %q", input.Code)
 			}
 			response.WriteHeader(http.StatusNoContent)
@@ -106,7 +106,7 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 	if err := client.BeginLicenseClaim(context.Background(), login.SessionToken, "buyer@example.com"); err != nil {
 		t.Fatal(err)
 	}
-	if err := client.ConfirmLicenseClaim(context.Background(), login.SessionToken, "AB12CD34EF"); err != nil {
+	if err := client.ConfirmLicenseClaim(context.Background(), login.SessionToken, "ABCD2345EF"); err != nil {
 		t.Fatal(err)
 	}
 }

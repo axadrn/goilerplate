@@ -189,10 +189,10 @@ func TestClaimStartsAndConfirmsPurchaseEmailProof(t *testing.T) {
 	if service.claimEmail != "buyer@example.com" || !strings.Contains(output.String(), "claim code") {
 		t.Fatalf("email = %q, output = %q", service.claimEmail, output.String())
 	}
-	if err := app.Run(context.Background(), []string{"claim", "--code", "ab12cd34ef"}); err != nil {
+	if err := app.Run(context.Background(), []string{"claim", "--code", "abcd2345ef"}); err != nil {
 		t.Fatal(err)
 	}
-	if service.claimCode != "AB12CD34EF" || !strings.Contains(output.String(), "License claimed") {
+	if service.claimCode != "ABCD2345EF" || !strings.Contains(output.String(), "License claimed") {
 		t.Fatalf("code = %q, output = %q", service.claimCode, output.String())
 	}
 }
