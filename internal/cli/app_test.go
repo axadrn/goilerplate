@@ -235,12 +235,15 @@ func TestChangelogPrintsPublishedReleaseNotes(t *testing.T) {
 	output := &bytes.Buffer{}
 	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
 	app.FetchReleases = func(context.Context) ([]github.Release, error) {
-		return []github.Release{{Tag: "v3.0.0", Name: "Launch", Body: "Everything you need.", PublishedAt: time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)}}, nil
+		return []github.Release{{
+			Tag: "v3.0.0-beta.1", Name: "Beta", Body: "Everything\x1b[31m you need.\x07",
+			PublishedAt: time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC), Prerelease: true,
+		}}, nil
 	}
 	if err := app.Run(context.Background(), []string{"changelog"}); err != nil {
 		t.Fatal(err)
 	}
-	if got := output.String(); !strings.Contains(got, "v3.0.0: Launch") || !strings.Contains(got, "2026-08-21") || !strings.Contains(got, "Everything you need.") {
+	if got := output.String(); !strings.Contains(got, "v3.0.0-beta.1: Beta (prerelease)") || !strings.Contains(got, "2026-08-21") || !strings.Contains(got, "Everything[31m you need.") || !strings.Contains(got, "Showing up to 10 latest releases") || strings.ContainsRune(got, '\x1b') || strings.ContainsRune(got, '\x07') {
 		t.Fatalf("output = %q", got)
 	}
 }

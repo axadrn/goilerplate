@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,8 @@ import (
 )
 
 type Level int
+
+const maxEnvironmentSize = 1 << 20
 
 const (
 	LevelOK Level = iota
@@ -65,16 +68,20 @@ func (i Inspector) Inspect(ctx context.Context, directory string) Report {
 	module, requiredGo, err := readModule(filepath.Join(root, "go.mod"))
 	if err != nil {
 		report = report.add("go.mod", err.Error(), LevelError)
-	} else if module != lock.Answers.ModulePath {
-		report = report.add("go.mod", fmt.Sprintf("module is %s, lock expects %s", module, lock.Answers.ModulePath), LevelError)
 	} else {
-		report = report.add("go.mod", module, LevelOK)
+		if module != lock.Answers.ModulePath {
+			report = report.add("go.mod", fmt.Sprintf("module is %s, lock expects %s", module, lock.Answers.ModulePath), LevelError)
+		} else {
+			report = report.add("go.mod", module, LevelOK)
+		}
+		if requiredGo != "" {
+			report = i.checkVersion(ctx, report, "go", []string{"env", "GOVERSION"}, requiredGo, "Install Go "+requiredGo+" or newer")
+		}
 	}
 
-	report = i.checkVersion(ctx, report, "go", []string{"env", "GOVERSION"}, requiredGo, "Install Go "+requiredGo+" or newer")
 	report = i.checkVersion(ctx, report, "git", []string{"--version"}, "2.38.0", "Install Git 2.38 or newer for goilerplate update")
-	report = i.checkTool(report, "task", "Install Task from https://taskfile.dev/installation/")
-	report = i.checkTool(report, "tailwindcss", "Install the Tailwind CSS CLI from https://tailwindcss.com/docs/installation/tailwind-cli")
+	report = i.checkTool(report, "task", "Optional. Install Task from https://taskfile.dev/installation/", LevelWarning)
+	report = i.checkTool(report, "tailwindcss", "Optional. Install the Tailwind CSS CLI from https://tailwindcss.com/docs/installation/tailwind-cli", LevelWarning)
 
 	environmentPath := filepath.Join(root, ".env")
 	if _, err := os.Stat(environmentPath); err == nil {
@@ -90,12 +97,12 @@ func (i Inspector) Inspect(ctx context.Context, directory string) Report {
 			}
 		}
 	} else if errors.Is(err, os.ErrNotExist) {
-		report = report.add(".env", "missing, run: cp .env.example .env", LevelWarning)
+		report = report.add(".env", "missing. Create .env from .env.example", LevelWarning)
 	} else {
 		report = report.add(".env", err.Error(), LevelWarning)
 	}
 	if lock.Answers.Database == "postgres" || lock.Answers.Mail == "smtp" {
-		report = i.checkTool(report, "docker", "Install Docker or provide the selected services yourself")
+		report = i.checkTool(report, "docker", "Optional. Install Docker or provide the selected services yourself", LevelWarning)
 	}
 	return report
 }
@@ -106,8 +113,16 @@ func readEnvironment(name string) (map[string]string, error) {
 		return nil, err
 	}
 	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if info.Size() > maxEnvironmentSize {
+		return nil, fmt.Errorf(".env is larger than %d bytes", maxEnvironmentSize)
+	}
 	values := map[string]string{}
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(io.LimitReader(file, maxEnvironmentSize+1))
+	scanner.Buffer(make([]byte, 64*1024), maxEnvironmentSize)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -178,10 +193,10 @@ func (r Report) add(name, message string, level Level) Report {
 	return r
 }
 
-func (i Inspector) checkTool(report Report, name, fix string) Report {
+func (i Inspector) checkTool(report Report, name, fix string, missingLevel Level) Report {
 	path, err := i.LookPath(name)
 	if err != nil {
-		return report.add(name, fix, LevelError)
+		return report.add(name, fix, missingLevel)
 	}
 	return report.add(name, path, LevelOK)
 }
@@ -230,7 +245,8 @@ func readModule(name string) (string, string, error) {
 	var module, goVersion string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
+		line, _, _ := strings.Cut(scanner.Text(), "//")
+		fields := strings.Fields(line)
 		if len(fields) == 2 && fields[0] == "module" {
 			module = fields[1]
 		}
@@ -241,29 +257,27 @@ func readModule(name string) (string, string, error) {
 	if err := scanner.Err(); err != nil {
 		return "", "", err
 	}
-	if module == "" || goVersion == "" {
-		return "", "", errors.New("go.mod must contain module and go directives")
+	if module == "" {
+		return "", "", errors.New("go.mod must contain a module directive")
 	}
 	return module, goVersion, nil
 }
 
 func firstVersion(value string) (string, bool) {
-	value = strings.TrimSpace(strings.TrimPrefix(value, "go"))
 	for _, field := range strings.Fields(value) {
-		candidate := strings.TrimPrefix(field, "go")
-		parts := strings.Split(candidate, ".")
-		if len(parts) >= 2 {
-			if _, err := strconv.Atoi(parts[0]); err == nil {
-				return candidate, true
-			}
+		candidate := strings.TrimLeftFunc(field, func(character rune) bool {
+			return character < '0' || character > '9'
+		})
+		if _, count := numericVersion(candidate); count >= 2 {
+			return candidate, true
 		}
 	}
 	return "", false
 }
 
 func compareVersions(left, right string) int {
-	leftParts := numericVersion(left)
-	rightParts := numericVersion(right)
+	leftParts, _ := numericVersion(left)
+	rightParts, _ := numericVersion(right)
 	for index := 0; index < 3; index++ {
 		if leftParts[index] < rightParts[index] {
 			return -1
@@ -275,12 +289,28 @@ func compareVersions(left, right string) int {
 	return 0
 }
 
-func numericVersion(value string) [3]int {
+func numericVersion(value string) ([3]int, int) {
 	var result [3]int
-	for index, part := range strings.SplitN(value, ".", 3) {
-		part = strings.TrimLeftFunc(part, func(character rune) bool { return character < '0' || character > '9' })
-		part = strings.TrimRightFunc(part, func(character rune) bool { return character < '0' || character > '9' })
-		result[index], _ = strconv.Atoi(part)
+	count := 0
+	for _, part := range strings.Split(value, ".") {
+		if count == len(result) {
+			break
+		}
+		digits := part
+		if end := strings.IndexFunc(part, func(character rune) bool {
+			return character < '0' || character > '9'
+		}); end >= 0 {
+			digits = part[:end]
+		}
+		if digits == "" {
+			break
+		}
+		number, err := strconv.Atoi(digits)
+		if err != nil {
+			break
+		}
+		result[count] = number
+		count++
 	}
-	return result
+	return result, count
 }
