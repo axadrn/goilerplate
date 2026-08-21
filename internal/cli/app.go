@@ -29,6 +29,8 @@ type ServiceClient interface {
 	Logout(context.Context, string) error
 	ActivationStatus(context.Context, string) (api.ActivationStatusResponse, error)
 	ResendActivation(context.Context, string) (api.ActivationStatusResponse, error)
+	BeginLicenseClaim(context.Context, string, string) error
+	ConfirmLicenseClaim(context.Context, string, string) error
 	LicenseMembers(context.Context, string, string) (api.LicenseMembersResponse, error)
 	InviteLicenseMember(context.Context, string, string, api.InviteLicenseMemberRequest) (api.InviteLicenseMemberResponse, error)
 	RemoveLicenseMember(context.Context, string, string, string) error
@@ -91,6 +93,8 @@ func (a *App) Run(ctx context.Context, arguments []string) error {
 		return a.logout(ctx, arguments[1:])
 	case "activation":
 		return a.activation(ctx, arguments[1:])
+	case "claim":
+		return a.claim(ctx, arguments[1:])
 	case "license":
 		return a.license(ctx, arguments[1:])
 	case "token":
@@ -240,6 +244,7 @@ func (a *App) printUsage() {
 	fmt.Fprintln(a.Out, "  update   Update a generated project on a new Git branch")
 	fmt.Fprintln(a.Out, "  login    Sign in with GitHub")
 	fmt.Fprintln(a.Out, "  activation resend  Send a new Free activation email")
+	fmt.Fprintln(a.Out, "  claim    Connect a purchase made with another email")
 	fmt.Fprintln(a.Out, "  whoami   Show the current account and licenses")
 	fmt.Fprintln(a.Out, "  license  Invite, list, or remove license members")
 	fmt.Fprintln(a.Out, "  token    Create, list, or revoke CI keys")
