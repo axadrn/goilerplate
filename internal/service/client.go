@@ -101,6 +101,30 @@ func (c *Client) ResendActivation(ctx context.Context, sessionToken string) (api
 	return response, nil
 }
 
+func (c *Client) BeginLicenseClaim(ctx context.Context, sessionToken, purchaseEmail string) error {
+	if strings.TrimSpace(sessionToken) == "" {
+		return errors.New("goilerplate session token is required")
+	}
+	if strings.TrimSpace(purchaseEmail) == "" {
+		return errors.New("purchase email is required")
+	}
+	return c.doJSON(ctx, http.MethodPost, api.PathLicenseClaim, sessionToken, api.BeginLicenseClaimRequest{
+		PurchaseEmail: purchaseEmail,
+	}, nil)
+}
+
+func (c *Client) ConfirmLicenseClaim(ctx context.Context, sessionToken, code string) error {
+	if strings.TrimSpace(sessionToken) == "" {
+		return errors.New("goilerplate session token is required")
+	}
+	if strings.TrimSpace(code) == "" {
+		return errors.New("claim code is required")
+	}
+	return c.doJSON(ctx, http.MethodPost, api.PathLicenseClaimCode, sessionToken, api.ConfirmLicenseClaimRequest{
+		Code: code,
+	}, nil)
+}
+
 func (c *Client) LicenseMembers(ctx context.Context, sessionToken, licenseID string) (api.LicenseMembersResponse, error) {
 	var response api.LicenseMembersResponse
 	path := licensePath(licenseID) + "/members"

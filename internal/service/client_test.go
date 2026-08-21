@@ -48,6 +48,24 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 				t.Fatalf("Authorization = %q", request.Header.Get("Authorization"))
 			}
 			json.NewEncoder(response).Encode(api.ActivationStatusResponse{State: api.ActivationStatePending})
+		case api.PathLicenseClaim:
+			var input api.BeginLicenseClaimRequest
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				t.Fatal(err)
+			}
+			if input.PurchaseEmail != "buyer@example.com" {
+				t.Fatalf("purchase email = %q", input.PurchaseEmail)
+			}
+			response.WriteHeader(http.StatusAccepted)
+		case api.PathLicenseClaimCode:
+			var input api.ConfirmLicenseClaimRequest
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				t.Fatal(err)
+			}
+			if input.Code != "ABCD2345EF" {
+				t.Fatalf("claim code = %q", input.Code)
+			}
+			response.WriteHeader(http.StatusNoContent)
 		case api.PathLogout:
 			if request.Header.Get("Authorization") != "Bearer session-token" {
 				t.Fatalf("Authorization = %q", request.Header.Get("Authorization"))
@@ -83,6 +101,12 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 		t.Fatalf("resend activation = %#v, %v", resent, err)
 	}
 	if err := client.Logout(context.Background(), login.SessionToken); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.BeginLicenseClaim(context.Background(), login.SessionToken, "buyer@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ConfirmLicenseClaim(context.Background(), login.SessionToken, "ABCD2345EF"); err != nil {
 		t.Fatal(err)
 	}
 }
