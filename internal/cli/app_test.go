@@ -209,6 +209,65 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	}
 }
 
+func TestNewWithoutArgumentsUsesWizardThenExistingGenerationPath(t *testing.T) {
+	output := &bytes.Buffer{}
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{generatedVersion: "v3.0.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
+	app := testApp(output, store, &fakeDevice{}, service)
+	destination := filepath.Join(t.TempDir(), "acme")
+	wizardCalled := false
+	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
+		wizardCalled = true
+		return []string{
+			"--name", "Acme",
+			"--module", "example.com/acme",
+			"--edition", "paid",
+			"--database", "postgres",
+			"--teams",
+			destination,
+		}, nil
+	}
+
+	if err := app.Run(context.Background(), []string{"new"}); err != nil {
+		t.Fatal(err)
+	}
+	if !wizardCalled || !service.generateCalled {
+		t.Fatalf("wizard called = %v, generated = %v", wizardCalled, service.generateCalled)
+	}
+	if service.generateRequest.Answers.Database != "postgres" || !service.generateRequest.Answers.Teams {
+		t.Fatalf("generation request = %#v", service.generateRequest)
+	}
+}
+
+func TestNewReturnsWizardErrorWithoutCallingService(t *testing.T) {
+	wizardError := errors.New("cancelled")
+	service := &fakeService{}
+	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
+		return nil, wizardError
+	}
+
+	if err := app.Run(context.Background(), []string{"new"}); !errors.Is(err, wizardError) {
+		t.Fatalf("new error = %v", err)
+	}
+	if service.generateCalled {
+		t.Fatal("service was called after wizard failure")
+	}
+}
+
+func TestNewWithoutArgumentsRequiresInteractiveTerminal(t *testing.T) {
+	service := &fakeService{}
+	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+
+	err := app.Run(context.Background(), []string{"new"})
+	if err == nil || !strings.Contains(err.Error(), "usage: goilerplate new") {
+		t.Fatalf("new error = %v", err)
+	}
+	if service.generateCalled {
+		t.Fatal("service was called without project arguments")
+	}
+}
+
 func TestNewUsesMachineTokenWithoutPersonalLoginOrActivation(t *testing.T) {
 	store := &memoryStore{}
 	service := &fakeService{generatedVersion: "v3.0.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}

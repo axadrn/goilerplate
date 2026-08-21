@@ -51,6 +51,7 @@ type App struct {
 	Version                string
 	WorkingDirectory       string
 	ActivationPollInterval time.Duration
+	RunNewProjectWizard    func(context.Context) ([]string, error)
 }
 
 func (a *App) signedInClient() (ServiceClient, string, error) {

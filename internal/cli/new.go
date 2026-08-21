@@ -15,6 +15,14 @@ import (
 )
 
 func (a *App) newProject(ctx context.Context, arguments []string) error {
+	if len(arguments) == 0 && a.RunNewProjectWizard != nil {
+		var err error
+		arguments, err = a.RunNewProjectWizard(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
 	flags := flag.NewFlagSet("new", flag.ContinueOnError)
 	flags.SetOutput(a.Out)
 	name := flags.String("name", "", "project name")
