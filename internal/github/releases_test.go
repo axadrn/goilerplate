@@ -4,8 +4,10 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -20,7 +22,7 @@ func TestListReleasesReturnsPublishedReleases(t *testing.T) {
 			t.Fatalf("request = %s, headers = %#v", request.URL, request.Header)
 		}
 		body := `[
-			{"tag_name":"v3.0.0","name":"Launch","body":"Ready","published_at":"2026-08-21T10:00:00Z"},
+			{"tag_name":"v3.0.0-beta.1","name":"Beta","body":"Ready","published_at":"2026-08-21T10:00:00Z","prerelease":true},
 			{"tag_name":"v3.1.0","draft":true}
 		]`
 		return &http.Response{StatusCode: http.StatusOK, Status: "200 OK", Body: io.NopCloser(strings.NewReader(body))}, nil
@@ -30,8 +32,24 @@ func TestListReleasesReturnsPublishedReleases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(releases) != 1 || releases[0].Tag != "v3.0.0" || releases[0].Body != "Ready" {
+	if len(releases) != 1 || releases[0].Tag != "v3.0.0-beta.1" || releases[0].Body != "Ready" || !releases[0].Prerelease {
 		t.Fatalf("releases = %#v", releases)
+	}
+}
+
+func TestListReleasesExplainsRateLimitReset(t *testing.T) {
+	reset := time.Date(2026, 8, 21, 12, 0, 0, 0, time.UTC)
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusForbidden,
+			Status:     "403 Forbidden",
+			Header:     http.Header{"X-Ratelimit-Reset": []string{strconv.FormatInt(reset.Unix(), 10)}},
+			Body:       io.NopCloser(strings.NewReader("rate limited")),
+		}, nil
+	})}
+	_, err := ListReleases(context.Background(), client)
+	if err == nil || !strings.Contains(err.Error(), reset.Format(time.RFC3339)) {
+		t.Fatalf("ListReleases() error = %v", err)
 	}
 }
 

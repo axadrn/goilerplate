@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 )
 
+const ReleaseLimit = 10
+const ReleasesPageURL = "https://github.com/axadrn/goilerplate/releases"
 const releasesURL = "https://api.github.com/repos/axadrn/goilerplate/releases?per_page=10"
 const maxReleasesResponseSize = 1 << 20
 
@@ -19,6 +22,7 @@ type Release struct {
 	Body        string    `json:"body"`
 	PublishedAt time.Time `json:"published_at"`
 	Draft       bool      `json:"draft"`
+	Prerelease  bool      `json:"prerelease"`
 }
 
 func ListReleases(ctx context.Context, client *http.Client) ([]Release, error) {
@@ -37,6 +41,11 @@ func ListReleases(ctx context.Context, client *http.Client) ([]Release, error) {
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
+		if response.StatusCode == http.StatusForbidden || response.StatusCode == http.StatusTooManyRequests {
+			if reset, ok := rateLimitReset(response.Header, time.Now().UTC()); ok {
+				return nil, fmt.Errorf("load release notes: GitHub rate limit reached. Try again after %s", reset.Format(time.RFC3339))
+			}
+		}
 		return nil, fmt.Errorf("load release notes: GitHub returned %s", response.Status)
 	}
 	content, err := io.ReadAll(io.LimitReader(response.Body, maxReleasesResponseSize+1))
@@ -57,4 +66,20 @@ func ListReleases(ctx context.Context, client *http.Client) ([]Release, error) {
 		}
 	}
 	return published, nil
+}
+
+func rateLimitReset(header http.Header, now time.Time) (time.Time, bool) {
+	if value := header.Get("Retry-After"); value != "" {
+		seconds, err := strconv.ParseInt(value, 10, 64)
+		if err == nil && seconds >= 0 {
+			return now.Add(time.Duration(seconds) * time.Second), true
+		}
+	}
+	if value := header.Get("X-RateLimit-Reset"); value != "" {
+		seconds, err := strconv.ParseInt(value, 10, 64)
+		if err == nil && seconds > 0 {
+			return time.Unix(seconds, 0).UTC(), true
+		}
+	}
+	return time.Time{}, false
 }

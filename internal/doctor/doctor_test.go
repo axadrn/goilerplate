@@ -54,13 +54,34 @@ func TestInspectReportsModuleVersionsAndMissingTools(t *testing.T) {
 	inspector := fakeInspector(map[string]string{"go": "go1.24.0", "git": "git version 2.37.0"})
 
 	report := inspector.Inspect(context.Background(), root)
-	if report.Errors != 5 {
+	if report.Errors != 3 {
 		t.Fatalf("errors = %d, checks = %#v", report.Errors, report.Checks)
 	}
-	for _, name := range []string{"go.mod", "go", "git", "task", "tailwindcss"} {
+	for _, name := range []string{"go.mod", "go", "git"} {
 		if !hasCheck(report, name, LevelError) {
 			t.Fatalf("missing failed check %q in %#v", name, report.Checks)
 		}
+	}
+	for _, name := range []string{"task", "tailwindcss"} {
+		if !hasCheck(report, name, LevelWarning) {
+			t.Fatalf("missing optional warning %q in %#v", name, report.Checks)
+		}
+	}
+}
+
+func TestInspectAllowsCommentsAndNoGoVersionGate(t *testing.T) {
+	root := t.TempDir()
+	writeProject(t, root, api.ProjectLock{
+		SchemaVersion:   api.LockSchemaVersion,
+		TemplateVersion: "v3.0.0",
+		Answers:         api.GenerationAnswers{ModulePath: "example.com/acme", Edition: "free", Database: "sqlite", Mail: "resend"},
+	})
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/acme // generated project\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	report := fakeInspector(map[string]string{"git": "git version 2.50.1"}).Inspect(context.Background(), root)
+	if report.Errors != 0 || hasCheckName(report, "go") {
+		t.Fatalf("report = %#v", report)
 	}
 }
 
@@ -116,15 +137,36 @@ func TestCompareVersions(t *testing.T) {
 		left, right string
 		want        int
 	}{
-		"older": {"2.37.9", "2.38.0", -1},
-		"equal": {"1.25", "1.25.0", 0},
-		"newer": {"1.25.7", "1.25.0", 1},
+		"older":             {"2.37.9", "2.38.0", -1},
+		"equal":             {"1.25", "1.25.0", 0},
+		"newer":             {"1.25.7", "1.25.0", 1},
+		"four components":   {"2.38.0.1", "2.38.0", 0},
+		"windows suffix":    {"2.38.1.windows.1", "2.38.1", 0},
+		"release candidate": {"1.26rc1", "1.26.0", 0},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if got := compareVersions(test.left, test.right); got != test.want {
 				t.Fatalf("compareVersions(%q, %q) = %d, want %d", test.left, test.right, got, test.want)
 			}
 		})
+	}
+}
+
+func TestFirstVersionReadsToolOutputVariants(t *testing.T) {
+	for _, value := range []string{"go1.25.7", "go version go1.26rc1 windows/amd64", "git version 2.50.1.windows.1", "git version 2.50.1.2"} {
+		if _, ok := firstVersion(value); !ok {
+			t.Fatalf("firstVersion(%q) did not find a version", value)
+		}
+	}
+}
+
+func TestReadEnvironmentRejectsOversizedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte(strings.Repeat("A", maxEnvironmentSize+1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readEnvironment(path); err == nil || !strings.Contains(err.Error(), "larger") {
+		t.Fatalf("readEnvironment() error = %v", err)
 	}
 }
 
@@ -159,6 +201,15 @@ func writeProject(t *testing.T, root string, lock api.ProjectLock) {
 func hasCheck(report Report, name string, level Level) bool {
 	for _, check := range report.Checks {
 		if check.Name == name && check.Level == level {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCheckName(report Report, name string) bool {
+	for _, check := range report.Checks {
+		if check.Name == name {
 			return true
 		}
 	}
