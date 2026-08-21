@@ -12,7 +12,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/axadrn/goilerplate/api"
+	"github.com/axadrn/goilerplate/v3/api"
 )
 
 const maxResponseSize = 1 << 20

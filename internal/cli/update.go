@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/axadrn/goilerplate/api"
-	"github.com/axadrn/goilerplate/internal/project"
-	projectupdate "github.com/axadrn/goilerplate/internal/update"
+	"github.com/axadrn/goilerplate/v3/api"
+	"github.com/axadrn/goilerplate/v3/internal/project"
+	projectupdate "github.com/axadrn/goilerplate/v3/internal/update"
 )
 
 func (a *App) updateProject(ctx context.Context, arguments []string) error {
