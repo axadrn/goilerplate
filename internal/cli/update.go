@@ -107,11 +107,7 @@ func (a *App) updateClient(ctx context.Context) (ServiceClient, string, error) {
 	if token == "" {
 		token = configuration.SessionToken
 	}
-	apiURL := configuration.APIURL
-	if apiURL == "" {
-		apiURL = a.DefaultAPIURL
-	}
-	client, err := a.NewService(apiURL)
+	client, err := a.NewService(a.apiURL(configuration))
 	if err != nil {
 		return nil, "", err
 	}

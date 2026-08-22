@@ -47,6 +47,50 @@ func TestLoginStoresOnlyGoilerplateSession(t *testing.T) {
 	}
 }
 
+func TestLoginPrefersAndStoresAPIURLOverride(t *testing.T) {
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com"}}
+	service := &fakeService{login: api.GitHubLoginResponse{
+		SessionToken: "beta-session",
+		Account:      api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
+	}}
+	app := testApp(&bytes.Buffer{}, store, &fakeDevice{githubToken: "temporary-github-token"}, service)
+	app.APIURLOverride = "https://beta.goilerplate.com"
+	var serviceURL string
+	app.NewService = func(baseURL string) (ServiceClient, error) {
+		serviceURL = baseURL
+		return service, nil
+	}
+
+	if err := app.Run(context.Background(), []string{"login"}); err != nil {
+		t.Fatal(err)
+	}
+	if serviceURL != "https://beta.goilerplate.com" {
+		t.Fatalf("service URL = %q", serviceURL)
+	}
+	if store.configuration.APIURL != "https://beta.goilerplate.com" {
+		t.Fatalf("stored API URL = %q", store.configuration.APIURL)
+	}
+}
+
+func TestSignedInCommandPrefersAPIURLOverride(t *testing.T) {
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{who: api.WhoAmIResponse{Account: api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"}}}
+	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+	app.APIURLOverride = "https://beta.goilerplate.com"
+	var serviceURL string
+	app.NewService = func(baseURL string) (ServiceClient, error) {
+		serviceURL = baseURL
+		return service, nil
+	}
+
+	if err := app.Run(context.Background(), []string{"whoami"}); err != nil {
+		t.Fatal(err)
+	}
+	if serviceURL != "https://beta.goilerplate.com" {
+		t.Fatalf("service URL = %q", serviceURL)
+	}
+}
+
 func TestLoginWaitsForFreeActivation(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{}

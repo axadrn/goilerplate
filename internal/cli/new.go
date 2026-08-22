@@ -92,11 +92,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 		}
 		authorizationToken = configuration.SessionToken
 	}
-	apiURL := configuration.APIURL
-	if apiURL == "" {
-		apiURL = a.DefaultAPIURL
-	}
-	client, err := a.NewService(apiURL)
+	client, err := a.NewService(a.apiURL(configuration))
 	if err != nil {
 		return err
 	}
