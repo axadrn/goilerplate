@@ -42,16 +42,13 @@ func run(ctx context.Context) error {
 		return err
 	}
 	httpClient := &http.Client{Timeout: 30 * time.Second}
-	apiURL := strings.TrimSpace(os.Getenv("GOILERPLATE_API_URL"))
-	if apiURL == "" {
-		apiURL = "https://goilerplate.com"
-	}
 	application := &cli.App{
 		Out:            os.Stdout,
 		Store:          store,
 		Device:         github.NewDeviceClient(httpClient),
 		GitHubClientID: githubClientID,
-		DefaultAPIURL:  apiURL,
+		DefaultAPIURL:  "https://goilerplate.com",
+		APIURLOverride: strings.TrimSpace(os.Getenv("GOILERPLATE_API_URL")),
 		MachineToken:   strings.TrimSpace(os.Getenv("GOILERPLATE_TOKEN")),
 		Version:        buildVersion(),
 		FetchReleases: func(ctx context.Context) ([]github.Release, error) {

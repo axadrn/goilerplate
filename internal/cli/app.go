@@ -50,6 +50,7 @@ type App struct {
 	NewService             func(string) (ServiceClient, error)
 	GitHubClientID         string
 	DefaultAPIURL          string
+	APIURLOverride         string
 	MachineToken           string
 	Version                string
 	WorkingDirectory       string
@@ -57,6 +58,16 @@ type App struct {
 	RunNewProjectWizard    func(context.Context) ([]string, error)
 	FetchReleases          func(context.Context) ([]github.Release, error)
 	RunDoctor              func(context.Context, string) doctor.Report
+}
+
+func (a *App) apiURL(configuration config.Config) string {
+	if apiURL := strings.TrimSpace(a.APIURLOverride); apiURL != "" {
+		return apiURL
+	}
+	if apiURL := strings.TrimSpace(configuration.APIURL); apiURL != "" {
+		return apiURL
+	}
+	return strings.TrimSpace(a.DefaultAPIURL)
 }
 
 func (a *App) signedInClient() (ServiceClient, string, error) {
@@ -67,11 +78,7 @@ func (a *App) signedInClient() (ServiceClient, string, error) {
 	if configuration.SessionToken == "" {
 		return nil, "", errors.New("not signed in. Run goilerplate login")
 	}
-	apiURL := configuration.APIURL
-	if apiURL == "" {
-		apiURL = a.DefaultAPIURL
-	}
-	client, err := a.NewService(apiURL)
+	client, err := a.NewService(a.apiURL(configuration))
 	if err != nil {
 		return nil, "", err
 	}
@@ -164,10 +171,7 @@ func (a *App) login(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	apiURL := configuration.APIURL
-	if apiURL == "" {
-		apiURL = a.DefaultAPIURL
-	}
+	apiURL := a.apiURL(configuration)
 	client, err := a.NewService(apiURL)
 	if err != nil {
 		return err
@@ -213,11 +217,7 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 	if configuration.SessionToken == "" {
 		return errors.New("not signed in. Run goilerplate login")
 	}
-	apiURL := configuration.APIURL
-	if apiURL == "" {
-		apiURL = a.DefaultAPIURL
-	}
-	client, err := a.NewService(apiURL)
+	client, err := a.NewService(a.apiURL(configuration))
 	if err != nil {
 		return err
 	}
@@ -249,11 +249,7 @@ func (a *App) logout(ctx context.Context, arguments []string) error {
 		fmt.Fprintln(a.Out, "Already signed out")
 		return nil
 	}
-	apiURL := configuration.APIURL
-	if apiURL == "" {
-		apiURL = a.DefaultAPIURL
-	}
-	client, err := a.NewService(apiURL)
+	client, err := a.NewService(a.apiURL(configuration))
 	if err != nil {
 		return err
 	}
