@@ -54,11 +54,7 @@ func (a *App) activation(ctx context.Context, arguments []string) error {
 	if configuration.SessionToken == "" {
 		return errors.New("not signed in. Run goilerplate login")
 	}
-	apiURL := configuration.APIURL
-	if apiURL == "" {
-		apiURL = a.DefaultAPIURL
-	}
-	client, err := a.NewService(apiURL)
+	client, err := a.NewService(a.apiURL(configuration))
 	if err != nil {
 		return err
 	}
