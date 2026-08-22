@@ -1,180 +1,106 @@
 # goilerplate
 
-The public CLI for goilerplate.
+Generate a production-ready Go SaaS, own every line, and update it with Git.
 
-Development is in progress. The CLI signs in through GitHub, generates projects,
-and manages account access. It requests only GitHub's `user:email` scope. It never
-asks for repository access and never stores the temporary GitHub OAuth token.
+Development is in progress. Public launch is coming soon. Visit [goilerplate.com](https://goilerplate.com), then star or watch this repository to follow the release.
 
 ## Install
 
-Homebrew is the shortest path on macOS:
+Homebrew includes the binary, so Go does not need to be installed first:
 
 ```text
 brew install --cask axadrn/tap/goilerplate
 ```
 
-With Go installed:
+If Go is already installed:
 
 ```text
 go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest
 ```
 
-The `/v3` segment is Go's required module version. The command is still simply
-`goilerplate`.
-
-```text
-goilerplate login
-goilerplate whoami
-goilerplate activation resend
-goilerplate new
-goilerplate update
-goilerplate doctor
-goilerplate changelog
-goilerplate logout
-```
+Linux, macOS, and Windows binaries are also published with every release.
 
 ## Create a project
 
-Run one command:
-
 ```text
+goilerplate login
 goilerplate new
 ```
 
-The interactive setup asks where the project should live, what its Go module
-path is, and which features you want. Use the arrow keys to move, Space to
-toggle multiple choices, and Enter to continue. Nothing is downloaded until
-you review the choices and select Generate.
+`new` opens a small terminal wizard. Choose a project name, module path, database, frontend, and the features you need. Review the command, press Enter, and get an ordinary Go repository on your machine.
 
-The setup is intentionally thin. It builds the same arguments as the regular
-command and hands them to the same validation and generation code. There is one
-generation path, whether you use the interactive setup, copy a command from the
-website, or run goilerplate in CI.
-
-Repeatedly pressing Enter creates the standard Free project in `./my-app` with
-module path `example.com/my-app`. Change those two values for a real project.
-
-Prefer flags for scripts and repeatable builds:
+Prefer explicit flags for scripts or CI:
 
 ```text
 goilerplate new --name Acme --module example.com/acme ./acme
-goilerplate new --edition paid --module example.com/acme --framework datastar --database postgres --teams --oauth google,github ./acme
+goilerplate new --edition paid --name Acme --module example.com/acme --framework datastar --database postgres --teams ./acme
 ```
 
-When input or output is redirected, `goilerplate new` requires these flags and
-never tries to open an interactive screen.
+The Free edition is a fixed htmx, SQLite, and SMTP foundation. Paid generation adds htmx or Datastar, PostgreSQL, payment providers, teams, OAuth, storage, content, and the Projects example.
 
-Free always uses SQLite, SMTP, and the htmx foundation. Paid lets you choose
-htmx or Datastar alongside every optional module. The interactive setup does not contain the private template
-and your source code never leaves your machine.
+The website builder produces the same flags. The terminal wizard, copied commands, and CI all use one generation path.
 
-## One company, one license, one login per developer
+## Update a project
 
-Think of a license as one shared key ring for a company:
-
-1. The company owns the license.
-2. Every developer signs in with their own GitHub account.
-3. Nobody shares a password, personal token, or login session.
-4. Owners invite and remove developers.
-5. Owners create CI keys for machines. A CI key can generate code, but it cannot manage people or other keys.
-
-`goilerplate whoami` prints your license ID. Use that ID in the management commands:
-
-```text
-goilerplate license members <license-id>
-goilerplate license invite <license-id> developer@example.com
-goilerplate license invite --owner <license-id> cofounder@example.com
-goilerplate license remove <license-id> <user-or-invitation-id>
-
-goilerplate token create <license-id> deploy
-goilerplate token list <license-id>
-goilerplate token revoke <license-id> <token-id>
-```
-
-A new CI key is shown once. Store it in the CI provider's secret store. If a developer leaves, remove the member. goilerplate revokes the company's CI keys so the Owner can create clean replacements.
-
-In CI, expose the key only to the command that needs it:
-
-```text
-GOILERPLATE_TOKEN="$GOILERPLATE_TOKEN" goilerplate new --module example.com/acme ./acme
-```
-
-`GOILERPLATE_TOKEN` works only for generation and later update commands. Account and license management still require a personal Owner login.
-
-Account deletion requires your GitHub login as confirmation. Capitalization and a leading `@` do not matter:
-
-```text
-goilerplate account delete --confirm axadrn
-```
-
-A company license always keeps at least one Owner. The final Owner must add another Owner before deleting their account.
-
-Bought with a different email than the verified email on GitHub? Prove access to the purchase inbox with one short code:
-
-```text
-goilerplate claim buyer@example.com
-goilerplate claim --code ABCD2345EF
-```
-
-This works only while the purchase is still unclaimed. A removed developer cannot use an old purchase address to add themselves back.
-
-### Why can one account show more than one license?
-
-Access belongs to the license, not to the login. A developer can work for two companies, so one personal login can access both company licenses. A personal Free license can also remain beside a Paid company license. goilerplate marks the best active license with `*` and uses it automatically. If the developer leaves the company later, their personal Free access still works.
-
-This does not create duplicate billing. Each Paid license still belongs to exactly one company.
-
-Paid selections stay explicit and composable:
-
-```text
-goilerplate new --edition paid --module example.com/acme --database postgres --teams --oauth google,github ./acme
-```
-
-## Update an existing project
-
-Run this inside a generated project:
+Run this inside a generated repository:
 
 ```text
 goilerplate update
 ```
 
-The short version:
+goilerplate downloads the old and new generated trees, then asks Git to perform a real three-way merge. The result lands on a new branch such as `goilerplate-update-v3.1.0`. Your current branch and working files stay untouched.
 
-1. Your project contains `goilerplate.lock`. It says which template version and answers created the project.
-2. goilerplate downloads that old generated tree and the newest generated tree.
-3. Git compares the old tree, your current project, and the new tree.
-4. goilerplate creates a new branch such as `goilerplate-update-v3.1.0`.
-5. Your current branch and working files stay untouched.
+Clean updates are ready to review. Conflicts use normal Git conflict markers. To abort, delete the update branch.
 
-If Git finds no conflicts, switch to the new branch and review it. If Git finds conflicts, the new branch contains normal conflict markers. Resolve them exactly like any other Git merge.
+Your source code never leaves your machine. The service receives only the answers already stored in `goilerplate.lock` and returns generated template trees.
+
+## Accounts and company access
+
+Every developer signs in with their own GitHub account. Nobody shares a password or personal token. One company license can cover unlimited internal projects and developers.
 
 ```text
-git switch goilerplate-update-v3.1.0
+goilerplate whoami
+goilerplate license members <license-id>
+goilerplate license invite <license-id> developer@example.com
+goilerplate license remove <license-id> <user-or-invitation-id>
 ```
 
-To abandon the update, stay on your original branch and delete the update branch.
+`whoami` prints the license ID. Owners invite or remove people. A company always keeps at least one Owner.
+
+CI uses a separate generation-only token:
 
 ```text
-git branch -D goilerplate-update-v3.1.0
+goilerplate token create <license-id> deploy
+GOILERPLATE_TOKEN="$GOILERPLATE_TOKEN" goilerplate new --module example.com/acme ./acme
 ```
 
-`goilerplate update` requires a clean Git worktree and Paid license access. Your source code never leaves your machine. The service receives only the answers already stored in `goilerplate.lock` and returns generated template trees.
+Store the token in the CI provider's secret store. It cannot manage people or other tokens.
 
-## Check your setup
-
-Inside a generated project, run:
+## Useful commands
 
 ```text
+goilerplate login
+goilerplate logout
+goilerplate whoami
+goilerplate activation resend
+goilerplate claim buyer@example.com
+goilerplate new
+goilerplate update
 goilerplate doctor
-```
-
-It checks the lock file, Go module, Go and Git versions, Task, Tailwind CSS,
-and the local tools required by your selected database and mail setup. It does
-not change or repair anything. Every failed check includes the concrete fix.
-
-Read the latest published release notes without opening a browser:
-
-```text
 goilerplate changelog
+goilerplate account delete
 ```
+
+`doctor` checks the generated repository and local tools without changing anything. `changelog` shows the latest published releases.
+
+## Privacy and scope
+
+The CLI requests GitHub's `user:email` scope for identity. It never asks for repository access, never stores the temporary GitHub OAuth token, and never sends customer source code to goilerplate.
+
+This public repository contains the CLI and shared API contract. The paid application template remains private and is delivered through the generator service.
+
+Read the [documentation](https://goilerplate.com/docs), review the [license](https://goilerplate.com/license), or report a CLI problem in [GitHub Issues](https://github.com/axadrn/goilerplate/issues).
+
+## License
+
+The CLI source is available under the [MIT License](LICENSE). Generated application code follows the product license shown at [goilerplate.com/license](https://goilerplate.com/license).
