@@ -18,7 +18,7 @@ If Go is already installed:
 go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest
 ```
 
-Linux, macOS, and Windows binaries are also published with every release.
+Every release includes ready-to-run binaries for macOS and Linux on amd64 and arm64. On Windows, use WSL and install the Linux build inside it. Native Windows and PowerShell are not supported.
 
 ## Create a project
 
