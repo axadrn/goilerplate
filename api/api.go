@@ -68,11 +68,10 @@ type Account struct {
 }
 
 type License struct {
-	ID         string        `json:"id"`
-	Tier       LicenseTier   `json:"tier"`
-	Status     LicenseStatus `json:"status"`
-	Role       LicenseRole   `json:"role"`
-	ValidUntil *time.Time    `json:"valid_until,omitempty"`
+	ID     string        `json:"id"`
+	Tier   LicenseTier   `json:"tier"`
+	Status LicenseStatus `json:"status"`
+	Role   LicenseRole   `json:"role"`
 }
 
 type LicenseTier string
@@ -88,7 +87,6 @@ type LicenseStatus string
 const (
 	LicenseStatusPending LicenseStatus = "pending"
 	LicenseStatusActive  LicenseStatus = "active"
-	LicenseStatusExpired LicenseStatus = "expired"
 	LicenseStatusRevoked LicenseStatus = "revoked"
 )
 
