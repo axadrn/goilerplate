@@ -140,31 +140,6 @@ func TestSignedInCommandPrefersAPIURLOverride(t *testing.T) {
 	}
 }
 
-func TestLoginWaitsForFreeActivation(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{}
-	service := &fakeService{
-		login: api.GitHubLoginResponse{
-			SessionToken:       "goilerplate-session",
-			Account:            api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-			ActivationRequired: true,
-		},
-		activationActiveAfter: 2,
-	}
-	app := testApp(output, store, &fakeDevice{githubToken: "temporary-github-token"}, service)
-	app.ActivationPollInterval = time.Millisecond
-
-	if err := app.Run(context.Background(), []string{"login"}); err != nil {
-		t.Fatal(err)
-	}
-	if service.activationChecks != 2 {
-		t.Fatalf("activation checks = %d, want 2", service.activationChecks)
-	}
-	if !strings.Contains(output.String(), "Free access activated") {
-		t.Fatalf("output = %q", output.String())
-	}
-}
-
 func TestLoginRevokesNewSessionWhenSavingFails(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{saveError: errors.New("disk full")}
@@ -299,7 +274,7 @@ func TestClaimValidatesArgumentsBeforeLogin(t *testing.T) {
 }
 
 func TestHelpCoversEveryCommand(t *testing.T) {
-	for _, command := range []string{"new", "update", "login", "whoami", "logout", "activation", "claim", "license", "token", "account", "changelog", "doctor", "version"} {
+	for _, command := range []string{"new", "update", "login", "whoami", "logout", "claim", "license", "token", "account", "changelog", "doctor", "version"} {
 		t.Run(command, func(t *testing.T) {
 			output := &bytes.Buffer{}
 			app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
@@ -458,7 +433,7 @@ func TestNewWithoutArgumentsRequiresInteractiveTerminal(t *testing.T) {
 	}
 }
 
-func TestNewUsesMachineTokenWithoutPersonalLoginOrActivation(t *testing.T) {
+func TestNewUsesMachineTokenWithoutPersonalLogin(t *testing.T) {
 	store := &memoryStore{}
 	service := &fakeService{generatedVersion: "v3.0.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
 	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
@@ -468,8 +443,8 @@ func TestNewUsesMachineTokenWithoutPersonalLoginOrActivation(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if service.generateToken != "gok_machine" || service.activationChecks != 0 || service.receivedGitHubToken != "" {
-		t.Fatalf("generate token = %q, activation checks = %d, GitHub token = %q", service.generateToken, service.activationChecks, service.receivedGitHubToken)
+	if service.generateToken != "gok_machine" || service.receivedGitHubToken != "" {
+		t.Fatalf("generate token = %q, GitHub token = %q", service.generateToken, service.receivedGitHubToken)
 	}
 }
 
@@ -557,69 +532,6 @@ func TestUpdateCreatesGitBranchFromLockedAnswers(t *testing.T) {
 	}
 }
 
-func TestNewResumesPendingFreeActivation(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{
-		activationActiveAfter: 2,
-		generatedVersion:      "v3.0.0",
-		archive:               cliTestArchive(t, "go.mod", "module example.com/acme"),
-	}
-	app := testApp(output, store, &fakeDevice{}, service)
-	app.ActivationPollInterval = time.Millisecond
-	destination := filepath.Join(t.TempDir(), "acme")
-
-	if err := app.Run(context.Background(), []string{"new", "--module", "example.com/acme", destination}); err != nil {
-		t.Fatal(err)
-	}
-	if service.activationChecks != 2 || !service.generateCalled {
-		t.Fatalf("activation checks = %d, generated = %v", service.activationChecks, service.generateCalled)
-	}
-}
-
-func TestNewDoesNotWaitWithoutPendingActivation(t *testing.T) {
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{activationUnavailable: true}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
-
-	err := app.Run(context.Background(), []string{"new", "--module", "example.com/acme", filepath.Join(t.TempDir(), "acme")})
-	if !errors.Is(err, errActivationUnavailable) {
-		t.Fatalf("new error = %v, want activation guidance", err)
-	}
-	if service.activationChecks != 1 || service.generateCalled {
-		t.Fatalf("activation checks = %d, generated = %v", service.activationChecks, service.generateCalled)
-	}
-}
-
-func TestNewGuidesExpiredActivationToResend(t *testing.T) {
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{activationResendRequired: true}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
-
-	err := app.Run(context.Background(), []string{"new", "--module", "example.com/acme", filepath.Join(t.TempDir(), "acme")})
-	if !errors.Is(err, errActivationResendRequired) {
-		t.Fatalf("new error = %v, want resend guidance", err)
-	}
-}
-
-func TestActivationResendSendsAndWaits(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{activationUnavailable: true, activationActiveAfter: 2}
-	app := testApp(output, store, &fakeDevice{}, service)
-	app.ActivationPollInterval = time.Millisecond
-
-	if err := app.Run(context.Background(), []string{"activation", "resend"}); err != nil {
-		t.Fatal(err)
-	}
-	if !service.activationResent || service.activationChecks != 2 {
-		t.Fatalf("resent = %v, activation checks = %d", service.activationResent, service.activationChecks)
-	}
-	if !strings.Contains(output.String(), "Activation email sent") || !strings.Contains(output.String(), "Free access activated") {
-		t.Fatalf("output = %q", output.String())
-	}
-}
-
 func testApp(output *bytes.Buffer, store *memoryStore, device *fakeDevice, service *fakeService) *App {
 	return &App{
 		Out:            output,
@@ -664,34 +576,29 @@ func (d *fakeDevice) Wait(context.Context, string, github.DeviceAuthorization) (
 }
 
 type fakeService struct {
-	login                    api.GitHubLoginResponse
-	who                      api.WhoAmIResponse
-	receivedGitHubToken      string
-	loggedOut                bool
-	logoutError              error
-	generateRequest          api.GenerateRequest
-	generateToken            string
-	generatedVersion         string
-	archive                  []byte
-	oldUpdateArchive         []byte
-	newUpdateArchive         []byte
-	updateVersion            string
-	updateRequests           []api.GenerateRequest
-	generateCalled           bool
-	activationChecks         int
-	activationActiveAfter    int
-	activationUnavailable    bool
-	activationResendRequired bool
-	activationResent         bool
-	members                  api.LicenseMembersResponse
-	tokens                   api.LicenseTokensResponse
-	createdToken             api.CreateLicenseTokenResponse
-	invited                  api.InviteLicenseMemberResponse
-	removedMember            string
-	revokedToken             string
-	deletedAccount           string
-	claimEmail               string
-	claimCode                string
+	login               api.GitHubLoginResponse
+	who                 api.WhoAmIResponse
+	receivedGitHubToken string
+	loggedOut           bool
+	logoutError         error
+	generateRequest     api.GenerateRequest
+	generateToken       string
+	generatedVersion    string
+	archive             []byte
+	oldUpdateArchive    []byte
+	newUpdateArchive    []byte
+	updateVersion       string
+	updateRequests      []api.GenerateRequest
+	generateCalled      bool
+	members             api.LicenseMembersResponse
+	tokens              api.LicenseTokensResponse
+	createdToken        api.CreateLicenseTokenResponse
+	invited             api.InviteLicenseMemberResponse
+	removedMember       string
+	revokedToken        string
+	deletedAccount      string
+	claimEmail          string
+	claimCode           string
 }
 
 func (s *fakeService) LoginWithGitHub(_ context.Context, token string) (api.GitHubLoginResponse, error) {
@@ -731,26 +638,6 @@ func (s *fakeService) UpdateTree(_ context.Context, token string, request api.Ge
 		return "", err
 	}
 	return version, nil
-}
-
-func (s *fakeService) ActivationStatus(context.Context, string) (api.ActivationStatusResponse, error) {
-	s.activationChecks++
-	state := api.ActivationStatePending
-	if s.activationUnavailable {
-		state = api.ActivationStateUnavailable
-	} else if s.activationResendRequired {
-		state = api.ActivationStateResendRequired
-	} else if s.activationActiveAfter == 0 || s.activationChecks >= s.activationActiveAfter {
-		state = api.ActivationStateActive
-	}
-	return api.ActivationStatusResponse{State: state}, nil
-}
-
-func (s *fakeService) ResendActivation(context.Context, string) (api.ActivationStatusResponse, error) {
-	s.activationResent = true
-	s.activationUnavailable = false
-	s.activationResendRequired = false
-	return api.ActivationStatusResponse{State: api.ActivationStatePending}, nil
 }
 
 func (s *fakeService) BeginLicenseClaim(_ context.Context, _ string, email string) error {
