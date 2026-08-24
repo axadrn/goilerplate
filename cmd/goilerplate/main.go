@@ -13,6 +13,7 @@ import (
 
 	"github.com/axadrn/goilerplate/v3/internal/cli"
 	"github.com/axadrn/goilerplate/v3/internal/config"
+	"github.com/axadrn/goilerplate/v3/internal/desktop"
 	"github.com/axadrn/goilerplate/v3/internal/doctor"
 	"github.com/axadrn/goilerplate/v3/internal/github"
 	"github.com/axadrn/goilerplate/v3/internal/service"
@@ -60,6 +61,8 @@ func run(ctx context.Context) error {
 		},
 	}
 	if isTerminal(os.Stdin) && isTerminal(os.Stdout) {
+		application.OpenBrowser = desktop.OpenBrowser
+		application.CopyToClipboard = desktop.CopyToClipboard
 		application.RunNewProjectWizard = func(ctx context.Context) ([]string, error) {
 			return tui.Run(ctx, os.Stdin, os.Stdout)
 		}

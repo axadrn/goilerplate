@@ -47,6 +47,8 @@ type App struct {
 	Out                    io.Writer
 	Store                  ConfigStore
 	Device                 DeviceAuthorizer
+	OpenBrowser            func(context.Context, string) error
+	CopyToClipboard        func(context.Context, string) error
 	NewService             func(string) (ServiceClient, error)
 	GitHubClientID         string
 	DefaultAPIURL          string
@@ -180,7 +182,21 @@ func (a *App) login(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(a.Out, "Open %s and enter code %s\n", authorization.VerificationURI, authorization.UserCode)
+	fmt.Fprintln(a.Out, "GitHub login")
+	fmt.Fprintln(a.Out)
+	copied := a.CopyToClipboard != nil && a.CopyToClipboard(ctx, authorization.UserCode) == nil
+	if copied {
+		fmt.Fprintf(a.Out, "Code: %s (copied)\n", authorization.UserCode)
+	} else {
+		fmt.Fprintf(a.Out, "Code: %s\n", authorization.UserCode)
+	}
+	fmt.Fprintf(a.Out, "Open: %s\n", authorization.VerificationURI)
+	fmt.Fprintln(a.Out)
+	if a.OpenBrowser != nil && a.OpenBrowser(ctx, authorization.VerificationURI) == nil {
+		fmt.Fprintln(a.Out, "Browser opened. Waiting for approval...")
+	} else {
+		fmt.Fprintln(a.Out, "Waiting for approval...")
+	}
 	githubToken, err := a.Device.Wait(ctx, a.GitHubClientID, authorization)
 	if err != nil {
 		return err
