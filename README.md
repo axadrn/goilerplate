@@ -82,7 +82,6 @@ Store the token in the CI provider's secret store. It cannot manage people or ot
 goilerplate login
 goilerplate logout
 goilerplate whoami
-goilerplate activation resend
 goilerplate claim buyer@example.com
 goilerplate new
 goilerplate update

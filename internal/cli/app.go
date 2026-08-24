@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/axadrn/goilerplate/v3/api"
 	"github.com/axadrn/goilerplate/v3/internal/config"
@@ -28,8 +27,6 @@ type ServiceClient interface {
 	LoginWithGitHub(context.Context, string) (api.GitHubLoginResponse, error)
 	WhoAmI(context.Context, string) (api.WhoAmIResponse, error)
 	Logout(context.Context, string) error
-	ActivationStatus(context.Context, string) (api.ActivationStatusResponse, error)
-	ResendActivation(context.Context, string) (api.ActivationStatusResponse, error)
 	BeginLicenseClaim(context.Context, string, string) error
 	ConfirmLicenseClaim(context.Context, string, string) error
 	LicenseMembers(context.Context, string, string) (api.LicenseMembersResponse, error)
@@ -44,22 +41,21 @@ type ServiceClient interface {
 }
 
 type App struct {
-	Out                    io.Writer
-	Store                  ConfigStore
-	Device                 DeviceAuthorizer
-	OpenBrowser            func(context.Context, string) error
-	CopyToClipboard        func(context.Context, string) error
-	NewService             func(string) (ServiceClient, error)
-	GitHubClientID         string
-	DefaultAPIURL          string
-	APIURLOverride         string
-	MachineToken           string
-	Version                string
-	WorkingDirectory       string
-	ActivationPollInterval time.Duration
-	RunNewProjectWizard    func(context.Context) ([]string, error)
-	FetchReleases          func(context.Context) ([]github.Release, error)
-	RunDoctor              func(context.Context, string) doctor.Report
+	Out                 io.Writer
+	Store               ConfigStore
+	Device              DeviceAuthorizer
+	OpenBrowser         func(context.Context, string) error
+	CopyToClipboard     func(context.Context, string) error
+	NewService          func(string) (ServiceClient, error)
+	GitHubClientID      string
+	DefaultAPIURL       string
+	APIURLOverride      string
+	MachineToken        string
+	Version             string
+	WorkingDirectory    string
+	RunNewProjectWizard func(context.Context) ([]string, error)
+	FetchReleases       func(context.Context) ([]github.Release, error)
+	RunDoctor           func(context.Context, string) doctor.Report
 }
 
 func (a *App) apiURL(configuration config.Config) string {
@@ -103,8 +99,6 @@ func (a *App) Run(ctx context.Context, arguments []string) error {
 		return a.whoAmI(ctx, arguments[1:])
 	case "logout":
 		return a.logout(ctx, arguments[1:])
-	case "activation":
-		return a.activation(ctx, arguments[1:])
 	case "claim":
 		return a.claim(ctx, arguments[1:])
 	case "license":
@@ -138,19 +132,18 @@ func (a *App) help(arguments []string) error {
 		return errors.New("usage: goilerplate help [command]")
 	}
 	usage := map[string][]string{
-		"new":        {"goilerplate new [options] <directory>", "Run without options in a terminal to open interactive setup."},
-		"update":     {"goilerplate update", "Create a Git branch containing the new generated template."},
-		"login":      {"goilerplate login", "Sign in through GitHub's device flow."},
-		"whoami":     {"goilerplate whoami", "Show the current account and available licenses."},
-		"logout":     {"goilerplate logout", "Revoke the current goilerplate session."},
-		"activation": {"goilerplate activation resend", "Send a new Free activation email."},
-		"claim":      {"goilerplate claim <purchase-email>", "goilerplate claim --code <code>"},
-		"license":    {"goilerplate license members|invite|remove ...", "Manage people on a company license."},
-		"token":      {"goilerplate token create|list|revoke ...", "Manage generation-only CI keys."},
-		"account":    {"goilerplate account delete --confirm <github-login>", "Delete the current account."},
-		"changelog":  {"goilerplate changelog", "Show published GitHub release notes."},
-		"doctor":     {"goilerplate doctor", "Check tools and configuration for a generated project."},
-		"version":    {"goilerplate version", "Show the CLI version."},
+		"new":       {"goilerplate new [options] <directory>", "Run without options in a terminal to open interactive setup."},
+		"update":    {"goilerplate update", "Create a Git branch containing the new generated template."},
+		"login":     {"goilerplate login", "Sign in through GitHub's device flow."},
+		"whoami":    {"goilerplate whoami", "Show the current account and available licenses."},
+		"logout":    {"goilerplate logout", "Revoke the current goilerplate session."},
+		"claim":     {"goilerplate claim <purchase-email>", "goilerplate claim --code <code>"},
+		"license":   {"goilerplate license members|invite|remove ...", "Manage people on a company license."},
+		"token":     {"goilerplate token create|list|revoke ...", "Manage generation-only CI keys."},
+		"account":   {"goilerplate account delete --confirm <github-login>", "Delete the current account."},
+		"changelog": {"goilerplate changelog", "Show published GitHub release notes."},
+		"doctor":    {"goilerplate doctor", "Check tools and configuration for a generated project."},
+		"version":   {"goilerplate version", "Show the CLI version."},
 	}
 	lines, ok := usage[arguments[0]]
 	if !ok {
@@ -210,13 +203,6 @@ func (a *App) login(ctx context.Context, arguments []string) error {
 	if err := a.Store.Save(configuration); err != nil {
 		_ = client.Logout(ctx, login.SessionToken)
 		return err
-	}
-	if login.ActivationRequired {
-		fmt.Fprintln(a.Out, "Check your email to activate Free access. Waiting for confirmation...")
-		if err := a.waitForActivation(ctx, client, login.SessionToken); err != nil {
-			return err
-		}
-		fmt.Fprintln(a.Out, "Free access activated")
 	}
 	fmt.Fprintf(a.Out, "Signed in as @%s\n", login.Account.GitHubLogin)
 	return nil
@@ -297,7 +283,6 @@ func (a *App) printUsage() {
 	fmt.Fprintln(a.Out, "  new      Generate a new project")
 	fmt.Fprintln(a.Out, "  update   Update a generated project on a new Git branch")
 	fmt.Fprintln(a.Out, "  login    Sign in with GitHub")
-	fmt.Fprintln(a.Out, "  activation resend  Send a new Free activation email")
 	fmt.Fprintln(a.Out, "  claim    Connect a purchase made with another email")
 	fmt.Fprintln(a.Out, "  whoami   Show the current account and licenses")
 	fmt.Fprintln(a.Out, "  license  Invite, list, or remove license members")

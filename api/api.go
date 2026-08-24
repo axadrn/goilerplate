@@ -10,8 +10,6 @@ const (
 	PathWhoAmI           = "/v1/account"
 	PathGenerate         = "/v1/generate"
 	PathUpdate           = "/v1/update"
-	PathActivation       = "/v1/license/activation"
-	PathActivationResend = "/v1/license/activation/resend"
 	PathLicenseClaim     = "/v1/license/claim"
 	PathLicenseClaimCode = "/v1/license/claim/code"
 	PathAccountDelete    = "/v1/account"
@@ -28,14 +26,9 @@ type GitHubLoginRequest struct {
 }
 
 type GitHubLoginResponse struct {
-	SessionToken       string    `json:"session_token"`
-	ExpiresAt          time.Time `json:"expires_at"`
-	Account            Account   `json:"account"`
-	ActivationRequired bool      `json:"activation_required"`
-}
-
-type ActivationStatusResponse struct {
-	State ActivationState `json:"state"`
+	SessionToken string    `json:"session_token"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	Account      Account   `json:"account"`
 }
 
 type BeginLicenseClaimRequest struct {
@@ -45,15 +38,6 @@ type BeginLicenseClaimRequest struct {
 type ConfirmLicenseClaimRequest struct {
 	Code string `json:"code"`
 }
-
-type ActivationState string
-
-const (
-	ActivationStatePending        ActivationState = "pending"
-	ActivationStateActive         ActivationState = "active"
-	ActivationStateResendRequired ActivationState = "resend_required"
-	ActivationStateUnavailable    ActivationState = "unavailable"
-)
 
 type WhoAmIResponse struct {
 	Account            Account   `json:"account"`
