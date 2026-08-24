@@ -29,7 +29,7 @@ goilerplate new
 
 `new` opens a small terminal wizard. Choose a project name, module path, database, frontend, and the features you need. Review the command, press Enter, and get an ordinary Go repository on your machine.
 
-Prefer explicit flags for scripts or CI:
+Prefer explicit flags for repeatable commands:
 
 ```text
 goilerplate new --name Acme --module example.com/acme ./acme
@@ -38,7 +38,7 @@ goilerplate new --edition paid --name Acme --module example.com/acme --framework
 
 The Free edition is a fixed htmx, SQLite, and SMTP foundation. Paid generation adds htmx or Datastar, PostgreSQL, payment providers, teams, OAuth, storage, content, and the Projects example.
 
-The website builder produces the same flags. The terminal wizard, copied commands, and CI all use one generation path.
+The website builder produces the same flags. The terminal wizard and copied commands use one generation path.
 
 ## Update a project
 
@@ -65,16 +65,7 @@ goilerplate license invite <license-id> developer@example.com
 goilerplate license remove <license-id> <user-or-invitation-id>
 ```
 
-`whoami` prints the license ID. Owners invite or remove people. A company always keeps at least one Owner.
-
-CI uses a separate generation-only token:
-
-```text
-goilerplate token create <license-id> deploy
-GOILERPLATE_TOKEN="$GOILERPLATE_TOKEN" goilerplate new --module example.com/acme ./acme
-```
-
-Store the token in the CI provider's secret store. It cannot manage people or other tokens.
+`whoami` prints `Access: Free` or `Access: Paid`. Paid users also see their license IDs. Owners invite or remove people. A company always keeps at least one Owner.
 
 ## Useful commands
 

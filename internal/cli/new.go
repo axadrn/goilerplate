@@ -79,18 +79,14 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	authorizationToken := strings.TrimSpace(a.MachineToken)
-	if authorizationToken == "" {
-		if configuration.SessionToken == "" {
-			if err := a.login(ctx, nil); err != nil {
-				return err
-			}
-			configuration, err = a.Store.Load()
-			if err != nil {
-				return err
-			}
+	if configuration.SessionToken == "" {
+		if err := a.login(ctx, nil); err != nil {
+			return err
 		}
-		authorizationToken = configuration.SessionToken
+		configuration, err = a.Store.Load()
+		if err != nil {
+			return err
+		}
 	}
 	client, err := a.NewService(a.apiURL(configuration))
 	if err != nil {
@@ -108,7 +104,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if a.Version != "" && a.Version != "dev" {
 		templateVersion = a.Version
 	}
-	generatedVersion, err := client.Generate(ctx, authorizationToken, api.GenerateRequest{
+	generatedVersion, err := client.Generate(ctx, configuration.SessionToken, api.GenerateRequest{
 		TemplateVersion: templateVersion,
 		Answers:         answers,
 	}, archive)

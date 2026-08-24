@@ -34,9 +34,8 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 				t.Fatalf("Authorization = %q", request.Header.Get("Authorization"))
 			}
 			json.NewEncoder(response).Encode(api.WhoAmIResponse{
-				Account:            api.Account{ID: "user-1", GitHubLogin: "axadrn", Email: "hello@example.com"},
-				Licenses:           []api.License{{ID: "license-1", Tier: api.LicenseTierPaid, Status: api.LicenseStatusActive, Role: api.LicenseRoleOwner}},
-				EffectiveLicenseID: "license-1",
+				Account:  api.Account{ID: "user-1", GitHubLogin: "axadrn", Email: "hello@example.com"},
+				Licenses: []api.License{{ID: "license-1", Status: api.LicenseStatusActive, Role: api.LicenseRoleOwner}},
 			})
 		case api.PathLicenseClaim:
 			var input api.BeginLicenseClaimRequest
@@ -79,7 +78,7 @@ func TestClientLoginAndWhoAmI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if who.Account.GitHubLogin != "axadrn" || who.EffectiveLicenseID != "license-1" {
+	if who.Account.GitHubLogin != "axadrn" || len(who.Licenses) != 1 || who.Licenses[0].ID != "license-1" {
 		t.Fatalf("whoami = %#v", who)
 	}
 	if err := client.Logout(context.Background(), login.SessionToken); err != nil {
@@ -112,13 +111,7 @@ func TestClientLicenseManagementPaths(t *testing.T) {
 			json.NewEncoder(response).Encode(api.LicenseMembersResponse{})
 		case "POST /v1/licenses/license-1/invitations":
 			json.NewEncoder(response).Encode(api.InviteLicenseMemberResponse{})
-		case "POST /v1/licenses/license-1/tokens":
-			json.NewEncoder(response).Encode(api.CreateLicenseTokenResponse{Value: "gok_secret"})
-		case "GET /v1/licenses/license-1/tokens":
-			json.NewEncoder(response).Encode(api.LicenseTokensResponse{})
-		case "DELETE /v1/licenses/license-1/access/user-1",
-			"DELETE /v1/licenses/license-1/tokens/token-1",
-			"DELETE /v1/account":
+		case "DELETE /v1/licenses/license-1/access/user-1", "DELETE /v1/account":
 			response.WriteHeader(http.StatusNoContent)
 		default:
 			http.NotFound(response, request)
@@ -139,19 +132,10 @@ func TestClientLicenseManagementPaths(t *testing.T) {
 	if err := client.RemoveLicenseMember(ctx, "personal-session", "license-1", "user-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := client.CreateLicenseToken(ctx, "personal-session", "license-1", "deploy"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := client.LicenseTokens(ctx, "personal-session", "license-1"); err != nil {
-		t.Fatal(err)
-	}
-	if err := client.RevokeLicenseToken(ctx, "personal-session", "license-1", "token-1"); err != nil {
-		t.Fatal(err)
-	}
 	if err := client.DeleteAccount(ctx, "personal-session", "axadrn"); err != nil {
 		t.Fatal(err)
 	}
-	if len(requests) != 7 {
+	if len(requests) != 4 {
 		t.Fatalf("requests = %#v", requests)
 	}
 }

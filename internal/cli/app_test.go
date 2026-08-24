@@ -160,23 +160,21 @@ func TestLoginRevokesNewSessionWhenSavingFails(t *testing.T) {
 	}
 }
 
-func TestWhoAmIShowsEffectiveLicense(t *testing.T) {
+func TestWhoAmIShowsPaidAccessAndLicenses(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
 	service := &fakeService{who: api.WhoAmIResponse{
 		Account: api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
 		Licenses: []api.License{
-			{ID: "free", Tier: api.LicenseTierFree, Status: api.LicenseStatusActive, Role: api.LicenseRoleOwner},
-			{ID: "paid", Tier: api.LicenseTierPaid, Status: api.LicenseStatusActive, Role: api.LicenseRoleMember},
+			{ID: "paid", Status: api.LicenseStatusActive, Role: api.LicenseRoleMember},
 		},
-		EffectiveLicenseID: "paid",
 	}}
 	app := testApp(output, store, &fakeDevice{}, service)
 
 	if err := app.Run(context.Background(), []string{"whoami"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "* paid  paid  active  member") {
+	if !strings.Contains(output.String(), "Access: Paid") || !strings.Contains(output.String(), "paid  active  member") {
 		t.Fatalf("output = %q", output.String())
 	}
 }
@@ -208,25 +206,19 @@ func TestLogoutPreservesTokenWhenRevocationFails(t *testing.T) {
 	}
 }
 
-func TestLicenseAndTokenCommandsUseExplicitLicenseIDs(t *testing.T) {
+func TestLicenseCommandsUseExplicitLicenseIDs(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
 	service := &fakeService{
 		members: api.LicenseMembersResponse{Members: []api.LicenseMember{{
 			UserID: "user-1", GitHubLogin: "developer", Email: "developer@example.com", Role: api.LicenseRoleMember,
 		}}},
-		createdToken: api.CreateLicenseTokenResponse{
-			Token: api.LicenseToken{ID: "token-1", Name: "deploy"}, Value: "gok_secret",
-		},
 	}
 	app := testApp(output, store, &fakeDevice{}, service)
 	if err := app.Run(context.Background(), []string{"license", "members", "license-1"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.Run(context.Background(), []string{"token", "create", "license-1", "deploy"}); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(output.String(), "@developer") || !strings.Contains(output.String(), "gok_secret") || !strings.Contains(output.String(), "shown only once") {
+	if !strings.Contains(output.String(), "@developer") {
 		t.Fatalf("output = %q", output.String())
 	}
 }
@@ -274,7 +266,7 @@ func TestClaimValidatesArgumentsBeforeLogin(t *testing.T) {
 }
 
 func TestHelpCoversEveryCommand(t *testing.T) {
-	for _, command := range []string{"new", "update", "login", "whoami", "logout", "claim", "license", "token", "account", "changelog", "doctor", "version"} {
+	for _, command := range []string{"new", "update", "login", "whoami", "logout", "claim", "license", "account", "changelog", "doctor", "version"} {
 		t.Run(command, func(t *testing.T) {
 			output := &bytes.Buffer{}
 			app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
@@ -433,21 +425,6 @@ func TestNewWithoutArgumentsRequiresInteractiveTerminal(t *testing.T) {
 	}
 }
 
-func TestNewUsesMachineTokenWithoutPersonalLogin(t *testing.T) {
-	store := &memoryStore{}
-	service := &fakeService{generatedVersion: "v3.0.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
-	app.MachineToken = "gok_machine"
-	if err := app.Run(context.Background(), []string{
-		"new", "--module", "example.com/acme", filepath.Join(t.TempDir(), "acme"),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if service.generateToken != "gok_machine" || service.receivedGitHubToken != "" {
-		t.Fatalf("generate token = %q, GitHub token = %q", service.generateToken, service.receivedGitHubToken)
-	}
-}
-
 func TestNewRejectsPaidModulesForFreeBeforeCallingService(t *testing.T) {
 	service := &fakeService{}
 	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
@@ -591,11 +568,8 @@ type fakeService struct {
 	updateRequests      []api.GenerateRequest
 	generateCalled      bool
 	members             api.LicenseMembersResponse
-	tokens              api.LicenseTokensResponse
-	createdToken        api.CreateLicenseTokenResponse
 	invited             api.InviteLicenseMemberResponse
 	removedMember       string
-	revokedToken        string
 	deletedAccount      string
 	claimEmail          string
 	claimCode           string
@@ -660,19 +634,6 @@ func (s *fakeService) InviteLicenseMember(context.Context, string, string, api.I
 
 func (s *fakeService) RemoveLicenseMember(_ context.Context, _ string, _ string, userID string) error {
 	s.removedMember = userID
-	return nil
-}
-
-func (s *fakeService) CreateLicenseToken(context.Context, string, string, string) (api.CreateLicenseTokenResponse, error) {
-	return s.createdToken, nil
-}
-
-func (s *fakeService) LicenseTokens(context.Context, string, string) (api.LicenseTokensResponse, error) {
-	return s.tokens, nil
-}
-
-func (s *fakeService) RevokeLicenseToken(_ context.Context, _ string, _ string, tokenID string) error {
-	s.revokedToken = tokenID
 	return nil
 }
 

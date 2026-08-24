@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/axadrn/goilerplate/v3/api"
 	"github.com/axadrn/goilerplate/v3/internal/project"
@@ -94,8 +93,7 @@ func (a *App) updateClient(ctx context.Context) (ServiceClient, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	token := strings.TrimSpace(a.MachineToken)
-	if token == "" && configuration.SessionToken == "" {
+	if configuration.SessionToken == "" {
 		if err := a.login(ctx, nil); err != nil {
 			return nil, "", err
 		}
@@ -104,14 +102,11 @@ func (a *App) updateClient(ctx context.Context) (ServiceClient, string, error) {
 			return nil, "", err
 		}
 	}
-	if token == "" {
-		token = configuration.SessionToken
-	}
 	client, err := a.NewService(a.apiURL(configuration))
 	if err != nil {
 		return nil, "", err
 	}
-	return client, token, nil
+	return client, configuration.SessionToken, nil
 }
 
 func extractArchive(file *os.File, destination string) error {
