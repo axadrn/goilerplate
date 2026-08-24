@@ -32,9 +32,6 @@ type ServiceClient interface {
 	LicenseMembers(context.Context, string, string) (api.LicenseMembersResponse, error)
 	InviteLicenseMember(context.Context, string, string, api.InviteLicenseMemberRequest) (api.InviteLicenseMemberResponse, error)
 	RemoveLicenseMember(context.Context, string, string, string) error
-	CreateLicenseToken(context.Context, string, string, string) (api.CreateLicenseTokenResponse, error)
-	LicenseTokens(context.Context, string, string) (api.LicenseTokensResponse, error)
-	RevokeLicenseToken(context.Context, string, string, string) error
 	DeleteAccount(context.Context, string, string) error
 	Generate(context.Context, string, api.GenerateRequest, io.Writer) (string, error)
 	UpdateTree(context.Context, string, api.GenerateRequest, io.Writer) (string, error)
@@ -50,7 +47,6 @@ type App struct {
 	GitHubClientID      string
 	DefaultAPIURL       string
 	APIURLOverride      string
-	MachineToken        string
 	Version             string
 	WorkingDirectory    string
 	RunNewProjectWizard func(context.Context) ([]string, error)
@@ -103,8 +99,6 @@ func (a *App) Run(ctx context.Context, arguments []string) error {
 		return a.claim(ctx, arguments[1:])
 	case "license":
 		return a.license(ctx, arguments[1:])
-	case "token":
-		return a.token(ctx, arguments[1:])
 	case "account":
 		return a.account(ctx, arguments[1:])
 	case "changelog":
@@ -139,7 +133,6 @@ func (a *App) help(arguments []string) error {
 		"logout":    {"goilerplate logout", "Revoke the current goilerplate session."},
 		"claim":     {"goilerplate claim <purchase-email>", "goilerplate claim --code <code>"},
 		"license":   {"goilerplate license members|invite|remove ...", "Manage people on a company license."},
-		"token":     {"goilerplate token create|list|revoke ...", "Manage generation-only CI keys."},
 		"account":   {"goilerplate account delete --confirm <github-login>", "Delete the current account."},
 		"changelog": {"goilerplate changelog", "Show published GitHub release notes."},
 		"doctor":    {"goilerplate doctor", "Check tools and configuration for a generated project."},
@@ -228,13 +221,20 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 		return err
 	}
 	fmt.Fprintf(a.Out, "@%s <%s>\n", identity.Account.GitHubLogin, identity.Account.Email)
-	fmt.Fprintln(a.Out, "  LICENSE ID  TIER  STATUS  ROLE")
+	access := "Free"
 	for _, license := range identity.Licenses {
-		marker := " "
-		if license.ID == identity.EffectiveLicenseID {
-			marker = "*"
+		if license.Status == api.LicenseStatusActive {
+			access = "Paid"
+			break
 		}
-		fmt.Fprintf(a.Out, "%s %s  %s  %s  %s\n", marker, license.ID, license.Tier, license.Status, license.Role)
+	}
+	fmt.Fprintf(a.Out, "Access: %s\n", access)
+	if len(identity.Licenses) == 0 {
+		return nil
+	}
+	fmt.Fprintln(a.Out, "  LICENSE ID  STATUS  ROLE")
+	for _, license := range identity.Licenses {
+		fmt.Fprintf(a.Out, "  %s  %s  %s\n", license.ID, license.Status, license.Role)
 	}
 	return nil
 }
@@ -286,7 +286,6 @@ func (a *App) printUsage() {
 	fmt.Fprintln(a.Out, "  claim    Connect a purchase made with another email")
 	fmt.Fprintln(a.Out, "  whoami   Show the current account and licenses")
 	fmt.Fprintln(a.Out, "  license  Invite, list, or remove license members")
-	fmt.Fprintln(a.Out, "  token    Create, list, or revoke CI keys")
 	fmt.Fprintln(a.Out, "  account delete  Delete the current account")
 	fmt.Fprintln(a.Out, "  changelog  Show published release notes")
 	fmt.Fprintln(a.Out, "  doctor   Check a generated project's local tools")

@@ -40,9 +40,8 @@ type ConfirmLicenseClaimRequest struct {
 }
 
 type WhoAmIResponse struct {
-	Account            Account   `json:"account"`
-	Licenses           []License `json:"licenses"`
-	EffectiveLicenseID string    `json:"effective_license_id,omitempty"`
+	Account  Account   `json:"account"`
+	Licenses []License `json:"licenses"`
 }
 
 type Account struct {
@@ -53,23 +52,13 @@ type Account struct {
 
 type License struct {
 	ID     string        `json:"id"`
-	Tier   LicenseTier   `json:"tier"`
 	Status LicenseStatus `json:"status"`
 	Role   LicenseRole   `json:"role"`
 }
 
-type LicenseTier string
-
-const (
-	LicenseTierFree          LicenseTier = "free"
-	LicenseTierPaid          LicenseTier = "paid"
-	LicenseTierGrandfathered LicenseTier = "grandfathered"
-)
-
 type LicenseStatus string
 
 const (
-	LicenseStatusPending LicenseStatus = "pending"
 	LicenseStatusActive  LicenseStatus = "active"
 	LicenseStatusRevoked LicenseStatus = "revoked"
 )
@@ -107,26 +96,6 @@ type InviteLicenseMemberRequest struct {
 
 type InviteLicenseMemberResponse struct {
 	Joined bool `json:"joined"`
-}
-
-type CreateLicenseTokenRequest struct {
-	Name string `json:"name"`
-}
-
-type CreateLicenseTokenResponse struct {
-	Token LicenseToken `json:"token"`
-	Value string       `json:"value"`
-}
-
-type LicenseTokensResponse struct {
-	Tokens []LicenseToken `json:"tokens"`
-}
-
-type LicenseToken struct {
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
 }
 
 type DeleteAccountRequest struct {

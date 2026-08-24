@@ -70,7 +70,7 @@ func (a *App) license(ctx context.Context, arguments []string) error {
 		if err := client.RemoveLicenseMember(ctx, token, arguments[1], arguments[2]); err != nil {
 			return err
 		}
-		fmt.Fprintln(a.Out, "Access removed. Company CI keys were revoked when an active member was removed.")
+		fmt.Fprintln(a.Out, "Access removed")
 		return nil
 	default:
 		return fmt.Errorf("unknown license command %q", arguments[0])

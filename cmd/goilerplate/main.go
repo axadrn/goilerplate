@@ -50,7 +50,6 @@ func run(ctx context.Context) error {
 		GitHubClientID: githubClientID,
 		DefaultAPIURL:  "https://goilerplate.com",
 		APIURLOverride: strings.TrimSpace(os.Getenv("GOILERPLATE_API_URL")),
-		MachineToken:   strings.TrimSpace(os.Getenv("GOILERPLATE_TOKEN")),
 		Version:        buildVersion(),
 		FetchReleases: func(ctx context.Context) ([]github.Release, error) {
 			return github.ListReleases(ctx, httpClient)

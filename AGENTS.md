@@ -7,7 +7,7 @@ This repository contains the public goilerplate CLI and the shared API contract.
 ## Brand
 
 - Always write the product name as `goilerplate` in lowercase, including at the start of sentences and headings.
-- Keep technical identifiers such as `GOILERPLATE_TOKEN` and `X-Goilerplate-Version` unchanged.
+- Keep technical identifiers such as `X-Goilerplate-Version` unchanged.
 
 ## Engineering
 
