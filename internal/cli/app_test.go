@@ -45,6 +45,55 @@ func TestLoginStoresOnlyGoilerplateSession(t *testing.T) {
 	if strings.Contains(output.String(), "temporary-github-token") || strings.Contains(output.String(), "goilerplate-session") {
 		t.Fatalf("secret appeared in output: %q", output.String())
 	}
+	if got := output.String(); !strings.Contains(got, "Code: ABCD-EFGH") || !strings.Contains(got, "Open: https://github.com/login/device") || !strings.Contains(got, "Waiting for approval...") {
+		t.Fatalf("login instructions = %q", got)
+	}
+}
+
+func TestLoginUsesDesktopConveniences(t *testing.T) {
+	output := &bytes.Buffer{}
+	service := &fakeService{login: api.GitHubLoginResponse{
+		SessionToken: "goilerplate-session",
+		Account:      api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
+	}}
+	app := testApp(output, &memoryStore{}, &fakeDevice{githubToken: "temporary-github-token"}, service)
+	var copied, opened string
+	app.CopyToClipboard = func(_ context.Context, value string) error {
+		copied = value
+		return nil
+	}
+	app.OpenBrowser = func(_ context.Context, address string) error {
+		opened = address
+		return nil
+	}
+
+	if err := app.Run(context.Background(), []string{"login"}); err != nil {
+		t.Fatal(err)
+	}
+	if copied != "ABCD-EFGH" || opened != "https://github.com/login/device" {
+		t.Fatalf("copied = %q, opened = %q", copied, opened)
+	}
+	if got := output.String(); !strings.Contains(got, "Code: ABCD-EFGH (copied)") || !strings.Contains(got, "Browser opened. Waiting for approval...") {
+		t.Fatalf("output = %q", got)
+	}
+}
+
+func TestLoginDesktopFailuresFallBackWithoutBlocking(t *testing.T) {
+	output := &bytes.Buffer{}
+	service := &fakeService{login: api.GitHubLoginResponse{
+		SessionToken: "goilerplate-session",
+		Account:      api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
+	}}
+	app := testApp(output, &memoryStore{}, &fakeDevice{githubToken: "temporary-github-token"}, service)
+	app.CopyToClipboard = func(context.Context, string) error { return errors.New("clipboard unavailable") }
+	app.OpenBrowser = func(context.Context, string) error { return errors.New("browser unavailable") }
+
+	if err := app.Run(context.Background(), []string{"login"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := output.String(); !strings.Contains(got, "Code: ABCD-EFGH\n") || strings.Contains(got, "copied") || !strings.Contains(got, "Open: https://github.com/login/device") || !strings.Contains(got, "Waiting for approval...") {
+		t.Fatalf("fallback output = %q", got)
+	}
 }
 
 func TestLoginPrefersAndStoresAPIURLOverride(t *testing.T) {
