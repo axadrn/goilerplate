@@ -100,13 +100,8 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	defer os.Remove(archivePath)
 	defer archive.Close()
 
-	templateVersion := ""
-	if a.Version != "" && a.Version != "dev" {
-		templateVersion = a.Version
-	}
 	generatedVersion, err := client.Generate(ctx, configuration.SessionToken, api.GenerateRequest{
-		TemplateVersion: templateVersion,
-		Answers:         answers,
+		Answers: answers,
 	}, archive)
 	if err != nil {
 		return err

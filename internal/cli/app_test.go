@@ -338,6 +338,7 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
 	service := &fakeService{generatedVersion: "v3.0.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
 	app := testApp(output, store, &fakeDevice{}, service)
+	app.Version = "v3.0.0-beta.1"
 	destination := filepath.Join(t.TempDir(), "acme")
 
 	err := app.Run(context.Background(), []string{
@@ -358,7 +359,7 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	if err != nil || string(content) != "module example.com/acme" {
 		t.Fatalf("go.mod = %q, %v", content, err)
 	}
-	if service.generateToken != "session" || service.generateRequest.Answers.Framework != "datastar" || service.generateRequest.Answers.Payment != "stripe" || !service.generateRequest.Answers.Teams {
+	if service.generateToken != "session" || service.generateRequest.TemplateVersion != "" || service.generateRequest.Answers.Framework != "datastar" || service.generateRequest.Answers.Payment != "stripe" || !service.generateRequest.Answers.Teams {
 		t.Fatalf("generation request = %#v", service.generateRequest)
 	}
 	if !strings.Contains(output.String(), "Created Acme") {
