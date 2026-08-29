@@ -29,6 +29,8 @@ goilerplate new
 
 `new` opens a small terminal wizard. Choose a project name, module path, database, frontend, and the features you need. Review the command, press Enter, and get an ordinary Go repository on your machine.
 
+Git is ready immediately. Every new project starts on `main` with a clean `Initial commit`.
+
 Prefer explicit flags for repeatable commands:
 
 ```text

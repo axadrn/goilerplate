@@ -365,6 +365,18 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	if !strings.Contains(output.String(), "Created Acme") {
 		t.Fatalf("output = %q", output.String())
 	}
+	if branch := strings.TrimSpace(runCLIGit(t, destination, "branch", "--show-current")); branch != "main" {
+		t.Fatalf("branch = %q", branch)
+	}
+	if message := strings.TrimSpace(runCLIGit(t, destination, "log", "-1", "--format=%s")); message != "Initial commit" {
+		t.Fatalf("commit message = %q", message)
+	}
+	if status := strings.TrimSpace(runCLIGit(t, destination, "status", "--porcelain")); status != "" {
+		t.Fatalf("worktree = %q", status)
+	}
+	if !strings.Contains(output.String(), "Git is ready on main") {
+		t.Fatalf("output = %q", output.String())
+	}
 }
 
 func TestNewWithoutArgumentsUsesWizardThenExistingGenerationPath(t *testing.T) {

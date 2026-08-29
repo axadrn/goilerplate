@@ -116,10 +116,11 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if _, err := archive.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("read project download: %w", err)
 	}
-	if err := project.Extract(archive, destination); err != nil {
+	if err := project.Create(ctx, archive, destination); err != nil {
 		return err
 	}
 	a.printSuccess(fmt.Sprintf("Created %s in %s with %s", answers.ProjectName, destination, generatedVersion))
+	a.printInfo("Git is ready on main with an initial commit")
 	return nil
 }
 

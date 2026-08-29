@@ -3,6 +3,7 @@ package project
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,16 @@ const maxFiles = 10_000
 const maxExpandedSize = 128 << 20
 
 func Extract(source io.Reader, destination string) error {
+	return extract(source, destination, nil)
+}
+
+func Create(ctx context.Context, source io.Reader, destination string) error {
+	return extract(source, destination, func(root string) error {
+		return initializeGit(ctx, root)
+	})
+}
+
+func extract(source io.Reader, destination string, prepare func(string) error) error {
 	destination, err := filepath.Abs(destination)
 	if err != nil {
 		return fmt.Errorf("resolve destination: %w", err)
@@ -36,6 +47,11 @@ func Extract(source io.Reader, destination string) error {
 
 	if err := extractInto(source, staging); err != nil {
 		return err
+	}
+	if prepare != nil {
+		if err := prepare(staging); err != nil {
+			return err
+		}
 	}
 	if existed {
 		if err := os.Remove(destination); err != nil {

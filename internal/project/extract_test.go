@@ -4,11 +4,34 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestCreatePublishesGitRepositoryWithInitialCommit(t *testing.T) {
+	destination := filepath.Join(t.TempDir(), "project")
+	archive := testArchive(t, map[string]string{"go.mod": "module example.com/project"})
+	if err := Create(context.Background(), bytes.NewReader(archive), destination); err != nil {
+		t.Fatal(err)
+	}
+	for arguments, want := range map[string]string{
+		"branch --show-current":        "main",
+		"log -1 --format=%s":           "Initial commit",
+		"log -1 --format=%an%x20<%ae>": "goilerplate <updates@goilerplate.com>",
+		"status --porcelain":           "",
+	} {
+		fields := strings.Fields(arguments)
+		command := exec.Command("git", append([]string{"-C", destination}, fields...)...)
+		output, err := command.CombinedOutput()
+		if err != nil || strings.TrimSpace(string(output)) != want {
+			t.Fatalf("git %s = %q, %v", arguments, output, err)
+		}
+	}
+}
 
 func TestExtractPublishesProjectIntoMissingOrEmptyDestination(t *testing.T) {
 	for _, existing := range []bool{false, true} {
