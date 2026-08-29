@@ -34,7 +34,7 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 	model.edition = "paid"
 	model.framework = "datastar"
 	model.database = "postgres"
-	model.payment = "lemon_squeezy"
+	model.payment = "polar"
 	model.mail = "resend"
 	model.teams = true
 	model.storage = true
@@ -47,7 +47,7 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 		"--edition", "paid",
 		"--framework", "datastar",
 		"--database", "postgres",
-		"--payment", "lemon_squeezy",
+		"--payment", "polar",
 		"--mail", "resend",
 		"--teams",
 		"--oauth", "google,github",

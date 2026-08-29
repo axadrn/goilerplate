@@ -30,7 +30,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	edition := flags.String("edition", "free", "free or paid")
 	framework := flags.String("framework", "htmx", "htmx or datastar")
 	database := flags.String("database", "sqlite", "sqlite or postgres")
-	payment := flags.String("payment", "", "stripe, polar, or lemon_squeezy")
+	payment := flags.String("payment", "", "stripe or polar")
 	mail := flags.String("mail", "smtp", "smtp or resend")
 	teams := flags.Bool("teams", false, "include team workspaces")
 	oauth := flags.String("oauth", "", "comma-separated OAuth providers")
