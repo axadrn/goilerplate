@@ -67,12 +67,39 @@ func TestFreeSelectionSkipsPaidQuestions(t *testing.T) {
 	model.selectCurrent()
 	model.moveForward()
 
+	if model.step != stepDestination {
+		t.Fatalf("step = %d, want destination", model.step)
+	}
+	model.setStep(stepName)
+	model.moveForward()
 	if model.step != stepReview {
 		t.Fatalf("step = %d, want review", model.step)
 	}
 	model.moveBack()
-	if model.step != stepEdition {
-		t.Fatalf("back step = %d, want edition", model.step)
+	if model.step != stepName {
+		t.Fatalf("back step = %d, want name", model.step)
+	}
+}
+
+func TestFreePaidSelectionRequestsPricingImmediately(t *testing.T) {
+	selection := newModel(false)
+	selection.moveCursor(1)
+
+	updated, command := selection.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	result := updated.(model)
+	if !result.openPricing || result.submitted || result.step != stepEdition || command == nil {
+		t.Fatalf("pricing = %v, submitted = %v, step = %d, command = %v", result.openPricing, result.submitted, result.step, command)
+	}
+}
+
+func TestPaidAccountContinuesIntoProjectSetup(t *testing.T) {
+	selection := newModel(true)
+	selection.moveCursor(1)
+
+	updated, _ := selection.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	result := updated.(model)
+	if result.openPricing || result.edition != "paid" || result.step != stepDestination {
+		t.Fatalf("pricing = %v, edition = %q, step = %d", result.openPricing, result.edition, result.step)
 	}
 }
 
@@ -127,7 +154,7 @@ func TestViewExplainsThatExistingCommandGenerates(t *testing.T) {
 	model := newModel()
 	model.setStep(stepReview)
 	view := model.View()
-	if !strings.Contains(view.Content, "existing CLI command") || !strings.Contains(view.Content, "performs the actual generation") {
+	if !strings.Contains(view.Content, "existing CLI command generates the project") {
 		t.Fatalf("view = %q", view.Content)
 	}
 }
@@ -190,6 +217,53 @@ func TestWideSummaryFitsWithMaximumInputLengths(t *testing.T) {
 	}
 }
 
+func TestLayoutDoesNotJumpBetweenSteps(t *testing.T) {
+	for _, width := range []int{40, 80, 100} {
+		selection := newModel(true)
+		selection.width = width
+		selection.height = 24
+		selection.edition = "paid"
+
+		var wantWidth, wantHeight int
+		for index, current := range []step{stepEdition, stepDestination, stepFramework, stepReview} {
+			selection.setStep(current)
+			content := selection.View().Content
+			gotWidth, gotHeight := lipgloss.Width(content), lipgloss.Height(content)
+			if index == 0 {
+				wantWidth, wantHeight = gotWidth, gotHeight
+				continue
+			}
+			if gotWidth != wantWidth || gotHeight != wantHeight {
+				t.Fatalf("width %d step %d size = %dx%d, want %dx%d", width, current, gotWidth, gotHeight, wantWidth, wantHeight)
+			}
+		}
+	}
+}
+
+func TestEditionOptionsStayOnSingleLines(t *testing.T) {
+	selection := newModel(false)
+	selection.width = 80
+
+	if height := lipgloss.Height(selection.questionView()); height != 5 {
+		t.Fatalf("edition question height = %d, want 5 single-line rows", height)
+	}
+}
+
+func TestHeaderIsCompactAndFooterStaysAtTerminalEdge(t *testing.T) {
+	selection := newModel(false)
+	selection.width = 80
+	selection.height = 24
+
+	content := selection.View().Content
+	if !strings.Contains(content, "goilerplate") || !strings.Contains(content, " new  1/5") || strings.Contains(content, "━") {
+		t.Fatalf("header = %q", strings.Split(content, "\n")[2])
+	}
+	lines := strings.Split(content, "\n")
+	if len(lines) != selection.height || !strings.Contains(lines[len(lines)-1], "choose") {
+		t.Fatalf("view has %d lines and last line %q", len(lines), lines[len(lines)-1])
+	}
+}
+
 func TestBackgroundMessageSelectsReadableLightTheme(t *testing.T) {
 	selection := newModel()
 	darkBrand := selection.styles.brand.Render("goilerplate")
@@ -210,7 +284,7 @@ func TestPaidCopySeparatesTheLicenseFromAppBilling(t *testing.T) {
 	selection := newModel()
 	selection.setStep(stepEdition)
 	selection.moveCursor(1)
-	if view := selection.questionView(); !strings.Contains(view, "Paid · View pricing") || !strings.Contains(view, "Opens goilerplate pricing") {
+	if view := selection.questionView(); !strings.Contains(view, "Paid") || !strings.Contains(view, "Open pricing") {
 		t.Fatalf("edition view = %q", view)
 	}
 	selection.setStep(stepPayment)

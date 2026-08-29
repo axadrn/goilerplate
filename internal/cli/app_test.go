@@ -380,16 +380,19 @@ func TestNewWithoutArgumentsUsesWizardThenExistingGenerationPath(t *testing.T) {
 	app := testApp(output, store, &fakeDevice{}, service)
 	destination := filepath.Join(t.TempDir(), "acme")
 	wizardCalled := false
-	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
+	app.RunNewProjectWizard = func(_ context.Context, paidAccess bool) (ProjectWizardResult, error) {
 		wizardCalled = true
-		return []string{
+		if !paidAccess {
+			t.Fatal("Paid account was not passed to the wizard")
+		}
+		return ProjectWizardResult{Arguments: []string{
 			"--name", "Acme",
 			"--module", "example.com/acme",
 			"--edition", "paid",
 			"--database", "postgres",
 			"--teams",
 			destination,
-		}, nil
+		}}, nil
 	}
 
 	if err := app.Run(context.Background(), []string{"new"}); err != nil {
@@ -414,10 +417,11 @@ func TestNewPaidSelectionOpensPricingForFreeAccount(t *testing.T) {
 		}
 		return nil
 	}
-	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
-		return []string{
-			"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", t.TempDir(),
-		}, nil
+	app.RunNewProjectWizard = func(_ context.Context, paidAccess bool) (ProjectWizardResult, error) {
+		if paidAccess {
+			t.Fatal("Free account was passed to the wizard as Paid")
+		}
+		return ProjectWizardResult{OpenPricing: true}, nil
 	}
 
 	if err := app.Run(context.Background(), []string{"new"}); err != nil {
@@ -435,8 +439,8 @@ func TestNewReturnsWizardErrorWithoutCallingService(t *testing.T) {
 	wizardError := errors.New("cancelled")
 	service := &fakeService{}
 	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
-	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
-		return nil, wizardError
+	app.RunNewProjectWizard = func(context.Context, bool) (ProjectWizardResult, error) {
+		return ProjectWizardResult{}, wizardError
 	}
 
 	if err := app.Run(context.Background(), []string{"new"}); !errors.Is(err, wizardError) {

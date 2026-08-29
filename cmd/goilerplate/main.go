@@ -62,8 +62,9 @@ func run(ctx context.Context) error {
 	if isTerminal(os.Stdin) && isTerminal(os.Stdout) {
 		application.OpenBrowser = desktop.OpenBrowser
 		application.CopyToClipboard = desktop.CopyToClipboard
-		application.RunNewProjectWizard = func(ctx context.Context) ([]string, error) {
-			return tui.Run(ctx, os.Stdin, os.Stdout)
+		application.RunNewProjectWizard = func(ctx context.Context, paidAccess bool) (cli.ProjectWizardResult, error) {
+			result, err := tui.Run(ctx, os.Stdin, os.Stdout, paidAccess)
+			return cli.ProjectWizardResult{Arguments: result.Arguments, OpenPricing: result.OpenPricing}, err
 		}
 	}
 	return application.Run(ctx, os.Args[1:])

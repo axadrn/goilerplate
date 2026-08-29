@@ -38,7 +38,7 @@ goilerplate new --edition paid --name Acme --module example.com/acme --framework
 
 The Free edition is a fixed htmx, SQLite, and SMTP foundation. Paid generation adds htmx or Datastar, PostgreSQL, payment providers, teams, OAuth, storage, content, and the Projects example.
 
-Choose Paid in the terminal wizard. A Free account opens the pricing page. Buy there with your verified GitHub email, then run `goilerplate new` again. No new login is needed.
+Edition comes first in the terminal wizard. Choosing Paid with a Free account opens the pricing page immediately. Buy there with your verified GitHub email, then run `goilerplate new` again. No new login is needed.
 
 The website builder produces the same flags. The terminal wizard and copied commands use one generation path.
 

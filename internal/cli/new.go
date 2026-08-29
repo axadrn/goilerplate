@@ -11,17 +11,33 @@ import (
 	"strings"
 
 	"github.com/axadrn/goilerplate/v3/api"
+	"github.com/axadrn/goilerplate/v3/internal/config"
 	"github.com/axadrn/goilerplate/v3/internal/project"
 )
 
 func (a *App) newProject(ctx context.Context, arguments []string) error {
 	interactive := len(arguments) == 0 && a.RunNewProjectWizard != nil
-	if len(arguments) == 0 && a.RunNewProjectWizard != nil {
+	var configuration config.Config
+	var client ServiceClient
+	if interactive {
 		var err error
-		arguments, err = a.RunNewProjectWizard(ctx)
+		configuration, client, err = a.projectClient(ctx)
 		if err != nil {
 			return err
 		}
+		identity, err := client.WhoAmI(ctx, configuration.SessionToken)
+		if err != nil {
+			return err
+		}
+		result, err := a.RunNewProjectWizard(ctx, hasPaidAccess(identity))
+		if err != nil {
+			return err
+		}
+		if result.OpenPricing {
+			a.openPricing(ctx, configuration)
+			return nil
+		}
+		arguments = result.Arguments
 	}
 
 	flags := flag.NewFlagSet("new", flag.ContinueOnError)
@@ -76,37 +92,11 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 		return err
 	}
 
-	configuration, err := a.Store.Load()
-	if err != nil {
-		return err
-	}
-	if configuration.SessionToken == "" {
-		if err := a.login(ctx, nil); err != nil {
-			return err
-		}
-		configuration, err = a.Store.Load()
+	if client == nil {
+		var err error
+		configuration, client, err = a.projectClient(ctx)
 		if err != nil {
 			return err
-		}
-	}
-	client, err := a.NewService(a.apiURL(configuration))
-	if err != nil {
-		return err
-	}
-	if interactive && answers.Edition == "paid" {
-		identity, err := client.WhoAmI(ctx, configuration.SessionToken)
-		if err != nil {
-			return err
-		}
-		if !hasPaidAccess(identity) {
-			pricingURL := strings.TrimRight(a.apiURL(configuration), "/") + "/pricing"
-			if a.OpenBrowser != nil && a.OpenBrowser(ctx, pricingURL) == nil {
-				fmt.Fprintln(a.Out, "Pricing opened in your browser")
-			} else {
-				fmt.Fprintf(a.Out, "Open pricing: %s\n", pricingURL)
-			}
-			fmt.Fprintln(a.Out, "Buy with your verified GitHub email, then run goilerplate new again. No new login needed")
-			return nil
 		}
 	}
 	archive, err := os.CreateTemp("", "goilerplate-project-*.tar.gz")
@@ -131,6 +121,37 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	}
 	fmt.Fprintf(a.Out, "Created %s in %s with %s\n", answers.ProjectName, destination, generatedVersion)
 	return nil
+}
+
+func (a *App) projectClient(ctx context.Context) (config.Config, ServiceClient, error) {
+	configuration, err := a.Store.Load()
+	if err != nil {
+		return config.Config{}, nil, err
+	}
+	if configuration.SessionToken == "" {
+		if err := a.login(ctx, nil); err != nil {
+			return config.Config{}, nil, err
+		}
+		configuration, err = a.Store.Load()
+		if err != nil {
+			return config.Config{}, nil, err
+		}
+	}
+	client, err := a.NewService(a.apiURL(configuration))
+	if err != nil {
+		return config.Config{}, nil, err
+	}
+	return configuration, client, nil
+}
+
+func (a *App) openPricing(ctx context.Context, configuration config.Config) {
+	pricingURL := strings.TrimRight(a.apiURL(configuration), "/") + "/pricing"
+	if a.OpenBrowser != nil && a.OpenBrowser(ctx, pricingURL) == nil {
+		fmt.Fprintln(a.Out, "Pricing opened in your browser")
+	} else {
+		fmt.Fprintf(a.Out, "Open pricing: %s\n", pricingURL)
+	}
+	fmt.Fprintln(a.Out, "Buy with your verified GitHub email, then run goilerplate new again. No new login needed")
 }
 
 func hasPaidAccess(identity api.WhoAmIResponse) bool {
