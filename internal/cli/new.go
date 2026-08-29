@@ -15,6 +15,7 @@ import (
 )
 
 func (a *App) newProject(ctx context.Context, arguments []string) error {
+	interactive := len(arguments) == 0 && a.RunNewProjectWizard != nil
 	if len(arguments) == 0 && a.RunNewProjectWizard != nil {
 		var err error
 		arguments, err = a.RunNewProjectWizard(ctx)
@@ -92,6 +93,22 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
+	if interactive && answers.Edition == "paid" {
+		identity, err := client.WhoAmI(ctx, configuration.SessionToken)
+		if err != nil {
+			return err
+		}
+		if !hasPaidAccess(identity) {
+			pricingURL := strings.TrimRight(a.apiURL(configuration), "/") + "/pricing"
+			if a.OpenBrowser != nil && a.OpenBrowser(ctx, pricingURL) == nil {
+				fmt.Fprintln(a.Out, "Pricing opened in your browser")
+			} else {
+				fmt.Fprintf(a.Out, "Open pricing: %s\n", pricingURL)
+			}
+			fmt.Fprintln(a.Out, "Buy with your verified GitHub email, then run goilerplate new again. No new login needed")
+			return nil
+		}
+	}
 	archive, err := os.CreateTemp("", "goilerplate-project-*.tar.gz")
 	if err != nil {
 		return fmt.Errorf("create project download: %w", err)
@@ -114,6 +131,15 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	}
 	fmt.Fprintf(a.Out, "Created %s in %s with %s\n", answers.ProjectName, destination, generatedVersion)
 	return nil
+}
+
+func hasPaidAccess(identity api.WhoAmIResponse) bool {
+	for _, license := range identity.Licenses {
+		if license.Status == api.LicenseStatusActive {
+			return true
+		}
+	}
+	return false
 }
 
 func splitList(value string) []string {

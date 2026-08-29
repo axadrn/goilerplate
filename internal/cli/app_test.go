@@ -370,7 +370,13 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 func TestNewWithoutArgumentsUsesWizardThenExistingGenerationPath(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{generatedVersion: "v3.0.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
+	service := &fakeService{
+		generatedVersion: "v3.0.0",
+		archive:          cliTestArchive(t, "go.mod", "module example.com/acme"),
+		who: api.WhoAmIResponse{Licenses: []api.License{{
+			Status: api.LicenseStatusActive,
+		}}},
+	}
 	app := testApp(output, store, &fakeDevice{}, service)
 	destination := filepath.Join(t.TempDir(), "acme")
 	wizardCalled := false
@@ -394,6 +400,34 @@ func TestNewWithoutArgumentsUsesWizardThenExistingGenerationPath(t *testing.T) {
 	}
 	if service.generateRequest.Answers.Database != "postgres" || !service.generateRequest.Answers.Teams {
 		t.Fatalf("generation request = %#v", service.generateRequest)
+	}
+}
+
+func TestNewPaidSelectionOpensPricingForFreeAccount(t *testing.T) {
+	output := &bytes.Buffer{}
+	store := &memoryStore{configuration: config.Config{SessionToken: "session"}}
+	service := &fakeService{}
+	app := testApp(output, store, &fakeDevice{}, service)
+	app.OpenBrowser = func(_ context.Context, address string) error {
+		if address != "https://goilerplate.com/pricing" {
+			t.Fatalf("pricing URL = %q", address)
+		}
+		return nil
+	}
+	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
+		return []string{
+			"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", t.TempDir(),
+		}, nil
+	}
+
+	if err := app.Run(context.Background(), []string{"new"}); err != nil {
+		t.Fatal(err)
+	}
+	if service.generateCalled {
+		t.Fatal("Free account generated Paid instead of opening pricing")
+	}
+	if !strings.Contains(output.String(), "Pricing opened") || !strings.Contains(output.String(), "No new login needed") {
+		t.Fatalf("output = %q", output.String())
 	}
 }
 

@@ -75,16 +75,16 @@ func newStyles(isDark bool) styles {
 	color := lipgloss.LightDark(isDark)
 	muted := color(lipgloss.Color("#52525B"), lipgloss.Color("#A1A1AA"))
 	purple := color(lipgloss.Color("#6D28D9"), lipgloss.Color("#A78BFA"))
-	cyan := color(lipgloss.Color("#0369A1"), lipgloss.Color("#67E8F9"))
+	fuchsia := color(lipgloss.Color("#A21CAF"), lipgloss.Color("#F0ABFC"))
 	green := color(lipgloss.Color("#047857"), lipgloss.Color("#34D399"))
 	border := color(lipgloss.Color("#A1A1AA"), lipgloss.Color("#52525B"))
-	activeText := color(lipgloss.Color("#4C1D95"), lipgloss.Color("#FAFAFA"))
-	activeBackground := color(lipgloss.Color("#EDE9FE"), lipgloss.Color("#312E81"))
+	activeText := color(lipgloss.Color("#701A75"), lipgloss.Color("#FAFAFA"))
+	activeBackground := color(lipgloss.Color("#FAE8FF"), lipgloss.Color("#701A75"))
 
 	return styles{
 		title:   lipgloss.NewStyle().Bold(true),
 		brand:   lipgloss.NewStyle().Bold(true).Foreground(purple),
-		label:   lipgloss.NewStyle().Bold(true).Foreground(cyan),
+		label:   lipgloss.NewStyle().Bold(true).Foreground(fuchsia),
 		muted:   lipgloss.NewStyle().Foreground(muted),
 		value:   lipgloss.NewStyle(),
 		success: lipgloss.NewStyle().Foreground(green),
@@ -419,13 +419,13 @@ func (m model) question() (string, string) {
 	case stepName:
 		return "What should the app be called?", "This is the human-readable product name."
 	case stepEdition:
-		return "Choose your edition", "Free is the complete foundation. Paid unlocks every product module and updates."
+		return "Choose your edition", "Free is the complete foundation. Paid unlocks every product module and lifetime updates."
 	case stepFramework:
 		return "Choose a frontend", "htmx is the default. Datastar uses server-sent events and fine-grained patches."
 	case stepDatabase:
 		return "Choose a database", "SQLite is simple. PostgreSQL is ready for distributed deployments."
 	case stepPayment:
-		return "Choose a payment provider", "Only the selected provider is included in your project."
+		return "Choose your app's billing provider", "Only the selected provider is included in your project."
 	case stepMail:
 		return "Choose transactional email", "SMTP works everywhere. Resend offers a hosted API."
 	case stepTeams:
@@ -448,7 +448,7 @@ func (m model) options() []option {
 	case stepEdition:
 		return []option{
 			{label: "Free", value: "free", description: "SQLite, SMTP, htmx, auth, security, and the app foundation."},
-			{label: "Paid", value: "paid", description: "All generator choices, commercial modules, and updates."},
+			{label: "Paid · View pricing", value: "paid", description: "Opens goilerplate pricing if your account is Free."},
 		}
 	case stepFramework:
 		return []option{

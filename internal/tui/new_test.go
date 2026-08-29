@@ -206,6 +206,20 @@ func TestBackgroundMessageSelectsReadableLightTheme(t *testing.T) {
 	}
 }
 
+func TestPaidCopySeparatesTheLicenseFromAppBilling(t *testing.T) {
+	selection := newModel()
+	selection.setStep(stepEdition)
+	selection.moveCursor(1)
+	if view := selection.questionView(); !strings.Contains(view, "Paid · View pricing") || !strings.Contains(view, "Opens goilerplate pricing") {
+		t.Fatalf("edition view = %q", view)
+	}
+	selection.setStep(stepPayment)
+	title, _ := selection.question()
+	if title != "Choose your app's billing provider" {
+		t.Fatalf("payment title = %q", title)
+	}
+}
+
 func TestTinyTerminalShowsResizeMessage(t *testing.T) {
 	selection := newModel()
 	selection.width = 30
