@@ -21,9 +21,14 @@ func (a *App) changelog(ctx context.Context, arguments []string) error {
 		return err
 	}
 	if len(releases) == 0 {
-		fmt.Fprintln(a.Out, "No releases published yet")
+		a.printInfo("No releases published yet")
 		return nil
 	}
+	if a.StyledOutput {
+		a.printHeading("changelog")
+		fmt.Fprintln(a.Out)
+	}
+	theme := a.theme()
 	for index, release := range releases {
 		if index > 0 {
 			fmt.Fprintln(a.Out)
@@ -37,15 +42,29 @@ func (a *App) changelog(ctx context.Context, arguments []string) error {
 		if release.Prerelease {
 			name += " (prerelease)"
 		}
-		fmt.Fprintln(a.Out, name)
+		if a.StyledOutput {
+			fmt.Fprintln(a.Out, theme.accent.Render(name))
+		} else {
+			fmt.Fprintln(a.Out, name)
+		}
 		if !release.PublishedAt.IsZero() {
-			fmt.Fprintln(a.Out, release.PublishedAt.Format("2006-01-02"))
+			date := release.PublishedAt.Format("2006-01-02")
+			if a.StyledOutput {
+				fmt.Fprintln(a.Out, theme.muted.Render(date))
+			} else {
+				fmt.Fprintln(a.Out, date)
+			}
 		}
 		if body := strings.TrimSpace(safeTerminalText(release.Body)); body != "" {
-			fmt.Fprintln(a.Out, body)
+			if a.StyledOutput {
+				fmt.Fprintln(a.Out, theme.value.Render(body))
+			} else {
+				fmt.Fprintln(a.Out, body)
+			}
 		}
 	}
-	fmt.Fprintf(a.Out, "\nShowing up to %d latest releases. View all: %s\n", github.ReleaseLimit, github.ReleasesPageURL)
+	fmt.Fprintln(a.Out)
+	a.printInfo(fmt.Sprintf("Showing up to %d latest releases. View all: %s", github.ReleaseLimit, github.ReleasesPageURL))
 	return nil
 }
 

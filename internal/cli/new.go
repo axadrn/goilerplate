@@ -41,7 +41,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	}
 
 	flags := flag.NewFlagSet("new", flag.ContinueOnError)
-	flags.SetOutput(a.Out)
+	flags.SetOutput(io.Discard)
 	name := flags.String("name", "", "project name")
 	modulePath := flags.String("module", "", "Go module path")
 	edition := flags.String("edition", "free", "free or paid")
@@ -119,7 +119,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if err := project.Extract(archive, destination); err != nil {
 		return err
 	}
-	fmt.Fprintf(a.Out, "Created %s in %s with %s\n", answers.ProjectName, destination, generatedVersion)
+	a.printSuccess(fmt.Sprintf("Created %s in %s with %s", answers.ProjectName, destination, generatedVersion))
 	return nil
 }
 
@@ -146,10 +146,20 @@ func (a *App) projectClient(ctx context.Context) (config.Config, ServiceClient, 
 
 func (a *App) openPricing(ctx context.Context, configuration config.Config) {
 	pricingURL := strings.TrimRight(a.apiURL(configuration), "/") + "/pricing"
-	if a.OpenBrowser != nil && a.OpenBrowser(ctx, pricingURL) == nil {
-		fmt.Fprintln(a.Out, "Pricing opened in your browser")
+	opened := a.OpenBrowser != nil && a.OpenBrowser(ctx, pricingURL) == nil
+	if a.StyledOutput {
+		a.printHeading("paid")
+		fmt.Fprintln(a.Out)
+	}
+	if opened {
+		a.printSuccess("Pricing opened in your browser")
 	} else {
-		fmt.Fprintf(a.Out, "Open pricing: %s\n", pricingURL)
+		a.printField("Open pricing", pricingURL)
+	}
+	if a.StyledOutput {
+		a.printInfo("Buy with your verified GitHub email")
+		a.printInfo("Then run goilerplate new again. No new login needed")
+		return
 	}
 	fmt.Fprintln(a.Out, "Buy with your verified GitHub email, then run goilerplate new again. No new login needed")
 }

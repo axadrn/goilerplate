@@ -44,6 +44,7 @@ type ServiceClient interface {
 
 type App struct {
 	Out                 io.Writer
+	StyledOutput        bool
 	Store               ConfigStore
 	Device              DeviceAuthorizer
 	OpenBrowser         func(context.Context, string) error
@@ -147,6 +148,14 @@ func (a *App) help(arguments []string) error {
 	if !ok {
 		return fmt.Errorf("unknown command %q", arguments[0])
 	}
+	if a.StyledOutput {
+		a.printHeading("help")
+		fmt.Fprintln(a.Out)
+		for _, line := range lines {
+			a.printInfo(line)
+		}
+		return nil
+	}
 	for _, line := range lines {
 		fmt.Fprintln(a.Out, line)
 	}
@@ -173,20 +182,24 @@ func (a *App) login(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(a.Out, "GitHub login")
+	if a.StyledOutput {
+		a.printHeading("login")
+	} else {
+		fmt.Fprintln(a.Out, "GitHub login")
+	}
 	fmt.Fprintln(a.Out)
 	copied := a.CopyToClipboard != nil && a.CopyToClipboard(ctx, authorization.UserCode) == nil
 	if copied {
-		fmt.Fprintf(a.Out, "Code: %s (copied)\n", authorization.UserCode)
+		a.printField("Code", authorization.UserCode+" (copied)")
 	} else {
-		fmt.Fprintf(a.Out, "Code: %s\n", authorization.UserCode)
+		a.printField("Code", authorization.UserCode)
 	}
-	fmt.Fprintf(a.Out, "Open: %s\n", authorization.VerificationURI)
+	a.printField("Open", authorization.VerificationURI)
 	fmt.Fprintln(a.Out)
 	if a.OpenBrowser != nil && a.OpenBrowser(ctx, authorization.VerificationURI) == nil {
-		fmt.Fprintln(a.Out, "Browser opened. Waiting for approval...")
+		a.printInfo("Browser opened. Waiting for approval...")
 	} else {
-		fmt.Fprintln(a.Out, "Waiting for approval...")
+		a.printInfo("Waiting for approval...")
 	}
 	githubToken, err := a.Device.Wait(ctx, a.GitHubClientID, authorization)
 	if err != nil {
@@ -202,7 +215,7 @@ func (a *App) login(ctx context.Context, arguments []string) error {
 		_ = client.Logout(ctx, login.SessionToken)
 		return err
 	}
-	fmt.Fprintf(a.Out, "Signed in as @%s\n", login.Account.GitHubLogin)
+	a.printSuccess("Signed in as @" + login.Account.GitHubLogin)
 	return nil
 }
 
@@ -225,7 +238,6 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(a.Out, "@%s <%s>\n", identity.Account.GitHubLogin, identity.Account.Email)
 	access := "Free"
 	for _, license := range identity.Licenses {
 		if license.Status == api.LicenseStatusActive {
@@ -233,6 +245,31 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 			break
 		}
 	}
+	if a.StyledOutput {
+		theme := a.theme()
+		a.printHeading("account")
+		fmt.Fprintln(a.Out)
+		fmt.Fprintln(a.Out, theme.accent.Render("@"+identity.Account.GitHubLogin))
+		a.printField("Email", identity.Account.Email)
+		a.printField("Access", theme.accent.Render(access))
+		if len(identity.Licenses) == 0 {
+			fmt.Fprintln(a.Out)
+			a.printInfo("No licenses connected")
+			return nil
+		}
+		fmt.Fprintln(a.Out)
+		fmt.Fprintln(a.Out, theme.brand.Render("Licenses"))
+		fmt.Fprintln(a.Out, "  "+theme.muted.Render(fmt.Sprintf("%-28s  %-10s  %s", "LICENSE ID", "STATUS", "ROLE")))
+		for _, license := range identity.Licenses {
+			statusStyle := theme.muted
+			if license.Status == api.LicenseStatusActive {
+				statusStyle = theme.success
+			}
+			fmt.Fprintln(a.Out, "  "+theme.value.Render(fmt.Sprintf("%-28s", license.ID))+"  "+statusStyle.Render(fmt.Sprintf("%-10s", license.Status))+"  "+theme.muted.Render(string(license.Role)))
+		}
+		return nil
+	}
+	fmt.Fprintf(a.Out, "@%s <%s>\n", identity.Account.GitHubLogin, identity.Account.Email)
 	fmt.Fprintf(a.Out, "Access: %s\n", access)
 	if len(identity.Licenses) == 0 {
 		return nil
@@ -253,7 +290,7 @@ func (a *App) logout(ctx context.Context, arguments []string) error {
 		return err
 	}
 	if configuration.SessionToken == "" {
-		fmt.Fprintln(a.Out, "Already signed out")
+		a.printInfo("Already signed out")
 		return nil
 	}
 	client, err := a.NewService(a.apiURL(configuration))
@@ -267,7 +304,7 @@ func (a *App) logout(ctx context.Context, arguments []string) error {
 	if err := a.Store.Save(configuration); err != nil {
 		return err
 	}
-	fmt.Fprintln(a.Out, "Signed out")
+	a.printSuccess("Signed out")
 	return nil
 }
 
@@ -275,11 +312,36 @@ func (a *App) version(arguments []string) error {
 	if len(arguments) != 0 {
 		return errors.New("usage: goilerplate version")
 	}
+	if a.StyledOutput {
+		a.printHeading("version")
+		fmt.Fprintln(a.Out)
+		a.printField("Version", a.Version)
+		return nil
+	}
 	fmt.Fprintln(a.Out, a.Version)
 	return nil
 }
 
 func (a *App) printUsage() {
+	if a.StyledOutput {
+		a.printHeading("cli")
+		fmt.Fprintln(a.Out)
+		a.printField("Usage", "goilerplate <command>")
+		fmt.Fprintln(a.Out)
+		fmt.Fprintln(a.Out, a.theme().brand.Render("Commands"))
+		a.printCommand("new", "Generate a new project")
+		a.printCommand("update", "Update a generated project on a new Git branch")
+		a.printCommand("login", "Sign in with GitHub")
+		a.printCommand("claim", "Connect a purchase made with another email")
+		a.printCommand("whoami", "Show the current account and licenses")
+		a.printCommand("license", "Invite, list, or remove license members")
+		a.printCommand("account delete", "Delete the current account")
+		a.printCommand("changelog", "Show published release notes")
+		a.printCommand("doctor", "Check a generated project's local tools")
+		a.printCommand("logout", "Revoke the current session")
+		a.printCommand("version", "Show the CLI version")
+		return
+	}
 	fmt.Fprintln(a.Out, "goilerplate")
 	fmt.Fprintln(a.Out)
 	fmt.Fprintln(a.Out, "Usage: goilerplate <command>")

@@ -69,7 +69,7 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 		return err
 	}
 	if targetVersion == lock.TemplateVersion {
-		fmt.Fprintf(a.Out, "Already using goilerplate template %s\n", targetVersion)
+		a.printInfo("Already using goilerplate template " + targetVersion)
 		return nil
 	}
 	oldRoot := filepath.Join(workspace, "old")
@@ -84,7 +84,7 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	printUpdateResult(a.Out, result)
+	a.printUpdateResult(result)
 	return nil
 }
 
@@ -119,20 +119,40 @@ func extractArchive(file *os.File, destination string) error {
 	return nil
 }
 
-func printUpdateResult(output io.Writer, result projectupdate.Result) {
-	fmt.Fprintf(output, "Created %s\n", result.Branch)
-	fmt.Fprintf(output, "%d files updated cleanly\n", len(result.Updated))
-	for _, name := range result.Updated {
-		fmt.Fprintf(output, "  %s\n", name)
-	}
-	if len(result.Conflicts) == 0 {
-		fmt.Fprintf(output, "Review it with: git switch %s\n", result.Branch)
+func (a *App) printUpdateResult(result projectupdate.Result) {
+	if !a.StyledOutput {
+		fmt.Fprintf(a.Out, "Created %s\n", result.Branch)
+		fmt.Fprintf(a.Out, "%d files updated cleanly\n", len(result.Updated))
+		for _, name := range result.Updated {
+			fmt.Fprintf(a.Out, "  %s\n", name)
+		}
+		if len(result.Conflicts) == 0 {
+			fmt.Fprintf(a.Out, "Review it with: git switch %s\n", result.Branch)
+			return
+		}
+		fmt.Fprintf(a.Out, "%d files need conflict resolution\n", len(result.Conflicts))
+		for _, name := range result.Conflicts {
+			fmt.Fprintf(a.Out, "  %s\n", name)
+		}
+		fmt.Fprintf(a.Out, "Switch with: git switch %s\n", result.Branch)
+		fmt.Fprintln(a.Out, "Resolve the normal Git conflict markers, then commit the result")
 		return
 	}
-	fmt.Fprintf(output, "%d files need conflict resolution\n", len(result.Conflicts))
-	for _, name := range result.Conflicts {
-		fmt.Fprintf(output, "  %s\n", name)
+	a.printHeading("update")
+	fmt.Fprintln(a.Out)
+	a.printSuccess("Created " + result.Branch)
+	a.printField("Updated", fmt.Sprintf("%d files", len(result.Updated)))
+	for _, name := range result.Updated {
+		a.printListItem(name)
 	}
-	fmt.Fprintf(output, "Switch with: git switch %s\n", result.Branch)
-	fmt.Fprintln(output, "Resolve the normal Git conflict markers, then commit the result")
+	if len(result.Conflicts) == 0 {
+		a.printField("Review with", "git switch "+result.Branch)
+		return
+	}
+	a.printWarning(fmt.Sprintf("%d files need conflict resolution", len(result.Conflicts)))
+	for _, name := range result.Conflicts {
+		a.printListItem(name)
+	}
+	a.printField("Switch with", "git switch "+result.Branch)
+	a.printInfo("Resolve the normal Git conflict markers, then commit the result")
 }

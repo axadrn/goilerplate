@@ -32,7 +32,7 @@ func main() {
 		if errors.Is(err, tui.ErrCancelled) {
 			return
 		}
-		fmt.Fprintln(os.Stderr, "Error:", err)
+		fmt.Fprintln(os.Stderr, cli.RenderError(err, styledTerminal(os.Stderr)))
 		os.Exit(1)
 	}
 }
@@ -45,6 +45,7 @@ func run(ctx context.Context) error {
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	application := &cli.App{
 		Out:            os.Stdout,
+		StyledOutput:   styledTerminal(os.Stdout),
 		Store:          store,
 		Device:         github.NewDeviceClient(httpClient),
 		GitHubClientID: githubClientID,
@@ -72,6 +73,11 @@ func run(ctx context.Context) error {
 
 func isTerminal(file *os.File) bool {
 	return term.IsTerminal(file.Fd())
+}
+
+func styledTerminal(file *os.File) bool {
+	_, noColor := os.LookupEnv("NO_COLOR")
+	return isTerminal(file) && !noColor
 }
 
 func buildVersion() string {

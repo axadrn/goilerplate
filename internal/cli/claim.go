@@ -32,14 +32,24 @@ func (a *App) claim(ctx context.Context, arguments []string) error {
 		if err := client.ConfirmLicenseClaim(ctx, sessionToken, normalizedCode); err != nil {
 			return err
 		}
-		fmt.Fprintln(a.Out, "License claimed. Run goilerplate whoami to see it")
+		if a.StyledOutput {
+			a.printSuccess("License claimed")
+			a.printInfo("Run goilerplate whoami to see it")
+		} else {
+			fmt.Fprintln(a.Out, "License claimed. Run goilerplate whoami to see it")
+		}
 		return nil
 	}
 	if err := client.BeginLicenseClaim(ctx, sessionToken, flags.Arg(0)); err != nil {
 		return err
 	}
-	fmt.Fprintln(a.Out, "If that email belongs to an unclaimed purchase, a claim code is on its way")
-	fmt.Fprintln(a.Out, "Finish with: goilerplate claim --code <code>")
+	if a.StyledOutput {
+		a.printInfo("If that email belongs to an unclaimed purchase, a claim code is on its way")
+		a.printField("Finish with", "goilerplate claim --code <code>")
+	} else {
+		fmt.Fprintln(a.Out, "If that email belongs to an unclaimed purchase, a claim code is on its way")
+		fmt.Fprintln(a.Out, "Finish with: goilerplate claim --code <code>")
+	}
 	return nil
 }
 

@@ -33,6 +33,6 @@ func (a *App) account(ctx context.Context, arguments []string) error {
 	if err := a.Store.Save(configuration); err != nil {
 		return fmt.Errorf("account was deleted, but the local session could not be cleared: %w", err)
 	}
-	fmt.Fprintln(a.Out, "Account deleted")
+	a.printSuccess("Account deleted")
 	return nil
 }
