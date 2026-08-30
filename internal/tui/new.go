@@ -425,7 +425,7 @@ func (m model) question() (string, string) {
 	case stepContent:
 		return "Include content modules", "Blog and Docs share the same Markdown engine."
 	case stepExample:
-		return "Include the Projects example?", "A small CRUD module and matching demo data you can delete later."
+		return "Include the Projects example?", "Complete CRUD code. Run task seed later if you want example data."
 	default:
 		return "Ready to build", "The existing CLI command generates the project."
 	}

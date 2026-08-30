@@ -61,6 +61,15 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 	}
 }
 
+func TestProjectsExampleQuestionUsesExampleDataWording(t *testing.T) {
+	model := newModel()
+	model.setStep(stepExample)
+	question, description := model.question()
+	if question != "Include the Projects example?" || description != "Complete CRUD code. Run task seed later if you want example data." {
+		t.Fatalf("question = %q, description = %q", question, description)
+	}
+}
+
 func TestFreeSelectionSkipsPaidQuestions(t *testing.T) {
 	model := newModel()
 	model.setStep(stepEdition)

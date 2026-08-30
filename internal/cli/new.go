@@ -121,6 +121,9 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	}
 	a.printSuccess(fmt.Sprintf("Created %s in %s with %s", answers.ProjectName, destination, generatedVersion))
 	a.printInfo("Git is ready on main with an initial commit")
+	if answers.Example {
+		a.printInfo("Run task seed to load the Projects example data")
+	}
 	return nil
 }
 
