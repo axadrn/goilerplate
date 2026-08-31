@@ -35,27 +35,3 @@ changelog:
 
 release:
   prerelease: auto
-
-homebrew_casks:
-  - name: goilerplate
-    ids:
-      - goilerplate
-    binaries:
-      - goilerplate
-    homepage: https://goilerplate.com
-    description: Production-ready Go SaaS projects from one command
-    license: MIT
-    skip_upload: auto
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/goilerplate"]
-          end
-    repository:
-      owner: axadrn
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    commit_author:
-      name: Axel Adrian
-      email: hello@axeladrian.com

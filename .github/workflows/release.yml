@@ -38,13 +38,6 @@ jobs:
           go test ./...
           go vet ./...
 
-      - name: Verify Homebrew credentials
-        if: ${{ !contains(github.ref_name, '-') }}
-        shell: bash
-        env:
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-        run: test -n "$HOMEBREW_TAP_GITHUB_TOKEN"
-
       - name: Release binaries
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
@@ -53,4 +46,3 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
