@@ -1,5 +1,7 @@
 # goilerplate
 
+The production Go stack you own.
+
 The CLI for generating production-ready Go SaaS projects.
 
 ## Documentation
