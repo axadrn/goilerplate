@@ -6,7 +6,7 @@ import (
 )
 
 func TestGenerationAnswersJSON(t *testing.T) {
-	encoded, err := json.Marshal(GenerationAnswers{Workspaces: true, Demo: true})
+	encoded, err := json.Marshal(GenerationAnswers{Workspaces: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -14,9 +14,10 @@ func TestGenerationAnswersJSON(t *testing.T) {
 	if err := json.Unmarshal(encoded, &fields); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"workspaces", "demo"} {
-		if string(fields[name]) != "true" {
-			t.Fatalf("%s = %s", name, fields[name])
-		}
+	if string(fields["workspaces"]) != "true" {
+		t.Fatalf("workspaces = %s", fields["workspaces"])
+	}
+	if len(fields) != 11 {
+		t.Fatalf("generation answer fields = %d, want 11", len(fields))
 	}
 }

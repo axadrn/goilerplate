@@ -127,5 +127,4 @@ type GenerationAnswers struct {
 	OAuth       []string `json:"oauth"`
 	Storage     bool     `json:"storage"`
 	Content     []string `json:"content"`
-	Demo        bool     `json:"demo"`
 }

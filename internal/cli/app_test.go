@@ -350,7 +350,6 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 		"--database", "postgres",
 		"--workspaces",
 		"--oauth", "google,github",
-		"--demo",
 		destination,
 	})
 	if err != nil {
@@ -360,7 +359,7 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	if err != nil || string(content) != "module example.com/acme" {
 		t.Fatalf("go.mod = %q, %v", content, err)
 	}
-	if service.generateToken != "session" || service.generateRequest.TemplateVersion != "" || service.generateRequest.Answers.Framework != "datastar" || service.generateRequest.Answers.Payment != "stripe" || !service.generateRequest.Answers.Workspaces || !service.generateRequest.Answers.Demo {
+	if service.generateToken != "session" || service.generateRequest.TemplateVersion != "" || service.generateRequest.Answers.Framework != "datastar" || service.generateRequest.Answers.Payment != "stripe" || !service.generateRequest.Answers.Workspaces {
 		t.Fatalf("generation request = %#v", service.generateRequest)
 	}
 	if !strings.Contains(output.String(), "Created Acme") {
@@ -375,7 +374,7 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	if status := strings.TrimSpace(runCLIGit(t, destination, "status", "--porcelain")); status != "" {
 		t.Fatalf("worktree = %q", status)
 	}
-	if !strings.Contains(output.String(), "Git is ready on main") || !strings.Contains(output.String(), "Run task seed to load the Demo data") {
+	if !strings.Contains(output.String(), "Git is ready on main") {
 		t.Fatalf("output = %q", output.String())
 	}
 }
@@ -416,9 +415,6 @@ func TestNewWithoutArgumentsUsesWizardThenExistingGenerationPath(t *testing.T) {
 	}
 	if service.generateRequest.Answers.Database != "postgres" || !service.generateRequest.Answers.Workspaces {
 		t.Fatalf("generation request = %#v", service.generateRequest)
-	}
-	if strings.Contains(output.String(), "task seed") {
-		t.Fatalf("output contains Demo data hint without the Demo: %q", output.String())
 	}
 }
 

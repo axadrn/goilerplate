@@ -39,7 +39,6 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 	model.workspaces = true
 	model.storage = true
 	model.content["docs"] = true
-	model.demo = true
 
 	want := []string{
 		"--name", "Rocket",
@@ -53,20 +52,10 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 		"--oauth", "google,github",
 		"--storage",
 		"--content", "docs",
-		"--demo",
 		"./rocket",
 	}
 	if got := model.arguments(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("arguments = %#v, want %#v", got, want)
-	}
-}
-
-func TestDemoQuestionExplainsTheFixedProject(t *testing.T) {
-	model := newModel()
-	model.setStep(stepDemo)
-	question, description := model.question()
-	if question != "Generate the Demo?" || description != "Fixed reference app with Projects data. Run task seed after generation." {
-		t.Fatalf("question = %q, description = %q", question, description)
 	}
 }
 
@@ -188,7 +177,6 @@ func TestReviewFitsStandardAndNarrowTerminals(t *testing.T) {
 			selection.storage = true
 			selection.content["blog"] = true
 			selection.content["docs"] = true
-			selection.demo = true
 			selection.setStep(stepReview)
 
 			content := selection.View().Content
@@ -214,8 +202,7 @@ func TestWideSummaryFitsWithMaximumInputLengths(t *testing.T) {
 	selection.storage = true
 	selection.content["blog"] = true
 	selection.content["docs"] = true
-	selection.demo = true
-	selection.setStep(stepDemo)
+	selection.setStep(stepContent)
 
 	content := selection.View().Content
 	if width := lipgloss.Width(content); width > 100 {
