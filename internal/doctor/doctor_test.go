@@ -17,7 +17,7 @@ func TestInspectChecksProjectAndSelectedTools(t *testing.T) {
 	writeProject(t, root, api.ProjectLock{
 		SchemaVersion:   api.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Answers: api.GenerationAnswers{
+		Config: api.GenerationAnswers{
 			ModulePath: "example.com/acme",
 			Edition:    "paid",
 			Database:   "postgres",
@@ -46,7 +46,7 @@ func TestInspectReportsModuleVersionsAndMissingTools(t *testing.T) {
 	writeProject(t, root, api.ProjectLock{
 		SchemaVersion:   api.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Answers:         api.GenerationAnswers{ModulePath: "example.com/wanted", Edition: "free", Database: "sqlite", Mail: "resend"},
+		Config:          api.GenerationAnswers{ModulePath: "example.com/wanted", Edition: "free", Database: "sqlite", Mail: "resend"},
 	})
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/wrong\n\ngo 1.25.0\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ func TestInspectAllowsCommentsAndNoGoVersionGate(t *testing.T) {
 	writeProject(t, root, api.ProjectLock{
 		SchemaVersion:   api.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Answers:         api.GenerationAnswers{ModulePath: "example.com/acme", Edition: "free", Database: "sqlite", Mail: "resend"},
+		Config:          api.GenerationAnswers{ModulePath: "example.com/acme", Edition: "free", Database: "sqlite", Mail: "resend"},
 	})
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/acme // generated project\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -90,7 +90,7 @@ func TestInspectValidatesSelectedEnvironment(t *testing.T) {
 	writeProject(t, root, api.ProjectLock{
 		SchemaVersion:   api.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Answers: api.GenerationAnswers{
+		Config: api.GenerationAnswers{
 			ModulePath: "example.com/acme",
 			Edition:    "paid",
 			Database:   "sqlite",
@@ -193,7 +193,7 @@ func writeProject(t *testing.T, root string, lock api.ProjectLock) {
 	if err := os.WriteFile(filepath.Join(root, "goilerplate.lock"), encoded, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+lock.Answers.ModulePath+"\n\ngo 1.25.0\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+lock.Config.ModulePath+"\n\ngo 1.25.0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }

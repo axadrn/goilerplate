@@ -12,7 +12,7 @@ func TestReadLock(t *testing.T) {
 	content := `{
   "schema_version": 1,
   "template_version": "v3.0.0",
-  "answers": {
+  "config": {
     "project_name": "Acme",
     "module_path": "example.com/acme",
     "edition": "paid",
@@ -34,7 +34,7 @@ func TestReadLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lock.TemplateVersion != "v3.0.0" || lock.Answers.ModulePath != "example.com/acme" {
+	if lock.TemplateVersion != "v3.0.0" || lock.Config.ModulePath != "example.com/acme" {
 		t.Fatalf("lock = %#v", lock)
 	}
 }
@@ -44,9 +44,9 @@ func TestReadLockRejectsMissingUnknownAndUnsupportedFiles(t *testing.T) {
 		t.Fatal("missing lock was accepted")
 	}
 	for name, content := range map[string]string{
-		"unknown":       `{"schema_version":1,"template_version":"v3.0.0","answers":{},"extra":true}`,
-		"unsupported":   `{"schema_version":2,"template_version":"v3.0.0","answers":{}}`,
-		"empty version": `{"schema_version":1,"template_version":" ","answers":{}}`,
+		"unknown":       `{"schema_version":1,"template_version":"v3.0.0","config":{},"extra":true}`,
+		"unsupported":   `{"schema_version":2,"template_version":"v3.0.0","config":{}}`,
+		"empty version": `{"schema_version":1,"template_version":" ","config":{}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()

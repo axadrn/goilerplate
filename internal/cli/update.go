@@ -50,7 +50,7 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 	defer oldArchive.Close()
 	oldVersion, err := client.UpdateTree(ctx, token, api.GenerateRequest{
 		TemplateVersion: lock.TemplateVersion,
-		Answers:         lock.Answers,
+		Answers:         lock.Config,
 	}, oldArchive)
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 		return err
 	}
 	defer newArchive.Close()
-	targetVersion, err := client.UpdateTree(ctx, token, api.GenerateRequest{Answers: lock.Answers}, newArchive)
+	targetVersion, err := client.UpdateTree(ctx, token, api.GenerateRequest{Answers: lock.Config}, newArchive)
 	if err != nil {
 		return err
 	}

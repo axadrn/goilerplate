@@ -504,11 +504,11 @@ func TestNewRejectsDatastarForFreeBeforeCallingService(t *testing.T) {
 	}
 }
 
-func TestUpdateCreatesGitBranchFromLockedAnswers(t *testing.T) {
+func TestUpdateCreatesGitBranchFromLockedConfig(t *testing.T) {
 	lock := api.ProjectLock{
 		SchemaVersion:   api.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Answers: api.GenerationAnswers{
+		Config: api.GenerationAnswers{
 			ProjectName: "Acme", ModulePath: "example.com/acme", Edition: "paid",
 			Framework: "htmx", Database: "sqlite", Payment: "stripe", Mail: "smtp",
 		},

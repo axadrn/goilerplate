@@ -112,7 +112,7 @@ const LockSchemaVersion = 1
 type ProjectLock struct {
 	SchemaVersion   int               `json:"schema_version"`
 	TemplateVersion string            `json:"template_version"`
-	Answers         GenerationAnswers `json:"answers"`
+	Config          GenerationAnswers `json:"config"`
 }
 
 type GenerationAnswers struct {
