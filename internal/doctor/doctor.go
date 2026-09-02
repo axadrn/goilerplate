@@ -63,14 +63,14 @@ func (i Inspector) Inspect(ctx context.Context, directory string) Report {
 	if err != nil {
 		return report.add("project", err.Error(), LevelError)
 	}
-	report = report.add("project", lock.TemplateVersion+" "+lock.Answers.Edition, LevelOK)
+	report = report.add("project", lock.TemplateVersion+" "+lock.Config.Edition, LevelOK)
 
 	module, requiredGo, err := readModule(filepath.Join(root, "go.mod"))
 	if err != nil {
 		report = report.add("go.mod", err.Error(), LevelError)
 	} else {
-		if module != lock.Answers.ModulePath {
-			report = report.add("go.mod", fmt.Sprintf("module is %s, lock expects %s", module, lock.Answers.ModulePath), LevelError)
+		if module != lock.Config.ModulePath {
+			report = report.add("go.mod", fmt.Sprintf("module is %s, lock expects %s", module, lock.Config.ModulePath), LevelError)
 		} else {
 			report = report.add("go.mod", module, LevelOK)
 		}
@@ -89,7 +89,7 @@ func (i Inspector) Inspect(ctx context.Context, directory string) Report {
 		if readErr != nil {
 			report = report.add(".env", readErr.Error(), LevelError)
 		} else {
-			missing := missingEnvironmentKeys(lock.Answers, environment)
+			missing := missingEnvironmentKeys(lock.Config, environment)
 			if len(missing) > 0 {
 				report = report.add(".env", "missing required values: "+strings.Join(missing, ", "), LevelError)
 			} else {
@@ -101,7 +101,7 @@ func (i Inspector) Inspect(ctx context.Context, directory string) Report {
 	} else {
 		report = report.add(".env", err.Error(), LevelWarning)
 	}
-	if lock.Answers.Database == "postgres" || lock.Answers.Mail == "smtp" {
+	if lock.Config.Database == "postgres" || lock.Config.Mail == "smtp" {
 		report = i.checkTool(report, "docker", "Optional. Install Docker or provide the selected services yourself", LevelWarning)
 	}
 	return report

@@ -419,7 +419,7 @@ func (m model) question() (string, string) {
 	case stepOAuth:
 		return "Include OAuth providers", "Choose any combination. Press Enter when ready."
 	case stepStorage:
-		return "Include file storage?", "Adds the S3-compatible storage package and configuration."
+		return "Include file storage?", "Adds the S3 storage package and configuration."
 	case stepContent:
 		return "Include content modules", "Blog and Docs share the same Markdown engine."
 	default:
