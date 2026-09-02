@@ -25,11 +25,11 @@ const (
 	stepDatabase
 	stepPayment
 	stepMail
-	stepTeams
+	stepWorkspaces
 	stepOAuth
 	stepStorage
 	stepContent
-	stepExample
+	stepDemo
 	stepReview
 )
 
@@ -65,11 +65,11 @@ type model struct {
 	database    string
 	payment     string
 	mail        string
-	teams       bool
+	workspaces  bool
 	oauth       map[string]bool
 	storage     bool
 	content     map[string]bool
-	example     bool
+	demo        bool
 	paidAccess  bool
 	submitted   bool
 	openPricing bool
@@ -352,7 +352,7 @@ func (m model) reviewView(lineWidth int) string {
 		return strings.Join(append(rows,
 			m.styles.value.Render(shorten("Paid · "+displayValue(m.framework)+" · "+displayValue(m.database), lineWidth)),
 			m.styles.value.Render(shorten(displayValue(m.payment)+" · "+displayValue(m.mail), lineWidth)),
-			m.styles.value.Render(shorten(fmt.Sprintf("Teams %s · OAuth %d", yesNo(m.teams), len(selectedKeys(m.oauth))), lineWidth)),
+			m.styles.value.Render(shorten(fmt.Sprintf("Workspaces %s · OAuth %d", yesNo(m.workspaces), len(selectedKeys(m.oauth))), lineWidth)),
 			m.styles.value.Render(shorten(fmt.Sprintf("Storage %s · Content %d", yesNo(m.storage), len(selectedKeys(m.content))), lineWidth)),
 		), "\n")
 	}
@@ -368,8 +368,8 @@ func (m model) reviewView(lineWidth int) string {
 	}
 	return strings.Join(append(rows,
 		m.styles.value.Render(shorten("Paid  ·  "+displayValue(m.framework)+"  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail), lineWidth)),
-		m.styles.value.Render(shorten("Teams "+yesNo(m.teams)+"  ·  OAuth "+selectedValues(m.oauth), lineWidth)),
-		m.styles.value.Render(shorten("Storage "+yesNo(m.storage)+"  ·  Content "+selectedValues(m.content)+"  ·  Example "+yesNo(m.example), lineWidth)),
+		m.styles.value.Render(shorten("Workspaces "+yesNo(m.workspaces)+"  ·  OAuth "+selectedValues(m.oauth), lineWidth)),
+		m.styles.value.Render(shorten("Storage "+yesNo(m.storage)+"  ·  Content "+selectedValues(m.content)+"  ·  Demo "+yesNo(m.demo), lineWidth)),
 	), "\n")
 }
 
@@ -416,16 +416,16 @@ func (m model) question() (string, string) {
 		return "Choose your app's billing provider", "Only the selected provider is included in your project."
 	case stepMail:
 		return "Choose transactional email", "SMTP works everywhere. Resend offers a hosted API."
-	case stepTeams:
-		return "Include team workspaces?", "Adds organizations, roles, invitations, and organization-owned billing."
+	case stepWorkspaces:
+		return "Include Workspaces?", "Adds shared workspaces, roles, invitations, seats, and workspace billing."
 	case stepOAuth:
 		return "Include OAuth providers", "Choose any combination. Press Enter when ready."
 	case stepStorage:
 		return "Include file storage?", "Adds the S3-compatible storage package and configuration."
 	case stepContent:
 		return "Include content modules", "Blog and Docs share the same Markdown engine."
-	case stepExample:
-		return "Include the Projects example?", "Complete CRUD code. Run task seed later if you want example data."
+	case stepDemo:
+		return "Generate the Demo?", "Fixed reference app with Projects data. Run task seed after generation."
 	default:
 		return "Ready to build", "The existing CLI command generates the project."
 	}
@@ -453,7 +453,7 @@ func (m model) options() []option {
 		return []option{{label: "Stripe", value: "stripe"}, {label: "Polar", value: "polar"}}
 	case stepMail:
 		return []option{{label: "SMTP", value: "smtp"}, {label: "Resend", value: "resend"}}
-	case stepTeams, stepStorage, stepExample:
+	case stepWorkspaces, stepStorage, stepDemo:
 		return []option{{label: "No", value: "false"}, {label: "Yes", value: "true"}}
 	case stepOAuth:
 		return []option{{label: "Google", value: "google"}, {label: "GitHub", value: "github"}}
@@ -477,8 +477,8 @@ func (m model) arguments() []string {
 			"--payment", m.payment,
 			"--mail", m.mail,
 		)
-		if m.teams {
-			arguments = append(arguments, "--teams")
+		if m.workspaces {
+			arguments = append(arguments, "--workspaces")
 		}
 		if values := selectedKeys(m.oauth); len(values) > 0 {
 			arguments = append(arguments, "--oauth", strings.Join(values, ","))
@@ -489,8 +489,8 @@ func (m model) arguments() []string {
 		if values := selectedKeys(m.content); len(values) > 0 {
 			arguments = append(arguments, "--content", strings.Join(values, ","))
 		}
-		if m.example {
-			arguments = append(arguments, "--example")
+		if m.demo {
+			arguments = append(arguments, "--demo")
 		}
 	}
 	return append(arguments, strings.TrimSpace(m.inputs[0].Value()))
@@ -589,12 +589,12 @@ func (m *model) selectCurrent() {
 		m.payment = value
 	case stepMail:
 		m.mail = value
-	case stepTeams:
-		m.teams = value == "true"
+	case stepWorkspaces:
+		m.workspaces = value == "true"
 	case stepStorage:
 		m.storage = value == "true"
-	case stepExample:
-		m.example = value == "true"
+	case stepDemo:
+		m.demo = value == "true"
 	}
 }
 
@@ -624,16 +624,16 @@ func (m model) optionSelected(value string) bool {
 		return m.payment == value
 	case stepMail:
 		return m.mail == value
-	case stepTeams:
-		return m.teams == (value == "true")
+	case stepWorkspaces:
+		return m.workspaces == (value == "true")
 	case stepOAuth:
 		return m.oauth[value]
 	case stepStorage:
 		return m.storage == (value == "true")
 	case stepContent:
 		return m.content[value]
-	case stepExample:
-		return m.example == (value == "true")
+	case stepDemo:
+		return m.demo == (value == "true")
 	default:
 		return false
 	}

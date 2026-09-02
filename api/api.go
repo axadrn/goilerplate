@@ -123,9 +123,9 @@ type GenerationAnswers struct {
 	Database    string   `json:"database"`
 	Payment     string   `json:"payment"`
 	Mail        string   `json:"mail"`
-	Teams       bool     `json:"teams"`
+	Workspaces  bool     `json:"workspaces"`
 	OAuth       []string `json:"oauth"`
 	Storage     bool     `json:"storage"`
 	Content     []string `json:"content"`
-	Example     bool     `json:"example"`
+	Demo        bool     `json:"demo"`
 }

@@ -20,11 +20,11 @@ func TestReadLock(t *testing.T) {
     "database": "sqlite",
     "payment": "stripe",
     "mail": "smtp",
-    "teams": false,
+    "workspaces": false,
     "oauth": [],
     "storage": false,
     "content": [],
-    "example": false
+    "demo": false
   }
 }
 `

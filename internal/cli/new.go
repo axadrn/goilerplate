@@ -49,11 +49,11 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	database := flags.String("database", "sqlite", "sqlite or postgres")
 	payment := flags.String("payment", "", "stripe or polar")
 	mail := flags.String("mail", "smtp", "smtp or resend")
-	teams := flags.Bool("teams", false, "include team workspaces")
+	workspaces := flags.Bool("workspaces", false, "include shared workspaces")
 	oauth := flags.String("oauth", "", "comma-separated OAuth providers")
 	storage := flags.Bool("storage", false, "include file storage")
 	content := flags.String("content", "", "comma-separated blog and docs modules")
-	example := flags.Bool("example", false, "include the Projects example")
+	demo := flags.Bool("demo", false, "generate the fixed Demo project")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -82,11 +82,11 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 		Database:    strings.TrimSpace(*database),
 		Payment:     strings.TrimSpace(*payment),
 		Mail:        strings.TrimSpace(*mail),
-		Teams:       *teams,
+		Workspaces:  *workspaces,
 		OAuth:       splitList(*oauth),
 		Storage:     *storage,
 		Content:     splitList(*content),
-		Example:     *example,
+		Demo:        *demo,
 	}
 	if err := validateEditionSelection(answers); err != nil {
 		return err
@@ -121,8 +121,8 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	}
 	a.printSuccess(fmt.Sprintf("Created %s in %s with %s", answers.ProjectName, destination, generatedVersion))
 	a.printInfo("Git is ready on main with an initial commit")
-	if answers.Example {
-		a.printInfo("Run task seed to load the Projects example data")
+	if answers.Demo {
+		a.printInfo("Run task seed to load the Demo data")
 	}
 	return nil
 }
@@ -193,12 +193,15 @@ func splitList(value string) []string {
 }
 
 func validateEditionSelection(answers api.GenerationAnswers) error {
+	if answers.Demo {
+		return nil
+	}
 	if answers.Framework != "htmx" && answers.Framework != "datastar" {
 		return fmt.Errorf("unsupported framework %q", answers.Framework)
 	}
 	switch answers.Edition {
 	case "free":
-		if answers.Framework != "htmx" || answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Teams || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 || answers.Example {
+		if answers.Framework != "htmx" || answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Workspaces || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 {
 			return errors.New("Free uses SQLite, SMTP, htmx, and no paid modules")
 		}
 	case "paid":

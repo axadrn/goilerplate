@@ -36,10 +36,10 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 	model.database = "postgres"
 	model.payment = "polar"
 	model.mail = "resend"
-	model.teams = true
+	model.workspaces = true
 	model.storage = true
 	model.content["docs"] = true
-	model.example = true
+	model.demo = true
 
 	want := []string{
 		"--name", "Rocket",
@@ -49,11 +49,11 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 		"--database", "postgres",
 		"--payment", "polar",
 		"--mail", "resend",
-		"--teams",
+		"--workspaces",
 		"--oauth", "google,github",
 		"--storage",
 		"--content", "docs",
-		"--example",
+		"--demo",
 		"./rocket",
 	}
 	if got := model.arguments(); !reflect.DeepEqual(got, want) {
@@ -61,11 +61,11 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 	}
 }
 
-func TestProjectsExampleQuestionUsesExampleDataWording(t *testing.T) {
+func TestDemoQuestionExplainsTheFixedProject(t *testing.T) {
 	model := newModel()
-	model.setStep(stepExample)
+	model.setStep(stepDemo)
 	question, description := model.question()
-	if question != "Include the Projects example?" || description != "Complete CRUD code. Run task seed later if you want example data." {
+	if question != "Generate the Demo?" || description != "Fixed reference app with Projects data. Run task seed after generation." {
 		t.Fatalf("question = %q, description = %q", question, description)
 	}
 }
@@ -184,11 +184,11 @@ func TestReviewFitsStandardAndNarrowTerminals(t *testing.T) {
 			selection.inputs[1].SetValue(strings.Repeat("m", 240))
 			selection.inputs[2].SetValue(strings.Repeat("n", 100))
 			selection.edition = "paid"
-			selection.teams = true
+			selection.workspaces = true
 			selection.storage = true
 			selection.content["blog"] = true
 			selection.content["docs"] = true
-			selection.example = true
+			selection.demo = true
 			selection.setStep(stepReview)
 
 			content := selection.View().Content
@@ -210,12 +210,12 @@ func TestWideSummaryFitsWithMaximumInputLengths(t *testing.T) {
 	selection.inputs[1].SetValue(strings.Repeat("m", 240))
 	selection.inputs[2].SetValue(strings.Repeat("n", 100))
 	selection.edition = "paid"
-	selection.teams = true
+	selection.workspaces = true
 	selection.storage = true
 	selection.content["blog"] = true
 	selection.content["docs"] = true
-	selection.example = true
-	selection.setStep(stepExample)
+	selection.demo = true
+	selection.setStep(stepDemo)
 
 	content := selection.View().Content
 	if width := lipgloss.Width(content); width > 100 {
