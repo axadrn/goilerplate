@@ -23,8 +23,7 @@ func TestReadLock(t *testing.T) {
     "workspaces": false,
     "oauth": [],
     "storage": false,
-    "content": [],
-    "demo": false
+    "content": []
   }
 }
 `

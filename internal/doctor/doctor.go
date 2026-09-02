@@ -171,9 +171,6 @@ func missingEnvironmentKeys(answers api.GenerationAnswers, values map[string]str
 	if answers.Storage {
 		required = append(required, "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_ENDPOINT")
 	}
-	if answers.Demo {
-		required = append(required, "SEED_PASSWORD")
-	}
 	var missing []string
 	for _, key := range required {
 		if strings.TrimSpace(values[key]) == "" {

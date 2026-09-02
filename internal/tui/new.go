@@ -29,7 +29,6 @@ const (
 	stepOAuth
 	stepStorage
 	stepContent
-	stepDemo
 	stepReview
 )
 
@@ -69,7 +68,6 @@ type model struct {
 	oauth       map[string]bool
 	storage     bool
 	content     map[string]bool
-	demo        bool
 	paidAccess  bool
 	submitted   bool
 	openPricing bool
@@ -369,7 +367,7 @@ func (m model) reviewView(lineWidth int) string {
 	return strings.Join(append(rows,
 		m.styles.value.Render(shorten("Paid  ·  "+displayValue(m.framework)+"  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail), lineWidth)),
 		m.styles.value.Render(shorten("Workspaces "+yesNo(m.workspaces)+"  ·  OAuth "+selectedValues(m.oauth), lineWidth)),
-		m.styles.value.Render(shorten("Storage "+yesNo(m.storage)+"  ·  Content "+selectedValues(m.content)+"  ·  Demo "+yesNo(m.demo), lineWidth)),
+		m.styles.value.Render(shorten("Storage "+yesNo(m.storage)+"  ·  Content "+selectedValues(m.content), lineWidth)),
 	), "\n")
 }
 
@@ -424,8 +422,6 @@ func (m model) question() (string, string) {
 		return "Include file storage?", "Adds the S3-compatible storage package and configuration."
 	case stepContent:
 		return "Include content modules", "Blog and Docs share the same Markdown engine."
-	case stepDemo:
-		return "Generate the Demo?", "Fixed reference app with Projects data. Run task seed after generation."
 	default:
 		return "Ready to build", "The existing CLI command generates the project."
 	}
@@ -453,7 +449,7 @@ func (m model) options() []option {
 		return []option{{label: "Stripe", value: "stripe"}, {label: "Polar", value: "polar"}}
 	case stepMail:
 		return []option{{label: "SMTP", value: "smtp"}, {label: "Resend", value: "resend"}}
-	case stepWorkspaces, stepStorage, stepDemo:
+	case stepWorkspaces, stepStorage:
 		return []option{{label: "No", value: "false"}, {label: "Yes", value: "true"}}
 	case stepOAuth:
 		return []option{{label: "Google", value: "google"}, {label: "GitHub", value: "github"}}
@@ -488,9 +484,6 @@ func (m model) arguments() []string {
 		}
 		if values := selectedKeys(m.content); len(values) > 0 {
 			arguments = append(arguments, "--content", strings.Join(values, ","))
-		}
-		if m.demo {
-			arguments = append(arguments, "--demo")
 		}
 	}
 	return append(arguments, strings.TrimSpace(m.inputs[0].Value()))
@@ -593,8 +586,6 @@ func (m *model) selectCurrent() {
 		m.workspaces = value == "true"
 	case stepStorage:
 		m.storage = value == "true"
-	case stepDemo:
-		m.demo = value == "true"
 	}
 }
 
@@ -632,8 +623,6 @@ func (m model) optionSelected(value string) bool {
 		return m.storage == (value == "true")
 	case stepContent:
 		return m.content[value]
-	case stepDemo:
-		return m.demo == (value == "true")
 	default:
 		return false
 	}
