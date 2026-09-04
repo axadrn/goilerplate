@@ -490,17 +490,22 @@ func TestNewRejectsPaidModulesForFreeBeforeCallingService(t *testing.T) {
 	}
 }
 
-func TestNewRejectsDatastarForFreeBeforeCallingService(t *testing.T) {
-	service := &fakeService{}
-	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+func TestNewAcceptsDatastarForFree(t *testing.T) {
+	output := &bytes.Buffer{}
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{generatedVersion: "v3.0.1", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
+	app := testApp(output, store, &fakeDevice{}, service)
 	err := app.Run(context.Background(), []string{
 		"new", "--module", "example.com/acme", "--framework", "datastar", filepath.Join(t.TempDir(), "acme"),
 	})
-	if err == nil || !strings.Contains(err.Error(), "Free uses SQLite") {
+	if err != nil {
 		t.Fatalf("new error = %v", err)
 	}
-	if service.generateCalled {
-		t.Fatal("service was called for an invalid Free frontend")
+	if !service.generateCalled {
+		t.Fatal("service was not called for a valid Free + datastar selection")
+	}
+	if service.generateRequest.Answers.Framework != "datastar" {
+		t.Fatalf("framework = %q", service.generateRequest.Answers.Framework)
 	}
 }
 
