@@ -101,7 +101,7 @@ func TestInspectValidatesSelectedEnvironment(t *testing.T) {
 		},
 	})
 	environment := strings.Join([]string{
-		"APP_NAME=Acme", "APP_ENV=development", "APP_URL=http://localhost:8090", "DB_CONNECTION=./data/app.db",
+		"APP_ENV=development", "APP_URL=http://localhost:8090", "DB_CONNECTION=./data/app.db",
 		"EMAIL_FROM=noreply@example.com", "SESSION_EXPIRY=168h", "RESEND_API_KEY=re_test", "STRIPE_SECRET_KEY=sk_test",
 		"STRIPE_WEBHOOK_SECRET=whsec_test", "STRIPE_PRICE_ID_PRO_MONTHLY=price_1", "STRIPE_PRICE_ID_PRO_YEARLY=price_2",
 		"STRIPE_PRICE_ID_ENTERPRISE_MONTHLY=price_3", "STRIPE_PRICE_ID_ENTERPRISE_YEARLY=price_4", "GITHUB_CLIENT_ID=id",
@@ -116,7 +116,7 @@ func TestInspectValidatesSelectedEnvironment(t *testing.T) {
 		t.Fatalf("report = %#v", report)
 	}
 
-	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("APP_NAME=Acme\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("APP_ENV=development\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	report := inspector.Inspect(context.Background(), root)
