@@ -194,7 +194,7 @@ func validateEditionSelection(answers api.GenerationAnswers) error {
 	switch answers.Edition {
 	case "free":
 		if (answers.Framework != "htmx" && answers.Framework != "datastar") || answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Workspaces || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 {
-			return errors.New("Free uses SQLite, SMTP, htmx or datastar, and no paid modules")
+			return errors.New("Free uses SQLite, SMTP, htmx or Datastar, and no paid modules")
 		}
 	case "paid":
 		if answers.Payment == "none" {

@@ -345,7 +345,7 @@ func (m model) reviewView(lineWidth int) string {
 			m.styles.muted.Render(shorten("Folder  "+strings.TrimSpace(m.inputs[0].Value()), lineWidth)),
 		}
 		if m.edition == "free" {
-			return strings.Join(append(rows, m.styles.value.Render(shorten("Free · SQLite · SMTP · htmx", lineWidth))), "\n")
+			return strings.Join(append(rows, m.styles.value.Render(shorten("Free · SQLite · SMTP · "+displayValue(m.framework), lineWidth))), "\n")
 		}
 		return strings.Join(append(rows,
 			m.styles.value.Render(shorten("Paid · "+displayValue(m.framework)+" · "+displayValue(m.database), lineWidth)),
@@ -361,7 +361,7 @@ func (m model) reviewView(lineWidth int) string {
 	}
 	if m.edition == "free" {
 		return strings.Join(append(rows,
-			m.styles.value.Render(shorten("Free  ·  SQLite  ·  SMTP  ·  htmx", lineWidth)),
+			m.styles.value.Render(shorten("Free  ·  SQLite  ·  SMTP  ·  "+displayValue(m.framework), lineWidth)),
 		), "\n")
 	}
 	return strings.Join(append(rows,
@@ -435,7 +435,7 @@ func (m model) options() []option {
 			paid.description = "Open pricing. Buy once, then run goilerplate new again."
 		}
 		return []option{
-			{label: "Free", value: "free", description: "Complete foundation with SQLite, SMTP, htmx, auth, and security."},
+			{label: "Free", value: "free", description: "Complete foundation with SQLite, SMTP, htmx or Datastar, auth, and security."},
 			paid,
 		}
 	case stepFramework:
@@ -465,10 +465,10 @@ func (m model) arguments() []string {
 		"--name", strings.TrimSpace(m.inputs[2].Value()),
 		"--module", strings.TrimSpace(m.inputs[1].Value()),
 		"--edition", m.edition,
+		"--framework", m.framework,
 	}
 	if m.edition == "paid" {
 		arguments = append(arguments,
-			"--framework", m.framework,
 			"--database", m.database,
 			"--payment", m.payment,
 			"--mail", m.mail,
@@ -513,11 +513,8 @@ func (m *model) moveForward() {
 	case m.step == stepEdition:
 		m.setStep(stepDestination)
 		return
-	case m.step == stepName && m.edition == "free":
+	case m.step == stepFramework && m.edition == "free":
 		m.setStep(stepReview)
-		return
-	case m.step == stepName:
-		m.setStep(stepFramework)
 		return
 	}
 	if m.step < stepReview {
@@ -535,11 +532,7 @@ func (m *model) moveBack() {
 		return
 	}
 	if m.step == stepReview && m.edition == "free" {
-		m.setStep(stepName)
-		return
-	}
-	if m.step == stepFramework {
-		m.setStep(stepName)
+		m.setStep(stepFramework)
 		return
 	}
 	if m.isTextStep() {
@@ -641,11 +634,8 @@ func (m model) progress() string {
 	completed := int(m.step) + 1
 	total := int(stepReview) + 1
 	if m.edition == "free" {
-		total = 5
-		switch m.step {
-		case stepEdition, stepDestination, stepModule, stepName:
-			completed = int(m.step) + 1
-		case stepReview:
+		total = 6
+		if m.step == stepReview {
 			completed = total
 		}
 	}
