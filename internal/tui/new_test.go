@@ -19,6 +19,7 @@ func TestFreeArgumentsUseTheStableNewCommand(t *testing.T) {
 		"--name", "Acme",
 		"--module", "example.com/acme",
 		"--edition", "free",
+		"--framework", "htmx",
 		"./acme",
 	}
 	if got := model.arguments(); !reflect.DeepEqual(got, want) {
@@ -70,12 +71,34 @@ func TestFreeSelectionSkipsPaidQuestions(t *testing.T) {
 	}
 	model.setStep(stepName)
 	model.moveForward()
+	if model.step != stepFramework {
+		t.Fatalf("step = %d, want framework", model.step)
+	}
+	model.moveForward()
 	if model.step != stepReview {
 		t.Fatalf("step = %d, want review", model.step)
 	}
 	model.moveBack()
-	if model.step != stepName {
-		t.Fatalf("back step = %d, want name", model.step)
+	if model.step != stepFramework {
+		t.Fatalf("back step = %d, want framework", model.step)
+	}
+}
+
+func TestFreeFrontendSelectionBuildsTheFrameworkFlag(t *testing.T) {
+	model := newModel()
+	model.setStep(stepFramework)
+	model.moveCursor(1)
+	model.selectCurrent()
+
+	if model.framework != "datastar" {
+		t.Fatalf("framework = %q", model.framework)
+	}
+	if arguments := strings.Join(model.arguments(), " "); !strings.Contains(arguments, "--edition free --framework datastar") {
+		t.Fatalf("arguments = %q", arguments)
+	}
+	model.setStep(stepReview)
+	if view := model.reviewView(model.contentWidth()); !strings.Contains(view, "Datastar") {
+		t.Fatalf("review = %q", view)
 	}
 }
 
@@ -251,7 +274,7 @@ func TestHeaderIsCompactAndFooterStaysAtTerminalEdge(t *testing.T) {
 	selection.height = 24
 
 	content := selection.View().Content
-	if !strings.Contains(content, "goilerplate") || !strings.Contains(content, " new  1/5") || strings.Contains(content, "━") {
+	if !strings.Contains(content, "goilerplate") || !strings.Contains(content, " new  1/6") || strings.Contains(content, "━") {
 		t.Fatalf("header = %q", strings.Split(content, "\n")[2])
 	}
 	lines := strings.Split(content, "\n")
