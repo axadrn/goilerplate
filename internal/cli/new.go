@@ -45,7 +45,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	name := flags.String("name", "", "project name")
 	modulePath := flags.String("module", "", "Go module path")
 	edition := flags.String("edition", "free", "free or paid")
-	framework := flags.String("framework", "htmx", "htmx, datastar or headless")
+	framework := flags.String("framework", "htmx", "htmx, datastar, svelte or headless")
 	database := flags.String("database", "sqlite", "sqlite or postgres")
 	payment := flags.String("payment", "", "stripe or polar")
 	mail := flags.String("mail", "smtp", "smtp or resend")
@@ -72,7 +72,8 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 		}
 		*framework = "headless"
 	}
-	if strings.TrimSpace(*framework) == "headless" {
+	switch strings.TrimSpace(*framework) {
+	case "headless", "svelte":
 		*jsonAPI = true
 	}
 	if flags.NArg() != 1 {
@@ -218,6 +219,13 @@ func validateEditionSelection(answers api.GenerationAnswers) error {
 		if len(answers.Content) != 0 {
 			return errors.New("Headless does not support blog or docs")
 		}
+	case "svelte":
+		if !answers.API {
+			return errors.New("SvelteKit requires the JSON API")
+		}
+		if len(answers.Content) != 0 {
+			return errors.New("SvelteKit does not support blog or docs")
+		}
 	default:
 		return fmt.Errorf("unsupported framework %q", answers.Framework)
 	}
@@ -227,7 +235,7 @@ func validateEditionSelection(answers api.GenerationAnswers) error {
 	switch answers.Edition {
 	case "free":
 		if answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Workspaces || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 {
-			return errors.New("Free supports htmx 4.0, Datastar 1.0 or Headless, the JSON API, the MCP server, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs")
+			return errors.New("Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless, the JSON API, the MCP server, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs")
 		}
 	case "paid":
 		if answers.Payment == "none" {

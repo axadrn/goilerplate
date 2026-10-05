@@ -352,7 +352,7 @@ func (m model) reviewView(lineWidth int) string {
 			return strings.Join(append(rows, m.styles.value.Render(shorten("Free · SQLite · SMTP · "+m.frontendSummary(" · "), lineWidth))), "\n")
 		}
 		storage := fmt.Sprintf("Storage %s · Content %d", yesNo(m.storage), len(selectedKeys(m.content)))
-		if m.headless() {
+		if m.apiOnly() {
 			storage = "Storage " + yesNo(m.storage)
 		}
 		return strings.Join(append(rows,
@@ -373,7 +373,7 @@ func (m model) reviewView(lineWidth int) string {
 		), "\n")
 	}
 	storage := "Storage " + yesNo(m.storage) + "  ·  Content " + selectedValues(m.content)
-	if m.headless() {
+	if m.apiOnly() {
 		storage = "Storage " + yesNo(m.storage)
 	}
 	return strings.Join(append(rows,
@@ -419,7 +419,7 @@ func (m model) question() (string, string) {
 	case stepEdition:
 		return "Choose your edition", "Free is the complete foundation. Paid unlocks every product module and lifetime updates."
 	case stepFramework:
-		return "Choose a frontend", "htmx is the default. Datastar streams patches. Headless ships only the Go backend and the JSON API."
+		return "Choose a frontend", "htmx is the default. Datastar streams patches. SvelteKit runs on the JSON API. Headless ships only the Go backend and the JSON API."
 	case stepAPI:
 		return "Include the JSON API?", "Adds JSON endpoints under /api/v1 for mobile apps and integrations, next to the web app."
 	case stepMCP:
@@ -451,13 +451,14 @@ func (m model) options() []option {
 			paid.description = "Open pricing. Buy once, then run goilerplate new again."
 		}
 		return []option{
-			{label: "Free", value: "free", description: "Complete foundation with SQLite, SMTP, htmx, Datastar or Headless, auth, and security."},
+			{label: "Free", value: "free", description: "Complete foundation with SQLite, SMTP, htmx, Datastar, SvelteKit or Headless, auth, and security."},
 			paid,
 		}
 	case stepFramework:
 		return []option{
 			{label: "htmx", value: "htmx", description: "Small, stable, and the default goilerplate frontend."},
 			{label: "Datastar", value: "datastar", description: "Server-sent events with a reactive HTML-first client."},
+			{label: "SvelteKit", value: "svelte", description: "SvelteKit app on the JSON API, served by the Go binary."},
 			{label: "Headless", value: "headless", description: "Go backend with a JSON API and no native frontend."},
 		}
 	case stepDatabase:
@@ -484,8 +485,10 @@ func (m model) arguments() []string {
 		"--edition", m.edition,
 	}
 	switch {
-	case m.headless():
+	case m.framework == "headless":
 		arguments = append(arguments, "--headless")
+	case m.framework == "svelte":
+		arguments = append(arguments, "--framework", "svelte")
 	case m.api:
 		arguments = append(arguments, "--framework", m.framework, "--api")
 	default:
@@ -510,7 +513,7 @@ func (m model) arguments() []string {
 			arguments = append(arguments, "--storage")
 		}
 		content := selectedKeys(m.content)
-		if len(content) > 0 && !m.headless() {
+		if len(content) > 0 && !m.apiOnly() {
 			arguments = append(arguments, "--content", strings.Join(content, ","))
 		}
 	}
@@ -534,13 +537,13 @@ func (m model) inputIndex() int {
 }
 
 // steps lists the questions the current selection asks, in order. Free
-// skips the module questions, Headless skips the JSON API question because
-// it always includes the API, and skips content because blog and docs are
-// HTML products. The MCP server question follows only when the JSON API is
-// included.
+// skips the module questions. SvelteKit and Headless skip the JSON API
+// question because they always include the API, and skip content because
+// blog and docs are HTML products. The MCP server question follows only when
+// the JSON API is included.
 func (m model) steps() []step {
 	steps := []step{stepEdition, stepDestination, stepModule, stepName, stepFramework}
-	if !m.headless() {
+	if !m.apiOnly() {
 		steps = append(steps, stepAPI)
 	}
 	if m.includesAPI() {
@@ -548,7 +551,7 @@ func (m model) steps() []step {
 	}
 	if m.edition == "paid" {
 		steps = append(steps, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage)
-		if !m.headless() {
+		if !m.apiOnly() {
 			steps = append(steps, stepContent)
 		}
 	}
@@ -589,12 +592,14 @@ func (m *model) moveBack() {
 	m.setStep(steps[index-1])
 }
 
-func (m model) headless() bool {
-	return m.framework == "headless"
+// apiOnly reports a frontend that runs on the JSON API instead of HTML
+// rendered by Go: SvelteKit and Headless.
+func (m model) apiOnly() bool {
+	return m.framework == "headless" || m.framework == "svelte"
 }
 
 func (m model) includesAPI() bool {
-	return m.headless() || m.api
+	return m.apiOnly() || m.api
 }
 
 // includesMCP reports the MCP server answer. It needs the JSON API, so
@@ -642,7 +647,7 @@ func (m *model) selectCurrent() {
 		m.edition = value
 	case stepFramework:
 		m.framework = value
-		if m.headless() {
+		if m.apiOnly() {
 			m.api = true
 		}
 	case stepAPI:
@@ -743,6 +748,8 @@ func displayValue(value string) string {
 		return "htmx"
 	case "datastar":
 		return "Datastar"
+	case "svelte":
+		return "SvelteKit"
 	case "headless":
 		return "Headless"
 	case "sqlite":

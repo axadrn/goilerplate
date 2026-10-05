@@ -507,7 +507,7 @@ func TestNewRejectsPaidModulesForFreeBeforeCallingService(t *testing.T) {
 	err := app.Run(context.Background(), []string{
 		"new", "--module", "example.com/acme", "--workspaces", filepath.Join(t.TempDir(), "acme"),
 	})
-	if err == nil || !strings.Contains(err.Error(), "Free supports htmx 4.0, Datastar 1.0 or Headless, the JSON API, the MCP server, SQLite, SMTP") {
+	if err == nil || !strings.Contains(err.Error(), "Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless, the JSON API, the MCP server, SQLite, SMTP") {
 		t.Fatalf("new error = %v", err)
 	}
 	if service.generateCalled {
@@ -565,6 +565,22 @@ func TestNewSendsHeadlessAndTheJSONAPI(t *testing.T) {
 			wantEdition:   "free",
 			wantFramework: "headless",
 			wantPayment:   "none",
+			wantAPI:       true,
+		},
+		{
+			name:          "free svelte implies the JSON API",
+			arguments:     []string{"--framework", "svelte", "--edition", "free"},
+			wantEdition:   "free",
+			wantFramework: "svelte",
+			wantPayment:   "none",
+			wantAPI:       true,
+		},
+		{
+			name:          "paid svelte with polar",
+			arguments:     []string{"--edition", "paid", "--payment", "polar", "--framework", "svelte", "--workspaces"},
+			wantEdition:   "paid",
+			wantFramework: "svelte",
+			wantPayment:   "polar",
 			wantAPI:       true,
 		},
 		{
@@ -633,12 +649,12 @@ func TestNewRejectsInvalidHeadlessSelectionsBeforeCallingService(t *testing.T) {
 		{
 			name:      "free headless with postgres",
 			arguments: []string{"--edition", "free", "--headless", "--database", "postgres"},
-			want:      "Free supports htmx 4.0, Datastar 1.0 or Headless, the JSON API, the MCP server, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs",
+			want:      "Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless, the JSON API, the MCP server, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs",
 		},
 		{
 			name:      "free api with workspaces",
 			arguments: []string{"--api", "--workspaces"},
-			want:      "Free supports htmx 4.0, Datastar 1.0 or Headless",
+			want:      "Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless",
 		},
 		{
 			name:      "paid headless with content",
@@ -646,9 +662,24 @@ func TestNewRejectsInvalidHeadlessSelectionsBeforeCallingService(t *testing.T) {
 			want:      "Headless does not support blog or docs",
 		},
 		{
+			name:      "headless with framework svelte",
+			arguments: []string{"--headless", "--framework", "svelte"},
+			want:      "--headless cannot be combined with --framework",
+		},
+		{
+			name:      "paid svelte with content",
+			arguments: []string{"--edition", "paid", "--framework", "svelte", "--content", "docs"},
+			want:      "SvelteKit does not support blog or docs",
+		},
+		{
+			name:      "free svelte with storage",
+			arguments: []string{"--framework", "svelte", "--storage"},
+			want:      "Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless",
+		},
+		{
 			name:      "unknown framework",
-			arguments: []string{"--framework", "svelte"},
-			want:      `unsupported framework "svelte"`,
+			arguments: []string{"--framework", "react"},
+			want:      `unsupported framework "react"`,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -681,6 +712,20 @@ func TestValidateEditionSelectionRequiresTheJSONAPIForHeadless(t *testing.T) {
 	}
 }
 
+func TestValidateEditionSelectionRequiresTheJSONAPIForSvelteKit(t *testing.T) {
+	answers := api.GenerationAnswers{Edition: "free", Framework: "svelte", Database: "sqlite", Payment: "none", Mail: "smtp"}
+	err := validateEditionSelection(answers)
+	if err == nil || err.Error() != "SvelteKit requires the JSON API" {
+		t.Fatalf("validation error = %v", err)
+	}
+	answers.API = true
+	answers.MCP = true
+	err = validateEditionSelection(answers)
+	if err != nil {
+		t.Fatalf("validation error = %v", err)
+	}
+}
+
 func TestHelpNewListsTheFrontendsAndTheJSONAPI(t *testing.T) {
 	output := &bytes.Buffer{}
 	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
@@ -688,7 +733,7 @@ func TestHelpNewListsTheFrontendsAndTheJSONAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"--framework htmx, datastar or headless", "--api", "--headless", "--mcp"} {
+	for _, want := range []string{"--framework htmx, datastar, svelte or headless", "--framework svelte", "--api", "--headless", "--mcp"} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("output = %q, want %q", output.String(), want)
 		}

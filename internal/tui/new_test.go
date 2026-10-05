@@ -339,7 +339,7 @@ func TestTinyTerminalShowsResizeMessage(t *testing.T) {
 	}
 }
 
-func TestFrontendOffersHeadlessInBothEditions(t *testing.T) {
+func TestFrontendOffersSvelteKitAndHeadlessInBothEditions(t *testing.T) {
 	for _, edition := range []string{"free", "paid"} {
 		t.Run(edition, func(t *testing.T) {
 			selection := newModel(true)
@@ -350,14 +350,17 @@ func TestFrontendOffersHeadlessInBothEditions(t *testing.T) {
 			for _, option := range options {
 				values = append(values, option.value)
 			}
-			if !reflect.DeepEqual(values, []string{"htmx", "datastar", "headless"}) {
+			if !reflect.DeepEqual(values, []string{"htmx", "datastar", "svelte", "headless"}) {
 				t.Fatalf("frontends = %v", values)
 			}
-			if options[2].label != "Headless" || !strings.HasPrefix(options[2].description, "Go backend with a JSON API and no native frontend") {
-				t.Fatalf("headless option = %#v", options[2])
+			if options[2].label != "SvelteKit" || options[2].description != "SvelteKit app on the JSON API, served by the Go binary." {
+				t.Fatalf("SvelteKit option = %#v", options[2])
+			}
+			if options[3].label != "Headless" || !strings.HasPrefix(options[3].description, "Go backend with a JSON API and no native frontend") {
+				t.Fatalf("headless option = %#v", options[3])
 			}
 			view := selection.questionView()
-			if !strings.Contains(view, "Headless") {
+			if !strings.Contains(view, "SvelteKit") || !strings.Contains(view, "Headless") {
 				t.Fatalf("frontend view = %q", view)
 			}
 		})
@@ -402,21 +405,25 @@ func TestJSONAPIStepFollowsHtmxAndDatastar(t *testing.T) {
 	}
 }
 
-func TestHeadlessSkipsTheJSONAPIAndContentSteps(t *testing.T) {
+func TestSvelteKitAndHeadlessSkipTheJSONAPIAndContentSteps(t *testing.T) {
 	for _, test := range []struct {
-		edition string
-		want    []step
+		edition   string
+		cursor    int
+		framework string
+		want      []step
 	}{
-		{edition: "free", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepReview}},
-		{edition: "paid", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage, stepReview}},
+		{edition: "free", cursor: 2, framework: "svelte", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepReview}},
+		{edition: "free", cursor: 3, framework: "headless", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepReview}},
+		{edition: "paid", cursor: 2, framework: "svelte", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage, stepReview}},
+		{edition: "paid", cursor: 3, framework: "headless", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage, stepReview}},
 	} {
-		t.Run(test.edition, func(t *testing.T) {
+		t.Run(test.edition+" "+test.framework, func(t *testing.T) {
 			selection := newModel(true)
 			selection.edition = test.edition
 			selection.setStep(stepFramework)
-			selection.moveCursor(2)
+			selection.moveCursor(test.cursor)
 			selection.selectCurrent()
-			if selection.framework != "headless" || !selection.api {
+			if selection.framework != test.framework || !selection.api {
 				t.Fatalf("framework = %q, api = %v", selection.framework, selection.api)
 			}
 
@@ -451,6 +458,8 @@ func TestProgressCountsOnlyAskedQuestions(t *testing.T) {
 	}{
 		{edition: "free", framework: "htmx", want: "7/7"},
 		{edition: "free", framework: "headless", want: "7/7"},
+		{edition: "free", framework: "svelte", want: "7/7"},
+		{edition: "paid", framework: "svelte", want: "13/13"},
 		{edition: "paid", framework: "datastar", want: "14/14"},
 		{edition: "paid", framework: "headless", want: "13/13"},
 	} {
@@ -476,6 +485,17 @@ func TestArgumentsEmitHeadlessOrTheJSONAPI(t *testing.T) {
 		{
 			name: "free headless", edition: "free", framework: "headless", api: true,
 			want: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--headless", "./acme"},
+		},
+		{
+			name: "free svelte", edition: "free", framework: "svelte", api: true,
+			want: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "svelte", "./acme"},
+		},
+		{
+			name: "paid svelte drops content", edition: "paid", framework: "svelte", api: true,
+			want: []string{
+				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--framework", "svelte",
+				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "./acme",
+			},
 		},
 		{
 			name: "free htmx with the JSON API", edition: "free", framework: "htmx", api: true,
@@ -528,6 +548,9 @@ func TestReviewShowsHeadlessAndTheJSONAPI(t *testing.T) {
 	}{
 		{edition: "free", framework: "headless", api: true, width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  Headless  ·  JSON API"}},
 		{edition: "free", framework: "htmx", api: true, width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  htmx  ·  JSON API"}},
+		{edition: "free", framework: "svelte", api: true, width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  SvelteKit  ·  JSON API"}},
+		{edition: "paid", framework: "svelte", api: true, width: 100, want: []string{"Paid  ·  SvelteKit  ·  JSON API  ·  SQLite", "Storage No"}, reject: []string{"Content"}},
+		{edition: "paid", framework: "svelte", api: true, width: 50, want: []string{"Paid · SvelteKit · JSON API", "Storage No"}, reject: []string{"Content"}},
 		{edition: "free", framework: "datastar", width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  Datastar"}, reject: []string{"JSON API"}},
 		{edition: "free", framework: "headless", api: true, width: 50, want: []string{"Free · SQLite · SMTP · Headless · JSON API"}},
 		{edition: "paid", framework: "headless", api: true, width: 100, want: []string{"Paid  ·  Headless  ·  JSON API  ·  SQLite", "Storage No"}, reject: []string{"Content"}},
