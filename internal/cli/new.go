@@ -227,7 +227,7 @@ func validateEditionSelection(answers api.GenerationAnswers) error {
 	switch answers.Edition {
 	case "free":
 		if answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Workspaces || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 {
-			return errors.New("Free supports htmx 4.0, Datastar 1.0 or Headless, the JSON API, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs")
+			return errors.New("Free supports htmx 4.0, Datastar 1.0 or Headless, the JSON API, the MCP server, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs")
 		}
 	case "paid":
 		if answers.Payment == "none" {

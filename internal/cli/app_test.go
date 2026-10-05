@@ -507,7 +507,7 @@ func TestNewRejectsPaidModulesForFreeBeforeCallingService(t *testing.T) {
 	err := app.Run(context.Background(), []string{
 		"new", "--module", "example.com/acme", "--workspaces", filepath.Join(t.TempDir(), "acme"),
 	})
-	if err == nil || !strings.Contains(err.Error(), "Free supports htmx 4.0, Datastar 1.0 or Headless, the JSON API, SQLite, SMTP") {
+	if err == nil || !strings.Contains(err.Error(), "Free supports htmx 4.0, Datastar 1.0 or Headless, the JSON API, the MCP server, SQLite, SMTP") {
 		t.Fatalf("new error = %v", err)
 	}
 	if service.generateCalled {
@@ -633,7 +633,7 @@ func TestNewRejectsInvalidHeadlessSelectionsBeforeCallingService(t *testing.T) {
 		{
 			name:      "free headless with postgres",
 			arguments: []string{"--edition", "free", "--headless", "--database", "postgres"},
-			want:      "Free supports htmx 4.0, Datastar 1.0 or Headless, the JSON API, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs",
+			want:      "Free supports htmx 4.0, Datastar 1.0 or Headless, the JSON API, the MCP server, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs",
 		},
 		{
 			name:      "free api with workspaces",
