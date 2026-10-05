@@ -733,7 +733,7 @@ func TestHelpNewListsTheFrontendsAndTheJSONAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"--framework htmx, datastar, svelte or headless", "--framework svelte", "--api", "--headless", "--mcp"} {
+	for _, want := range []string{"--framework htmx, datastar, svelte or headless", "--framework svelte", "Node.js 22.17 or newer and pnpm", "--api", "--headless", "--mcp"} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("output = %q, want %q", output.String(), want)
 		}

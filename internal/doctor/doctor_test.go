@@ -69,6 +69,69 @@ func TestInspectReportsModuleVersionsAndMissingTools(t *testing.T) {
 	}
 }
 
+func TestInspectChecksTheFrontendToolsOfTheSelection(t *testing.T) {
+	for name, test := range map[string]struct {
+		framework string
+		outputs   map[string]string
+		errors    []string
+		absent    []string
+	}{
+		"sveltekit": {
+			framework: "svelte",
+			outputs:   map[string]string{"go": "go1.25.7", "git": "git version 2.50.1", "task": "", "node": "v24.11.0", "pnpm": ""},
+			absent:    []string{"tailwindcss"},
+		},
+		"sveltekit with old node and no pnpm": {
+			framework: "svelte",
+			outputs:   map[string]string{"go": "go1.25.7", "git": "git version 2.50.1", "task": "", "node": "v22.16.0"},
+			errors:    []string{"node", "pnpm"},
+			absent:    []string{"tailwindcss"},
+		},
+		"sveltekit without node": {
+			framework: "svelte",
+			outputs:   map[string]string{"go": "go1.25.7", "git": "git version 2.50.1", "task": "", "pnpm": ""},
+			errors:    []string{"node"},
+			absent:    []string{"tailwindcss"},
+		},
+		"headless": {
+			framework: "headless",
+			outputs:   map[string]string{"go": "go1.25.7", "git": "git version 2.50.1", "task": ""},
+			absent:    []string{"tailwindcss", "node", "pnpm"},
+		},
+		"htmx": {
+			framework: "htmx",
+			outputs:   map[string]string{"go": "go1.25.7", "git": "git version 2.50.1", "task": "", "tailwindcss": ""},
+			absent:    []string{"node", "pnpm"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			writeProject(t, root, api.ProjectLock{
+				SchemaVersion:   api.LockSchemaVersion,
+				TemplateVersion: "v3.1.0",
+				Config:          api.GenerationAnswers{ModulePath: "example.com/acme", Edition: "free", Framework: test.framework, API: test.framework != "htmx", Database: "sqlite", Mail: "resend"},
+			})
+			report := fakeInspector(test.outputs).Inspect(context.Background(), root)
+			if report.Errors != len(test.errors) {
+				t.Fatalf("errors = %d, checks = %#v", report.Errors, report.Checks)
+			}
+			for _, check := range test.errors {
+				if !hasCheck(report, check, LevelError) {
+					t.Fatalf("missing failed check %q in %#v", check, report.Checks)
+				}
+			}
+			for _, check := range test.absent {
+				if hasCheckName(report, check) {
+					t.Fatalf("unexpected check %q in %#v", check, report.Checks)
+				}
+			}
+			if test.framework == "svelte" && len(test.errors) == 0 && (!hasCheck(report, "node", LevelOK) || !hasCheck(report, "pnpm", LevelOK)) {
+				t.Fatalf("checks = %#v", report.Checks)
+			}
+		})
+	}
+}
+
 func TestInspectAllowsCommentsAndNoGoVersionGate(t *testing.T) {
 	root := t.TempDir()
 	writeProject(t, root, api.ProjectLock{

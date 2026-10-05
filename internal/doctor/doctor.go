@@ -81,7 +81,15 @@ func (i Inspector) Inspect(ctx context.Context, directory string) Report {
 
 	report = i.checkVersion(ctx, report, "git", []string{"--version"}, "2.38.0", "Install Git 2.38 or newer for goilerplate update")
 	report = i.checkTool(report, "task", "Optional. Install Task from https://taskfile.dev/installation/", LevelWarning)
-	report = i.checkTool(report, "tailwindcss", "Optional. Install the Tailwind CSS CLI from https://tailwindcss.com/docs/installation/tailwind-cli", LevelWarning)
+	switch lock.Config.Framework {
+	case "svelte":
+		report = i.checkVersion(ctx, report, "node", []string{"--version"}, "22.17.0", "Install Node.js 22.17 or newer to build the SvelteKit app")
+		report = i.checkTool(report, "pnpm", "Install pnpm from https://pnpm.io/installation to build the SvelteKit app", LevelError)
+	case "headless":
+		// Headless has no frontend build.
+	default:
+		report = i.checkTool(report, "tailwindcss", "Optional. Install the Tailwind CSS CLI from https://tailwindcss.com/docs/installation/tailwind-cli", LevelWarning)
+	}
 
 	environmentPath := filepath.Join(root, ".env")
 	if _, err := os.Stat(environmentPath); err == nil {
