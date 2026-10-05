@@ -55,6 +55,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	content := flags.String("content", "", "comma-separated blog and docs modules")
 	jsonAPI := flags.Bool("api", false, "include the JSON API")
 	headless := flags.Bool("headless", false, "Go backend with the JSON API and no native frontend")
+	mcp := flags.Bool("mcp", false, "include the MCP server, needs the JSON API")
 	err := flags.Parse(arguments)
 	if err != nil {
 		return err
@@ -104,6 +105,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 		Storage:     *storage,
 		Content:     splitList(*content),
 		API:         *jsonAPI,
+		MCP:         *mcp,
 	}
 	err = validateEditionSelection(answers)
 	if err != nil {
@@ -218,6 +220,9 @@ func validateEditionSelection(answers api.GenerationAnswers) error {
 		}
 	default:
 		return fmt.Errorf("unsupported framework %q", answers.Framework)
+	}
+	if answers.MCP && !answers.API {
+		return errors.New("MCP requires the JSON API")
 	}
 	switch answers.Edition {
 	case "free":

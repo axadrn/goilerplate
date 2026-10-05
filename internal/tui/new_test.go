@@ -370,10 +370,10 @@ func TestJSONAPIStepFollowsHtmxAndDatastar(t *testing.T) {
 		framework int
 		next      step
 	}{
-		{edition: "free", framework: 0, next: stepReview},
-		{edition: "free", framework: 1, next: stepReview},
-		{edition: "paid", framework: 0, next: stepDatabase},
-		{edition: "paid", framework: 1, next: stepDatabase},
+		{edition: "free", framework: 0, next: stepMCP},
+		{edition: "free", framework: 1, next: stepMCP},
+		{edition: "paid", framework: 0, next: stepMCP},
+		{edition: "paid", framework: 1, next: stepMCP},
 	} {
 		selection := newModel(true)
 		selection.edition = test.edition
@@ -407,8 +407,8 @@ func TestHeadlessSkipsTheJSONAPIAndContentSteps(t *testing.T) {
 		edition string
 		want    []step
 	}{
-		{edition: "free", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepReview}},
-		{edition: "paid", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage, stepReview}},
+		{edition: "free", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepReview}},
+		{edition: "paid", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage, stepReview}},
 	} {
 		t.Run(test.edition, func(t *testing.T) {
 			selection := newModel(true)
@@ -450,9 +450,9 @@ func TestProgressCountsOnlyAskedQuestions(t *testing.T) {
 		want      string
 	}{
 		{edition: "free", framework: "htmx", want: "7/7"},
-		{edition: "free", framework: "headless", want: "6/6"},
+		{edition: "free", framework: "headless", want: "7/7"},
 		{edition: "paid", framework: "datastar", want: "14/14"},
-		{edition: "paid", framework: "headless", want: "12/12"},
+		{edition: "paid", framework: "headless", want: "13/13"},
 	} {
 		selection := newModel(true)
 		selection.edition = test.edition
@@ -552,6 +552,141 @@ func TestReviewShowsHeadlessAndTheJSONAPI(t *testing.T) {
 				t.Fatalf("%s %s width %d review = %q, rejects %q", test.edition, test.framework, test.width, view, reject)
 			}
 		}
+	}
+}
+
+func TestMCPStepFollowsTheJSONAPI(t *testing.T) {
+	for _, test := range []struct {
+		edition   string
+		framework int
+		api       bool
+		next      step
+	}{
+		{edition: "free", framework: 0, api: true, next: stepReview},
+		{edition: "free", framework: 2, next: stepReview},
+		{edition: "paid", framework: 1, api: true, next: stepDatabase},
+		{edition: "paid", framework: 2, next: stepDatabase},
+	} {
+		selection := newModel(true)
+		selection.edition = test.edition
+		selection.setStep(stepFramework)
+		selection.moveCursor(test.framework)
+		selection = press(t, selection, tea.KeyEnter)
+		if test.api {
+			selection.moveCursor(1)
+			selection = press(t, selection, tea.KeyEnter)
+		}
+		if selection.step != stepMCP {
+			t.Fatalf("%s %s: step = %d, want MCP", test.edition, selection.framework, selection.step)
+		}
+		title, hint := selection.question()
+		if title != "Include the MCP server?" || !strings.Contains(hint, "personal API token") {
+			t.Fatalf("question = %q, %q", title, hint)
+		}
+		if selection.mcp || selection.cursor != 0 {
+			t.Fatalf("MCP default = %v, cursor = %d", selection.mcp, selection.cursor)
+		}
+		selection.moveCursor(1)
+		selection = press(t, selection, tea.KeyEnter)
+		if !selection.mcp || selection.step != test.next {
+			t.Fatalf("%s %s: mcp = %v, step = %d, want %d", test.edition, selection.framework, selection.mcp, selection.step, test.next)
+		}
+		selection.moveBack()
+		if selection.step != stepMCP || selection.cursor != 1 {
+			t.Fatalf("back step = %d, cursor = %d, want MCP with Yes", selection.step, selection.cursor)
+		}
+	}
+}
+
+func TestMCPStepIsSkippedWithoutTheJSONAPI(t *testing.T) {
+	for _, edition := range []string{"free", "paid"} {
+		selection := newModel(true)
+		selection.edition = edition
+		selection.setStep(stepAPI)
+		selection = press(t, selection, tea.KeyEnter)
+		if selection.api || selection.step == stepMCP {
+			t.Fatalf("%s: api = %v, step = %d", edition, selection.api, selection.step)
+		}
+	}
+}
+
+func TestTurningTheJSONAPIOffDropsTheMCPServer(t *testing.T) {
+	selection := newModel(true)
+	selection.inputs[0].SetValue("./acme")
+	selection.inputs[1].SetValue("example.com/acme")
+	selection.inputs[2].SetValue("Acme")
+	selection.api = true
+	selection.mcp = true
+	got := selection.arguments()
+	want := []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "htmx", "--api", "--mcp", "./acme"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("arguments = %#v, want %#v", got, want)
+	}
+	selection.setStep(stepAPI)
+	selection.moveCursor(-1)
+	selection = press(t, selection, tea.KeyEnter)
+	if selection.step != stepReview {
+		t.Fatalf("step = %d, want review", selection.step)
+	}
+	got = selection.arguments()
+	want = []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "htmx", "./acme"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("arguments = %#v, want %#v", got, want)
+	}
+}
+
+func TestArgumentsAndReviewShowTheMCPServer(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		edition   string
+		framework string
+		api       bool
+		width     int
+		arguments []string
+		review    string
+	}{
+		{
+			name: "free headless", edition: "free", framework: "headless", api: true, width: 80,
+			arguments: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--headless", "--mcp", "./acme"},
+			review:    "Free  ·  SQLite  ·  SMTP  ·  Headless  ·  JSON API  ·  MCP",
+		},
+		{
+			name: "paid datastar", edition: "paid", framework: "datastar", api: true, width: 120,
+			arguments: []string{
+				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--framework", "datastar", "--api", "--mcp",
+				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "./acme",
+			},
+			review: "Paid  ·  Datastar  ·  JSON API  ·  MCP  ·  SQLite",
+		},
+		{
+			name: "paid headless narrow", edition: "paid", framework: "headless", api: true, width: 50,
+			arguments: []string{
+				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--headless", "--mcp",
+				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "./acme",
+			},
+			review: "Paid · Headless · JSON API · MCP",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			selection := newModel(true)
+			selection.inputs[0].SetValue("./acme")
+			selection.inputs[1].SetValue("example.com/acme")
+			selection.inputs[2].SetValue("Acme")
+			selection.width = test.width
+			selection.edition = test.edition
+			selection.framework = test.framework
+			selection.api = test.api
+			selection.mcp = true
+			got := selection.arguments()
+			if !reflect.DeepEqual(got, test.arguments) {
+				t.Fatalf("arguments = %#v, want %#v", got, test.arguments)
+			}
+			selection.setStep(stepReview)
+			view := selection.reviewView(selection.contentWidth())
+			if !strings.Contains(view, test.review) {
+				t.Fatalf("review = %q, want %q", view, test.review)
+			}
+		})
 	}
 }
 

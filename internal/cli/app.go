@@ -137,6 +137,7 @@ func (a *App) help(arguments []string) error {
 			"Run without options in a terminal to open interactive setup.",
 			"--framework htmx, datastar or headless. --api adds the JSON API.",
 			"--headless is the Go backend with the JSON API and no native frontend.",
+			"--mcp adds the MCP server and needs --api or --headless.",
 		},
 		"update":    {"goilerplate update", "Create a Git branch containing the new generated template."},
 		"login":     {"goilerplate login", "Sign in through GitHub's device flow."},

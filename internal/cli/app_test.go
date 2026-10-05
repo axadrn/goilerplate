@@ -688,10 +688,82 @@ func TestHelpNewListsTheFrontendsAndTheJSONAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"--framework htmx, datastar or headless", "--api", "--headless"} {
+	for _, want := range []string{"--framework htmx, datastar or headless", "--api", "--headless", "--mcp"} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("output = %q, want %q", output.String(), want)
 		}
+	}
+}
+
+func TestNewSendsTheMCPServer(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		arguments     []string
+		wantEdition   string
+		wantFramework string
+		wantMCP       bool
+	}{
+		{name: "free htmx with the JSON API", arguments: []string{"--api", "--mcp"}, wantEdition: "free", wantFramework: "htmx", wantMCP: true},
+		{name: "free headless", arguments: []string{"--headless", "--mcp"}, wantEdition: "free", wantFramework: "headless", wantMCP: true},
+		{name: "paid datastar with the JSON API", arguments: []string{"--edition", "paid", "--framework", "datastar", "--api", "--mcp"}, wantEdition: "paid", wantFramework: "datastar", wantMCP: true},
+		{name: "paid headless", arguments: []string{"--edition", "paid", "--payment", "polar", "--headless", "--mcp"}, wantEdition: "paid", wantFramework: "headless", wantMCP: true},
+		{name: "paid htmx with the JSON API only", arguments: []string{"--edition", "paid", "--api"}, wantEdition: "paid", wantFramework: "htmx"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+			service := &fakeService{generatedVersion: "v3.1.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
+			app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+			arguments := append([]string{"new", "--module", "example.com/acme"}, test.arguments...)
+			arguments = append(arguments, filepath.Join(t.TempDir(), "acme"))
+
+			err := app.Run(context.Background(), arguments)
+			if err != nil {
+				t.Fatalf("new error = %v", err)
+			}
+			answers := service.generateRequest.Answers
+			if answers.Edition != test.wantEdition || answers.Framework != test.wantFramework || !answers.API || answers.MCP != test.wantMCP {
+				t.Fatalf("answers = %#v", answers)
+			}
+		})
+	}
+}
+
+func TestNewRejectsTheMCPServerWithoutTheJSONAPI(t *testing.T) {
+	for _, arguments := range [][]string{
+		{"--mcp"},
+		{"--framework", "datastar", "--mcp"},
+		{"--edition", "paid", "--payment", "stripe", "--mcp"},
+	} {
+		service := &fakeService{}
+		app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+		command := append([]string{"new", "--module", "example.com/acme"}, arguments...)
+		command = append(command, filepath.Join(t.TempDir(), "acme"))
+
+		err := app.Run(context.Background(), command)
+		if err == nil || err.Error() != "MCP requires the JSON API" {
+			t.Fatalf("new %v error = %v", arguments, err)
+		}
+		if service.generateCalled {
+			t.Fatalf("service was called for %v", arguments)
+		}
+	}
+}
+
+func TestGenerationAnswersEncodeAndDecodeTheMCPServer(t *testing.T) {
+	encoded, err := json.Marshal(api.GenerationAnswers{API: true, MCP: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"mcp":true`) {
+		t.Fatalf("encoded = %s", encoded)
+	}
+	var older api.ProjectLock
+	err = json.Unmarshal([]byte(`{"schema_version":1,"template_version":"v3.0.3","config":{"edition":"free","framework":"htmx","api":true}}`), &older)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if older.Config.MCP {
+		t.Fatal("a lock without mcp decoded as true")
 	}
 }
 
@@ -701,7 +773,7 @@ func TestUpdateCreatesGitBranchFromLockedConfig(t *testing.T) {
 		TemplateVersion: "v3.0.0",
 		Config: api.GenerationAnswers{
 			ProjectName: "Acme", ModulePath: "example.com/acme", Edition: "paid",
-			Framework: "headless", Database: "sqlite", Payment: "stripe", Mail: "smtp", API: true,
+			Framework: "headless", Database: "sqlite", Payment: "stripe", Mail: "smtp", API: true, MCP: true,
 		},
 	}
 	lockBytes, err := json.MarshalIndent(lock, "", "  ")
@@ -741,7 +813,7 @@ func TestUpdateCreatesGitBranchFromLockedConfig(t *testing.T) {
 		t.Fatalf("update requests = %#v", service.updateRequests)
 	}
 	for _, request := range service.updateRequests {
-		if request.Answers.Framework != "headless" || !request.Answers.API {
+		if request.Answers.Framework != "headless" || !request.Answers.API || !request.Answers.MCP {
 			t.Fatalf("update answers = %#v", request.Answers)
 		}
 	}

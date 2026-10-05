@@ -128,4 +128,5 @@ type GenerationAnswers struct {
 	Storage     bool     `json:"storage"`
 	Content     []string `json:"content"`
 	API         bool     `json:"api"`
+	MCP         bool     `json:"mcp"`
 }

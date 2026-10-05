@@ -23,6 +23,7 @@ const (
 	stepName
 	stepFramework
 	stepAPI
+	stepMCP
 	stepDatabase
 	stepPayment
 	stepMail
@@ -63,6 +64,7 @@ type model struct {
 	edition     string
 	framework   string
 	api         bool
+	mcp         bool
 	database    string
 	payment     string
 	mail        string
@@ -420,6 +422,8 @@ func (m model) question() (string, string) {
 		return "Choose a frontend", "htmx is the default. Datastar streams patches. Headless ships only the Go backend and the JSON API."
 	case stepAPI:
 		return "Include the JSON API?", "Adds JSON endpoints under /api/v1 for mobile apps and integrations, next to the web app."
+	case stepMCP:
+		return "Include the MCP server?", "Lets your users connect Claude, ChatGPT or Cursor with a personal API token."
 	case stepDatabase:
 		return "Choose a database", "SQLite is simple. PostgreSQL is ready for distributed deployments."
 	case stepPayment:
@@ -462,7 +466,7 @@ func (m model) options() []option {
 		return []option{{label: "Stripe", value: "stripe"}, {label: "Polar", value: "polar"}}
 	case stepMail:
 		return []option{{label: "SMTP", value: "smtp"}, {label: "Resend", value: "resend"}}
-	case stepAPI, stepWorkspaces, stepStorage:
+	case stepAPI, stepMCP, stepWorkspaces, stepStorage:
 		return []option{{label: "No", value: "false"}, {label: "Yes", value: "true"}}
 	case stepOAuth:
 		return []option{{label: "Google", value: "google"}, {label: "GitHub", value: "github"}}
@@ -486,6 +490,9 @@ func (m model) arguments() []string {
 		arguments = append(arguments, "--framework", m.framework, "--api")
 	default:
 		arguments = append(arguments, "--framework", m.framework)
+	}
+	if m.includesMCP() {
+		arguments = append(arguments, "--mcp")
 	}
 	if m.edition == "paid" {
 		arguments = append(arguments,
@@ -529,11 +536,15 @@ func (m model) inputIndex() int {
 // steps lists the questions the current selection asks, in order. Free
 // skips the module questions, Headless skips the JSON API question because
 // it always includes the API, and skips content because blog and docs are
-// HTML products.
+// HTML products. The MCP server question follows only when the JSON API is
+// included.
 func (m model) steps() []step {
 	steps := []step{stepEdition, stepDestination, stepModule, stepName, stepFramework}
 	if !m.headless() {
 		steps = append(steps, stepAPI)
+	}
+	if m.includesAPI() {
+		steps = append(steps, stepMCP)
 	}
 	if m.edition == "paid" {
 		steps = append(steps, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage)
@@ -582,11 +593,25 @@ func (m model) headless() bool {
 	return m.framework == "headless"
 }
 
+func (m model) includesAPI() bool {
+	return m.headless() || m.api
+}
+
+// includesMCP reports the MCP server answer. It needs the JSON API, so
+// turning the API off later drops it.
+func (m model) includesMCP() bool {
+	return m.includesAPI() && m.mcp
+}
+
 func (m model) frontendSummary(separator string) string {
-	if m.headless() || m.api {
-		return displayValue(m.framework) + separator + "JSON API"
+	summary := displayValue(m.framework)
+	if m.includesAPI() {
+		summary += separator + "JSON API"
 	}
-	return displayValue(m.framework)
+	if m.includesMCP() {
+		summary += separator + "MCP"
+	}
+	return summary
 }
 
 func (m *model) setStep(next step) {
@@ -622,6 +647,8 @@ func (m *model) selectCurrent() {
 		}
 	case stepAPI:
 		m.api = value == "true"
+	case stepMCP:
+		m.mcp = value == "true"
 	case stepDatabase:
 		m.database = value
 	case stepPayment:
@@ -657,6 +684,8 @@ func (m model) optionSelected(value string) bool {
 		return m.framework == value
 	case stepAPI:
 		return m.api == (value == "true")
+	case stepMCP:
+		return m.mcp == (value == "true")
 	case stepDatabase:
 		return m.database == value
 	case stepPayment:
