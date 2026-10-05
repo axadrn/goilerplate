@@ -22,6 +22,7 @@ const (
 	stepModule
 	stepName
 	stepFramework
+	stepAPI
 	stepDatabase
 	stepPayment
 	stepMail
@@ -61,6 +62,7 @@ type model struct {
 	height      int
 	edition     string
 	framework   string
+	api         bool
 	database    string
 	payment     string
 	mail        string
@@ -345,13 +347,17 @@ func (m model) reviewView(lineWidth int) string {
 			m.styles.muted.Render(shorten("Folder  "+strings.TrimSpace(m.inputs[0].Value()), lineWidth)),
 		}
 		if m.edition == "free" {
-			return strings.Join(append(rows, m.styles.value.Render(shorten("Free · SQLite · SMTP · "+displayValue(m.framework), lineWidth))), "\n")
+			return strings.Join(append(rows, m.styles.value.Render(shorten("Free · SQLite · SMTP · "+m.frontendSummary(" · "), lineWidth))), "\n")
+		}
+		storage := fmt.Sprintf("Storage %s · Content %d", yesNo(m.storage), len(selectedKeys(m.content)))
+		if m.headless() {
+			storage = "Storage " + yesNo(m.storage)
 		}
 		return strings.Join(append(rows,
-			m.styles.value.Render(shorten("Paid · "+displayValue(m.framework)+" · "+displayValue(m.database), lineWidth)),
+			m.styles.value.Render(shorten("Paid · "+m.frontendSummary(" · ")+" · "+displayValue(m.database), lineWidth)),
 			m.styles.value.Render(shorten(displayValue(m.payment)+" · "+displayValue(m.mail), lineWidth)),
 			m.styles.value.Render(shorten(fmt.Sprintf("Workspaces %s · OAuth %d", yesNo(m.workspaces), len(selectedKeys(m.oauth))), lineWidth)),
-			m.styles.value.Render(shorten(fmt.Sprintf("Storage %s · Content %d", yesNo(m.storage), len(selectedKeys(m.content))), lineWidth)),
+			m.styles.value.Render(shorten(storage, lineWidth)),
 		), "\n")
 	}
 	rows := []string{
@@ -361,13 +367,17 @@ func (m model) reviewView(lineWidth int) string {
 	}
 	if m.edition == "free" {
 		return strings.Join(append(rows,
-			m.styles.value.Render(shorten("Free  ·  SQLite  ·  SMTP  ·  "+displayValue(m.framework), lineWidth)),
+			m.styles.value.Render(shorten("Free  ·  SQLite  ·  SMTP  ·  "+m.frontendSummary("  ·  "), lineWidth)),
 		), "\n")
 	}
+	storage := "Storage " + yesNo(m.storage) + "  ·  Content " + selectedValues(m.content)
+	if m.headless() {
+		storage = "Storage " + yesNo(m.storage)
+	}
 	return strings.Join(append(rows,
-		m.styles.value.Render(shorten("Paid  ·  "+displayValue(m.framework)+"  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail), lineWidth)),
+		m.styles.value.Render(shorten("Paid  ·  "+m.frontendSummary("  ·  ")+"  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail), lineWidth)),
 		m.styles.value.Render(shorten("Workspaces "+yesNo(m.workspaces)+"  ·  OAuth "+selectedValues(m.oauth), lineWidth)),
-		m.styles.value.Render(shorten("Storage "+yesNo(m.storage)+"  ·  Content "+selectedValues(m.content), lineWidth)),
+		m.styles.value.Render(shorten(storage, lineWidth)),
 	), "\n")
 }
 
@@ -407,7 +417,9 @@ func (m model) question() (string, string) {
 	case stepEdition:
 		return "Choose your edition", "Free is the complete foundation. Paid unlocks every product module and lifetime updates."
 	case stepFramework:
-		return "Choose a frontend", "htmx is the default. Datastar uses server-sent events and fine-grained patches."
+		return "Choose a frontend", "htmx is the default. Datastar streams patches. Headless ships only the Go backend and the JSON API."
+	case stepAPI:
+		return "Include the JSON API?", "Adds JSON endpoints under /api/v1 for mobile apps and integrations, next to the web app."
 	case stepDatabase:
 		return "Choose a database", "SQLite is simple. PostgreSQL is ready for distributed deployments."
 	case stepPayment:
@@ -435,13 +447,14 @@ func (m model) options() []option {
 			paid.description = "Open pricing. Buy once, then run goilerplate new again."
 		}
 		return []option{
-			{label: "Free", value: "free", description: "Complete foundation with SQLite, SMTP, htmx or Datastar, auth, and security."},
+			{label: "Free", value: "free", description: "Complete foundation with SQLite, SMTP, htmx, Datastar or Headless, auth, and security."},
 			paid,
 		}
 	case stepFramework:
 		return []option{
 			{label: "htmx", value: "htmx", description: "Small, stable, and the default goilerplate frontend."},
 			{label: "Datastar", value: "datastar", description: "Server-sent events with a reactive HTML-first client."},
+			{label: "Headless", value: "headless", description: "Go backend with a JSON API and no native frontend."},
 		}
 	case stepDatabase:
 		return []option{{label: "SQLite", value: "sqlite"}, {label: "PostgreSQL", value: "postgres"}}
@@ -449,7 +462,7 @@ func (m model) options() []option {
 		return []option{{label: "Stripe", value: "stripe"}, {label: "Polar", value: "polar"}}
 	case stepMail:
 		return []option{{label: "SMTP", value: "smtp"}, {label: "Resend", value: "resend"}}
-	case stepWorkspaces, stepStorage:
+	case stepAPI, stepWorkspaces, stepStorage:
 		return []option{{label: "No", value: "false"}, {label: "Yes", value: "true"}}
 	case stepOAuth:
 		return []option{{label: "Google", value: "google"}, {label: "GitHub", value: "github"}}
@@ -465,7 +478,14 @@ func (m model) arguments() []string {
 		"--name", strings.TrimSpace(m.inputs[2].Value()),
 		"--module", strings.TrimSpace(m.inputs[1].Value()),
 		"--edition", m.edition,
-		"--framework", m.framework,
+	}
+	switch {
+	case m.headless():
+		arguments = append(arguments, "--headless")
+	case m.api:
+		arguments = append(arguments, "--framework", m.framework, "--api")
+	default:
+		arguments = append(arguments, "--framework", m.framework)
 	}
 	if m.edition == "paid" {
 		arguments = append(arguments,
@@ -482,8 +502,9 @@ func (m model) arguments() []string {
 		if m.storage {
 			arguments = append(arguments, "--storage")
 		}
-		if values := selectedKeys(m.content); len(values) > 0 {
-			arguments = append(arguments, "--content", strings.Join(values, ","))
+		content := selectedKeys(m.content)
+		if len(content) > 0 && !m.headless() {
+			arguments = append(arguments, "--content", strings.Join(content, ","))
 		}
 	}
 	return append(arguments, strings.TrimSpace(m.inputs[0].Value()))
@@ -505,40 +526,67 @@ func (m model) inputIndex() int {
 	return int(m.step - stepDestination)
 }
 
+// steps lists the questions the current selection asks, in order. Free
+// skips the module questions, Headless skips the JSON API question because
+// it always includes the API, and skips content because blog and docs are
+// HTML products.
+func (m model) steps() []step {
+	steps := []step{stepEdition, stepDestination, stepModule, stepName, stepFramework}
+	if !m.headless() {
+		steps = append(steps, stepAPI)
+	}
+	if m.edition == "paid" {
+		steps = append(steps, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage)
+		if !m.headless() {
+			steps = append(steps, stepContent)
+		}
+	}
+	return append(steps, stepReview)
+}
+
+func (m model) stepIndex() int {
+	steps := m.steps()
+	for index, current := range steps {
+		if current == m.step {
+			return index
+		}
+	}
+	return 0
+}
+
 func (m *model) moveForward() {
+	steps := m.steps()
+	index := m.stepIndex()
+	if index+1 >= len(steps) {
+		return
+	}
 	if m.isTextStep() {
 		m.currentInput().Blur()
 	}
-	switch {
-	case m.step == stepEdition:
-		m.setStep(stepDestination)
-		return
-	case m.step == stepFramework && m.edition == "free":
-		m.setStep(stepReview)
-		return
-	}
-	if m.step < stepReview {
-		m.setStep(m.step + 1)
-	}
+	m.setStep(steps[index+1])
 }
 
 func (m *model) moveBack() {
-	if m.step == stepEdition {
-		return
-	}
-	if m.step == stepDestination {
-		m.currentInput().Blur()
-		m.setStep(stepEdition)
-		return
-	}
-	if m.step == stepReview && m.edition == "free" {
-		m.setStep(stepFramework)
+	steps := m.steps()
+	index := m.stepIndex()
+	if index == 0 {
 		return
 	}
 	if m.isTextStep() {
 		m.currentInput().Blur()
 	}
-	m.setStep(m.step - 1)
+	m.setStep(steps[index-1])
+}
+
+func (m model) headless() bool {
+	return m.framework == "headless"
+}
+
+func (m model) frontendSummary(separator string) string {
+	if m.headless() || m.api {
+		return displayValue(m.framework) + separator + "JSON API"
+	}
+	return displayValue(m.framework)
 }
 
 func (m *model) setStep(next step) {
@@ -569,6 +617,11 @@ func (m *model) selectCurrent() {
 		m.edition = value
 	case stepFramework:
 		m.framework = value
+		if m.headless() {
+			m.api = true
+		}
+	case stepAPI:
+		m.api = value == "true"
 	case stepDatabase:
 		m.database = value
 	case stepPayment:
@@ -602,6 +655,8 @@ func (m model) optionSelected(value string) bool {
 		return m.edition == value
 	case stepFramework:
 		return m.framework == value
+	case stepAPI:
+		return m.api == (value == "true")
 	case stepDatabase:
 		return m.database == value
 	case stepPayment:
@@ -631,15 +686,7 @@ func (m model) selectedCursor() int {
 }
 
 func (m model) progress() string {
-	completed := int(m.step) + 1
-	total := int(stepReview) + 1
-	if m.edition == "free" {
-		total = 6
-		if m.step == stepReview {
-			completed = total
-		}
-	}
-	return fmt.Sprintf("%d/%d", completed, total)
+	return fmt.Sprintf("%d/%d", m.stepIndex()+1, len(m.steps()))
 }
 
 func (m model) contentWidth() int {
@@ -667,6 +714,8 @@ func displayValue(value string) string {
 		return "htmx"
 	case "datastar":
 		return "Datastar"
+	case "headless":
+		return "Headless"
 	case "sqlite":
 		return "SQLite"
 	case "postgres":

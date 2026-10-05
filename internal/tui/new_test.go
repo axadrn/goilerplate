@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -75,8 +76,16 @@ func TestFreeSelectionSkipsPaidQuestions(t *testing.T) {
 		t.Fatalf("step = %d, want framework", model.step)
 	}
 	model.moveForward()
+	if model.step != stepAPI {
+		t.Fatalf("step = %d, want JSON API", model.step)
+	}
+	model.moveForward()
 	if model.step != stepReview {
 		t.Fatalf("step = %d, want review", model.step)
+	}
+	model.moveBack()
+	if model.step != stepAPI {
+		t.Fatalf("back step = %d, want JSON API", model.step)
 	}
 	model.moveBack()
 	if model.step != stepFramework {
@@ -274,7 +283,7 @@ func TestHeaderIsCompactAndFooterStaysAtTerminalEdge(t *testing.T) {
 	selection.height = 24
 
 	content := selection.View().Content
-	if !strings.Contains(content, "goilerplate") || !strings.Contains(content, " new  1/6") || strings.Contains(content, "━") {
+	if !strings.Contains(content, "goilerplate") || !strings.Contains(content, " new  1/7") || strings.Contains(content, "━") {
 		t.Fatalf("header = %q", strings.Split(content, "\n")[2])
 	}
 	lines := strings.Split(content, "\n")
@@ -328,4 +337,226 @@ func TestTinyTerminalShowsResizeMessage(t *testing.T) {
 	if height := lipgloss.Height(content); height > 12 {
 		t.Fatalf("view height = %d, terminal height = 12", height)
 	}
+}
+
+func TestFrontendOffersHeadlessInBothEditions(t *testing.T) {
+	for _, edition := range []string{"free", "paid"} {
+		t.Run(edition, func(t *testing.T) {
+			selection := newModel(true)
+			selection.edition = edition
+			selection.setStep(stepFramework)
+			options := selection.options()
+			values := make([]string, 0, len(options))
+			for _, option := range options {
+				values = append(values, option.value)
+			}
+			if !reflect.DeepEqual(values, []string{"htmx", "datastar", "headless"}) {
+				t.Fatalf("frontends = %v", values)
+			}
+			if options[2].label != "Headless" || !strings.HasPrefix(options[2].description, "Go backend with a JSON API and no native frontend") {
+				t.Fatalf("headless option = %#v", options[2])
+			}
+			view := selection.questionView()
+			if !strings.Contains(view, "Headless") {
+				t.Fatalf("frontend view = %q", view)
+			}
+		})
+	}
+}
+
+func TestJSONAPIStepFollowsHtmxAndDatastar(t *testing.T) {
+	for _, test := range []struct {
+		edition   string
+		framework int
+		next      step
+	}{
+		{edition: "free", framework: 0, next: stepReview},
+		{edition: "free", framework: 1, next: stepReview},
+		{edition: "paid", framework: 0, next: stepDatabase},
+		{edition: "paid", framework: 1, next: stepDatabase},
+	} {
+		selection := newModel(true)
+		selection.edition = test.edition
+		selection.setStep(stepFramework)
+		selection.moveCursor(test.framework)
+		selection = press(t, selection, tea.KeyEnter)
+		if selection.step != stepAPI {
+			t.Fatalf("%s %s: step = %d, want JSON API", test.edition, selection.framework, selection.step)
+		}
+		title, _ := selection.question()
+		if title != "Include the JSON API?" {
+			t.Fatalf("title = %q", title)
+		}
+		if selection.api || selection.cursor != 0 {
+			t.Fatalf("JSON API default = %v, cursor = %d", selection.api, selection.cursor)
+		}
+		selection.moveCursor(1)
+		selection = press(t, selection, tea.KeyEnter)
+		if !selection.api || selection.step != test.next {
+			t.Fatalf("%s %s: api = %v, step = %d, want %d", test.edition, selection.framework, selection.api, selection.step, test.next)
+		}
+		selection.moveBack()
+		if selection.step != stepAPI {
+			t.Fatalf("back step = %d, want JSON API", selection.step)
+		}
+	}
+}
+
+func TestHeadlessSkipsTheJSONAPIAndContentSteps(t *testing.T) {
+	for _, test := range []struct {
+		edition string
+		want    []step
+	}{
+		{edition: "free", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepReview}},
+		{edition: "paid", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage, stepReview}},
+	} {
+		t.Run(test.edition, func(t *testing.T) {
+			selection := newModel(true)
+			selection.edition = test.edition
+			selection.setStep(stepFramework)
+			selection.moveCursor(2)
+			selection.selectCurrent()
+			if selection.framework != "headless" || !selection.api {
+				t.Fatalf("framework = %q, api = %v", selection.framework, selection.api)
+			}
+
+			selection.setStep(stepEdition)
+			visited := []step{selection.step}
+			for selection.step != stepReview {
+				selection.moveForward()
+				visited = append(visited, selection.step)
+			}
+			if !reflect.DeepEqual(visited, test.want) {
+				t.Fatalf("visited = %v, want %v", visited, test.want)
+			}
+			for index := len(test.want) - 1; index > 0; index-- {
+				if selection.step != test.want[index] {
+					t.Fatalf("back step = %d, want %d", selection.step, test.want[index])
+				}
+				selection.moveBack()
+			}
+			got := selection.progress()
+			if got != fmt.Sprintf("1/%d", len(test.want)) {
+				t.Fatalf("progress = %q", got)
+			}
+		})
+	}
+}
+
+func TestProgressCountsOnlyAskedQuestions(t *testing.T) {
+	for _, test := range []struct {
+		edition   string
+		framework string
+		want      string
+	}{
+		{edition: "free", framework: "htmx", want: "7/7"},
+		{edition: "free", framework: "headless", want: "6/6"},
+		{edition: "paid", framework: "datastar", want: "14/14"},
+		{edition: "paid", framework: "headless", want: "12/12"},
+	} {
+		selection := newModel(true)
+		selection.edition = test.edition
+		selection.framework = test.framework
+		selection.setStep(stepReview)
+		got := selection.progress()
+		if got != test.want {
+			t.Fatalf("%s %s progress = %q, want %q", test.edition, test.framework, got, test.want)
+		}
+	}
+}
+
+func TestArgumentsEmitHeadlessOrTheJSONAPI(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		edition   string
+		framework string
+		api       bool
+		want      []string
+	}{
+		{
+			name: "free headless", edition: "free", framework: "headless", api: true,
+			want: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--headless", "./acme"},
+		},
+		{
+			name: "free htmx with the JSON API", edition: "free", framework: "htmx", api: true,
+			want: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "htmx", "--api", "./acme"},
+		},
+		{
+			name: "free datastar without the JSON API", edition: "free", framework: "datastar",
+			want: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "datastar", "./acme"},
+		},
+		{
+			name: "paid headless drops content", edition: "paid", framework: "headless", api: true,
+			want: []string{
+				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--headless",
+				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "./acme",
+			},
+		},
+		{
+			name: "paid datastar with the JSON API", edition: "paid", framework: "datastar", api: true,
+			want: []string{
+				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--framework", "datastar", "--api",
+				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "--content", "blog", "./acme",
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			selection := newModel(true)
+			selection.inputs[0].SetValue("./acme")
+			selection.inputs[1].SetValue("example.com/acme")
+			selection.inputs[2].SetValue("Acme")
+			selection.edition = test.edition
+			selection.framework = test.framework
+			selection.api = test.api
+			selection.content["blog"] = true
+			got := selection.arguments()
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("arguments = %#v, want %#v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestReviewShowsHeadlessAndTheJSONAPI(t *testing.T) {
+	for _, test := range []struct {
+		edition   string
+		framework string
+		api       bool
+		width     int
+		want      []string
+		reject    []string
+	}{
+		{edition: "free", framework: "headless", api: true, width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  Headless  ·  JSON API"}},
+		{edition: "free", framework: "htmx", api: true, width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  htmx  ·  JSON API"}},
+		{edition: "free", framework: "datastar", width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  Datastar"}, reject: []string{"JSON API"}},
+		{edition: "free", framework: "headless", api: true, width: 50, want: []string{"Free · SQLite · SMTP · Headless · JSON API"}},
+		{edition: "paid", framework: "headless", api: true, width: 100, want: []string{"Paid  ·  Headless  ·  JSON API  ·  SQLite", "Storage No"}, reject: []string{"Content"}},
+		{edition: "paid", framework: "htmx", api: true, width: 100, want: []string{"Paid  ·  htmx  ·  JSON API  ·  SQLite", "Content Blog"}},
+		{edition: "paid", framework: "headless", api: true, width: 50, want: []string{"Paid · Headless · JSON API", "Storage No"}, reject: []string{"Content"}},
+	} {
+		selection := newModel(true)
+		selection.width = test.width
+		selection.edition = test.edition
+		selection.framework = test.framework
+		selection.api = test.api
+		selection.content["blog"] = true
+		selection.setStep(stepReview)
+		view := selection.reviewView(selection.contentWidth())
+		for _, want := range test.want {
+			if !strings.Contains(view, want) {
+				t.Fatalf("%s %s width %d review = %q, want %q", test.edition, test.framework, test.width, view, want)
+			}
+		}
+		for _, reject := range test.reject {
+			if strings.Contains(view, reject) {
+				t.Fatalf("%s %s width %d review = %q, rejects %q", test.edition, test.framework, test.width, view, reject)
+			}
+		}
+	}
+}
+
+func press(t *testing.T, selection model, code rune) model {
+	t.Helper()
+	updated, _ := selection.Update(tea.KeyPressMsg{Code: code})
+	return updated.(model)
 }
