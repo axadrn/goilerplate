@@ -45,7 +45,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	name := flags.String("name", "", "project name")
 	modulePath := flags.String("module", "", "Go module path")
 	edition := flags.String("edition", "free", "free or paid")
-	framework := flags.String("framework", "htmx", "htmx or datastar")
+	framework := flags.String("framework", "htmx", "htmx, datastar, svelte or headless")
 	database := flags.String("database", "sqlite", "sqlite or postgres")
 	payment := flags.String("payment", "", "stripe or polar")
 	mail := flags.String("mail", "smtp", "smtp or resend")
@@ -53,8 +53,28 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	oauth := flags.String("oauth", "", "comma-separated OAuth providers")
 	storage := flags.Bool("storage", false, "include file storage")
 	content := flags.String("content", "", "comma-separated blog and docs modules")
-	if err := flags.Parse(arguments); err != nil {
+	jsonAPI := flags.Bool("api", false, "include the JSON API")
+	headless := flags.Bool("headless", false, "Go backend with the JSON API and no native frontend")
+	mcp := flags.Bool("mcp", false, "include the MCP server, needs the JSON API")
+	err := flags.Parse(arguments)
+	if err != nil {
 		return err
+	}
+	if *headless {
+		frameworkSet := false
+		flags.Visit(func(set *flag.Flag) {
+			if set.Name == "framework" {
+				frameworkSet = true
+			}
+		})
+		if frameworkSet {
+			return errors.New("--headless cannot be combined with --framework")
+		}
+		*framework = "headless"
+	}
+	switch strings.TrimSpace(*framework) {
+	case "headless", "svelte":
+		*jsonAPI = true
 	}
 	if flags.NArg() != 1 {
 		return errors.New("usage: goilerplate new [options] <directory>")
@@ -85,13 +105,15 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 		OAuth:       splitList(*oauth),
 		Storage:     *storage,
 		Content:     splitList(*content),
+		API:         *jsonAPI,
+		MCP:         *mcp,
 	}
-	if err := validateEditionSelection(answers); err != nil {
+	err = validateEditionSelection(answers)
+	if err != nil {
 		return err
 	}
 
 	if client == nil {
-		var err error
 		configuration, client, err = a.projectClient(ctx)
 		if err != nil {
 			return err
@@ -188,13 +210,32 @@ func splitList(value string) []string {
 }
 
 func validateEditionSelection(answers api.GenerationAnswers) error {
-	if answers.Framework != "htmx" && answers.Framework != "datastar" {
+	switch answers.Framework {
+	case "htmx", "datastar":
+	case "headless":
+		if !answers.API {
+			return errors.New("Headless requires the JSON API")
+		}
+		if len(answers.Content) != 0 {
+			return errors.New("Headless does not support blog or docs")
+		}
+	case "svelte":
+		if !answers.API {
+			return errors.New("SvelteKit requires the JSON API")
+		}
+		if len(answers.Content) != 0 {
+			return errors.New("SvelteKit does not support blog or docs")
+		}
+	default:
 		return fmt.Errorf("unsupported framework %q", answers.Framework)
+	}
+	if answers.MCP && !answers.API {
+		return errors.New("MCP requires the JSON API")
 	}
 	switch answers.Edition {
 	case "free":
-		if (answers.Framework != "htmx" && answers.Framework != "datastar") || answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Workspaces || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 {
-			return errors.New("Free uses SQLite, SMTP, htmx or Datastar, and no paid modules")
+		if answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Workspaces || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 {
+			return errors.New("Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless, the JSON API, the MCP server, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs")
 		}
 	case "paid":
 		if answers.Payment == "none" {

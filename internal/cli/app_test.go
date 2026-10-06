@@ -418,6 +418,31 @@ func TestNewWithoutArgumentsUsesWizardThenExistingGenerationPath(t *testing.T) {
 	}
 }
 
+func TestNewWizardHeadlessArgumentsReachTheService(t *testing.T) {
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{generatedVersion: "v3.1.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
+	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+	destination := filepath.Join(t.TempDir(), "acme")
+	app.RunNewProjectWizard = func(context.Context, bool) (ProjectWizardResult, error) {
+		return ProjectWizardResult{Arguments: []string{
+			"--name", "Acme",
+			"--module", "example.com/acme",
+			"--edition", "free",
+			"--headless",
+			destination,
+		}}, nil
+	}
+
+	err := app.Run(context.Background(), []string{"new"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	answers := service.generateRequest.Answers
+	if answers.Framework != "headless" || !answers.API || answers.Edition != "free" || answers.Payment != "none" {
+		t.Fatalf("answers = %#v", answers)
+	}
+}
+
 func TestNewPaidSelectionOpensPricingForFreeAccount(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{configuration: config.Config{SessionToken: "session"}}
@@ -482,7 +507,7 @@ func TestNewRejectsPaidModulesForFreeBeforeCallingService(t *testing.T) {
 	err := app.Run(context.Background(), []string{
 		"new", "--module", "example.com/acme", "--workspaces", filepath.Join(t.TempDir(), "acme"),
 	})
-	if err == nil || !strings.Contains(err.Error(), "Free uses SQLite") {
+	if err == nil || !strings.Contains(err.Error(), "Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless, the JSON API, the MCP server, SQLite, SMTP") {
 		t.Fatalf("new error = %v", err)
 	}
 	if service.generateCalled {
@@ -509,13 +534,291 @@ func TestNewAcceptsDatastarForFree(t *testing.T) {
 	}
 }
 
+func TestNewSendsHeadlessAndTheJSONAPI(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		arguments     []string
+		wantEdition   string
+		wantFramework string
+		wantPayment   string
+		wantAPI       bool
+	}{
+		{
+			name:          "paid headless",
+			arguments:     []string{"--edition", "paid", "--payment", "stripe", "--headless"},
+			wantEdition:   "paid",
+			wantFramework: "headless",
+			wantPayment:   "stripe",
+			wantAPI:       true,
+		},
+		{
+			name:          "free headless",
+			arguments:     []string{"--edition", "free", "--headless"},
+			wantEdition:   "free",
+			wantFramework: "headless",
+			wantPayment:   "none",
+			wantAPI:       true,
+		},
+		{
+			name:          "framework headless implies the JSON API",
+			arguments:     []string{"--framework", "headless"},
+			wantEdition:   "free",
+			wantFramework: "headless",
+			wantPayment:   "none",
+			wantAPI:       true,
+		},
+		{
+			name:          "free svelte implies the JSON API",
+			arguments:     []string{"--framework", "svelte", "--edition", "free"},
+			wantEdition:   "free",
+			wantFramework: "svelte",
+			wantPayment:   "none",
+			wantAPI:       true,
+		},
+		{
+			name:          "paid svelte with polar",
+			arguments:     []string{"--edition", "paid", "--payment", "polar", "--framework", "svelte", "--workspaces"},
+			wantEdition:   "paid",
+			wantFramework: "svelte",
+			wantPayment:   "polar",
+			wantAPI:       true,
+		},
+		{
+			name:          "free htmx with the JSON API",
+			arguments:     []string{"--api"},
+			wantEdition:   "free",
+			wantFramework: "htmx",
+			wantPayment:   "none",
+			wantAPI:       true,
+		},
+		{
+			name:          "paid datastar with the JSON API",
+			arguments:     []string{"--edition", "paid", "--framework", "datastar", "--api"},
+			wantEdition:   "paid",
+			wantFramework: "datastar",
+			wantPayment:   "stripe",
+			wantAPI:       true,
+		},
+		{
+			name:          "paid htmx without the JSON API",
+			arguments:     []string{"--edition", "paid"},
+			wantEdition:   "paid",
+			wantFramework: "htmx",
+			wantPayment:   "stripe",
+			wantAPI:       false,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+			service := &fakeService{generatedVersion: "v3.1.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
+			app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+			arguments := append([]string{"new", "--module", "example.com/acme"}, test.arguments...)
+			arguments = append(arguments, filepath.Join(t.TempDir(), "acme"))
+
+			err := app.Run(context.Background(), arguments)
+			if err != nil {
+				t.Fatalf("new error = %v", err)
+			}
+			answers := service.generateRequest.Answers
+			if answers.Edition != test.wantEdition || answers.Framework != test.wantFramework || answers.Payment != test.wantPayment || answers.API != test.wantAPI {
+				t.Fatalf("answers = %#v", answers)
+			}
+			if len(answers.Content) != 0 {
+				t.Fatalf("content = %#v", answers.Content)
+			}
+		})
+	}
+}
+
+func TestNewRejectsInvalidHeadlessSelectionsBeforeCallingService(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		arguments []string
+		want      string
+	}{
+		{
+			name:      "headless with htmx",
+			arguments: []string{"--headless", "--framework", "htmx"},
+			want:      "--headless cannot be combined with --framework",
+		},
+		{
+			name:      "headless with framework headless",
+			arguments: []string{"--headless", "--framework", "headless"},
+			want:      "--headless cannot be combined with --framework",
+		},
+		{
+			name:      "free headless with postgres",
+			arguments: []string{"--edition", "free", "--headless", "--database", "postgres"},
+			want:      "Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless, the JSON API, the MCP server, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs",
+		},
+		{
+			name:      "free api with workspaces",
+			arguments: []string{"--api", "--workspaces"},
+			want:      "Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless",
+		},
+		{
+			name:      "paid headless with content",
+			arguments: []string{"--edition", "paid", "--headless", "--content", "blog"},
+			want:      "Headless does not support blog or docs",
+		},
+		{
+			name:      "headless with framework svelte",
+			arguments: []string{"--headless", "--framework", "svelte"},
+			want:      "--headless cannot be combined with --framework",
+		},
+		{
+			name:      "paid svelte with content",
+			arguments: []string{"--edition", "paid", "--framework", "svelte", "--content", "docs"},
+			want:      "SvelteKit does not support blog or docs",
+		},
+		{
+			name:      "free svelte with storage",
+			arguments: []string{"--framework", "svelte", "--storage"},
+			want:      "Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless",
+		},
+		{
+			name:      "unknown framework",
+			arguments: []string{"--framework", "react"},
+			want:      `unsupported framework "react"`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service := &fakeService{}
+			app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+			arguments := append([]string{"new", "--module", "example.com/acme"}, test.arguments...)
+			arguments = append(arguments, filepath.Join(t.TempDir(), "acme"))
+
+			err := app.Run(context.Background(), arguments)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("new error = %v, want %q", err, test.want)
+			}
+			if service.generateCalled {
+				t.Fatal("service was called for an invalid selection")
+			}
+		})
+	}
+}
+
+func TestValidateEditionSelectionRequiresTheJSONAPIForHeadless(t *testing.T) {
+	answers := api.GenerationAnswers{Edition: "paid", Framework: "headless", Database: "sqlite", Payment: "stripe", Mail: "smtp"}
+	err := validateEditionSelection(answers)
+	if err == nil || err.Error() != "Headless requires the JSON API" {
+		t.Fatalf("validation error = %v", err)
+	}
+	answers.API = true
+	err = validateEditionSelection(answers)
+	if err != nil {
+		t.Fatalf("validation error = %v", err)
+	}
+}
+
+func TestValidateEditionSelectionRequiresTheJSONAPIForSvelteKit(t *testing.T) {
+	answers := api.GenerationAnswers{Edition: "free", Framework: "svelte", Database: "sqlite", Payment: "none", Mail: "smtp"}
+	err := validateEditionSelection(answers)
+	if err == nil || err.Error() != "SvelteKit requires the JSON API" {
+		t.Fatalf("validation error = %v", err)
+	}
+	answers.API = true
+	answers.MCP = true
+	err = validateEditionSelection(answers)
+	if err != nil {
+		t.Fatalf("validation error = %v", err)
+	}
+}
+
+func TestHelpNewListsTheFrontendsAndTheJSONAPI(t *testing.T) {
+	output := &bytes.Buffer{}
+	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	err := app.Run(context.Background(), []string{"help", "new"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"--framework htmx, datastar, svelte or headless", "--framework svelte", "Node.js 22.17 or newer and pnpm", "--api", "--headless", "--mcp"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("output = %q, want %q", output.String(), want)
+		}
+	}
+}
+
+func TestNewSendsTheMCPServer(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		arguments     []string
+		wantEdition   string
+		wantFramework string
+		wantMCP       bool
+	}{
+		{name: "free htmx with the JSON API", arguments: []string{"--api", "--mcp"}, wantEdition: "free", wantFramework: "htmx", wantMCP: true},
+		{name: "free headless", arguments: []string{"--headless", "--mcp"}, wantEdition: "free", wantFramework: "headless", wantMCP: true},
+		{name: "paid datastar with the JSON API", arguments: []string{"--edition", "paid", "--framework", "datastar", "--api", "--mcp"}, wantEdition: "paid", wantFramework: "datastar", wantMCP: true},
+		{name: "paid headless", arguments: []string{"--edition", "paid", "--payment", "polar", "--headless", "--mcp"}, wantEdition: "paid", wantFramework: "headless", wantMCP: true},
+		{name: "paid htmx with the JSON API only", arguments: []string{"--edition", "paid", "--api"}, wantEdition: "paid", wantFramework: "htmx"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+			service := &fakeService{generatedVersion: "v3.1.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme")}
+			app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+			arguments := append([]string{"new", "--module", "example.com/acme"}, test.arguments...)
+			arguments = append(arguments, filepath.Join(t.TempDir(), "acme"))
+
+			err := app.Run(context.Background(), arguments)
+			if err != nil {
+				t.Fatalf("new error = %v", err)
+			}
+			answers := service.generateRequest.Answers
+			if answers.Edition != test.wantEdition || answers.Framework != test.wantFramework || !answers.API || answers.MCP != test.wantMCP {
+				t.Fatalf("answers = %#v", answers)
+			}
+		})
+	}
+}
+
+func TestNewRejectsTheMCPServerWithoutTheJSONAPI(t *testing.T) {
+	for _, arguments := range [][]string{
+		{"--mcp"},
+		{"--framework", "datastar", "--mcp"},
+		{"--edition", "paid", "--payment", "stripe", "--mcp"},
+	} {
+		service := &fakeService{}
+		app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+		command := append([]string{"new", "--module", "example.com/acme"}, arguments...)
+		command = append(command, filepath.Join(t.TempDir(), "acme"))
+
+		err := app.Run(context.Background(), command)
+		if err == nil || err.Error() != "MCP requires the JSON API" {
+			t.Fatalf("new %v error = %v", arguments, err)
+		}
+		if service.generateCalled {
+			t.Fatalf("service was called for %v", arguments)
+		}
+	}
+}
+
+func TestGenerationAnswersEncodeAndDecodeTheMCPServer(t *testing.T) {
+	encoded, err := json.Marshal(api.GenerationAnswers{API: true, MCP: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"mcp":true`) {
+		t.Fatalf("encoded = %s", encoded)
+	}
+	var older api.ProjectLock
+	err = json.Unmarshal([]byte(`{"schema_version":1,"template_version":"v3.0.3","config":{"edition":"free","framework":"htmx","api":true}}`), &older)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if older.Config.MCP {
+		t.Fatal("a lock without mcp decoded as true")
+	}
+}
+
 func TestUpdateCreatesGitBranchFromLockedConfig(t *testing.T) {
 	lock := api.ProjectLock{
 		SchemaVersion:   api.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
 		Config: api.GenerationAnswers{
 			ProjectName: "Acme", ModulePath: "example.com/acme", Edition: "paid",
-			Framework: "htmx", Database: "sqlite", Payment: "stripe", Mail: "smtp",
+			Framework: "headless", Database: "sqlite", Payment: "stripe", Mail: "smtp", API: true, MCP: true,
 		},
 	}
 	lockBytes, err := json.MarshalIndent(lock, "", "  ")
@@ -553,6 +856,11 @@ func TestUpdateCreatesGitBranchFromLockedConfig(t *testing.T) {
 	}
 	if len(service.updateRequests) != 2 || service.updateRequests[0].TemplateVersion != "v3.0.0" || service.updateRequests[1].TemplateVersion != "" {
 		t.Fatalf("update requests = %#v", service.updateRequests)
+	}
+	for _, request := range service.updateRequests {
+		if request.Answers.Framework != "headless" || !request.Answers.API || !request.Answers.MCP {
+			t.Fatalf("update answers = %#v", request.Answers)
+		}
 	}
 	if content := runCLIGit(t, repository, "show", "goilerplate-update-v3.1.0:app.txt"); content != "new\n" {
 		t.Fatalf("updated app = %q", content)
