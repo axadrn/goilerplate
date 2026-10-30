@@ -21,33 +21,23 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	var client ServiceClient
 	if interactive {
 		var err error
-		configuration, client, err = a.projectClient(ctx)
+		configuration, client, err = a.licensedClient(ctx)
 		if err != nil {
 			return err
 		}
-		identity, err := client.WhoAmI(ctx, configuration.SessionToken)
+		arguments, err = a.RunNewProjectWizard(ctx)
 		if err != nil {
 			return err
 		}
-		result, err := a.RunNewProjectWizard(ctx, hasPaidAccess(identity))
-		if err != nil {
-			return err
-		}
-		if result.OpenPricing {
-			a.openPricing(ctx, configuration)
-			return nil
-		}
-		arguments = result.Arguments
 	}
 
 	flags := flag.NewFlagSet("new", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	name := flags.String("name", "", "project name")
 	modulePath := flags.String("module", "", "Go module path")
-	edition := flags.String("edition", "free", "free or paid")
 	framework := flags.String("framework", "htmx", "htmx, datastar, svelte or headless")
 	database := flags.String("database", "sqlite", "sqlite or postgres")
-	payment := flags.String("payment", "", "stripe or polar")
+	payment := flags.String("payment", "stripe", "stripe or polar")
 	mail := flags.String("mail", "smtp", "smtp or resend")
 	workspaces := flags.Bool("workspaces", false, "include shared workspaces")
 	oauth := flags.String("oauth", "", "comma-separated OAuth providers")
@@ -57,6 +47,9 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	headless := flags.Bool("headless", false, "Go backend with the JSON API and no native frontend")
 	mcp := flags.Bool("mcp", false, "include the MCP server, needs the JSON API")
 	err := flags.Parse(arguments)
+	if errors.Is(err, flag.ErrHelp) {
+		return a.help([]string{"new"})
+	}
 	if err != nil {
 		return err
 	}
@@ -86,17 +79,10 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if strings.TrimSpace(*name) == "" {
 		*name = filepath.Base(filepath.Clean(destination))
 	}
-	if *payment == "" {
-		if *edition == "free" {
-			*payment = "none"
-		} else {
-			*payment = "stripe"
-		}
-	}
 	answers := api.GenerationAnswers{
 		ProjectName: strings.TrimSpace(*name),
 		ModulePath:  strings.TrimSpace(*modulePath),
-		Edition:     strings.TrimSpace(*edition),
+		Edition:     api.EditionPaid,
 		Framework:   strings.TrimSpace(*framework),
 		Database:    strings.TrimSpace(*database),
 		Payment:     strings.TrimSpace(*payment),
@@ -108,13 +94,13 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 		API:         *jsonAPI,
 		MCP:         *mcp,
 	}
-	err = validateEditionSelection(answers)
+	err = validateSelection(answers)
 	if err != nil {
 		return err
 	}
 
 	if client == nil {
-		configuration, client, err = a.projectClient(ctx)
+		configuration, client, err = a.licensedClient(ctx)
 		if err != nil {
 			return err
 		}
@@ -165,13 +151,36 @@ func (a *App) projectClient(ctx context.Context) (config.Config, ServiceClient, 
 	return configuration, client, nil
 }
 
+// licensedClient returns a client for an account with an active license.
+// Without one it opens pricing and fails, so nothing is asked or generated.
+func (a *App) licensedClient(ctx context.Context) (config.Config, ServiceClient, error) {
+	configuration, client, err := a.projectClient(ctx)
+	if err != nil {
+		return config.Config{}, nil, err
+	}
+	identity, err := client.WhoAmI(ctx, configuration.SessionToken)
+	if err != nil {
+		return config.Config{}, nil, err
+	}
+	if !hasActiveLicense(identity) {
+		a.openPricing(ctx, configuration)
+		return config.Config{}, nil, errors.New("no active license")
+	}
+	return configuration, client, nil
+}
+
+func (a *App) pricingURL(configuration config.Config) string {
+	return strings.TrimRight(a.apiURL(configuration), "/") + "/pricing"
+}
+
 func (a *App) openPricing(ctx context.Context, configuration config.Config) {
-	pricingURL := strings.TrimRight(a.apiURL(configuration), "/") + "/pricing"
+	pricingURL := a.pricingURL(configuration)
 	opened := a.OpenBrowser != nil && a.OpenBrowser(ctx, pricingURL) == nil
 	if a.StyledOutput {
-		a.printHeading("paid")
+		a.printHeading("license")
 		fmt.Fprintln(a.Out)
 	}
+	a.printInfo("goilerplate needs a license")
 	if opened {
 		a.printSuccess("Pricing opened in your browser")
 	} else {
@@ -185,7 +194,7 @@ func (a *App) openPricing(ctx context.Context, configuration config.Config) {
 	fmt.Fprintln(a.Out, "Buy with your verified GitHub email, then run goilerplate new again. No new login needed")
 }
 
-func hasPaidAccess(identity api.WhoAmIResponse) bool {
+func hasActiveLicense(identity api.WhoAmIResponse) bool {
 	for _, license := range identity.Licenses {
 		if license.Status == api.LicenseStatusActive {
 			return true
@@ -209,7 +218,7 @@ func splitList(value string) []string {
 	return result
 }
 
-func validateEditionSelection(answers api.GenerationAnswers) error {
+func validateSelection(answers api.GenerationAnswers) error {
 	switch answers.Framework {
 	case "htmx", "datastar":
 	case "headless":
@@ -232,17 +241,10 @@ func validateEditionSelection(answers api.GenerationAnswers) error {
 	if answers.MCP && !answers.API {
 		return errors.New("MCP requires the JSON API")
 	}
-	switch answers.Edition {
-	case "free":
-		if answers.Database != "sqlite" || answers.Payment != "none" || answers.Mail != "smtp" || answers.Workspaces || len(answers.OAuth) != 0 || answers.Storage || len(answers.Content) != 0 {
-			return errors.New("Free supports htmx 4.0, Datastar 1.0, SvelteKit or Headless, the JSON API, the MCP server, SQLite, SMTP, and no payments, workspaces, OAuth, storage, blog, or docs")
-		}
-	case "paid":
-		if answers.Payment == "none" {
-			return errors.New("Paid requires a payment provider")
-		}
+	switch answers.Payment {
+	case "stripe", "polar":
 	default:
-		return fmt.Errorf("unsupported edition %q", answers.Edition)
+		return fmt.Errorf("unsupported payment provider %q, use stripe or polar", answers.Payment)
 	}
 	return nil
 }

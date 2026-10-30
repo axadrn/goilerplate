@@ -39,6 +39,22 @@ func TestReadLock(t *testing.T) {
 	}
 }
 
+func TestReadLockAcceptsLegacyFreeEdition(t *testing.T) {
+	root := t.TempDir()
+	content := `{"schema_version":1,"template_version":"v3.0.0","config":{"edition":"free","framework":"htmx","database":"sqlite","payment":"none","mail":"smtp"}}`
+	err := os.WriteFile(filepath.Join(root, "goilerplate.lock"), []byte(content), 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := ReadLock(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lock.Config.Edition != "free" || lock.Config.Framework != "htmx" {
+		t.Fatalf("lock = %#v", lock)
+	}
+}
+
 func TestReadLockDecodesTheJSONAPI(t *testing.T) {
 	for name, test := range map[string]struct {
 		config string

@@ -63,7 +63,7 @@ func (i Inspector) Inspect(ctx context.Context, directory string) Report {
 	if err != nil {
 		return report.add("project", err.Error(), LevelError)
 	}
-	report = report.add("project", lock.TemplateVersion+" "+lock.Config.Edition, LevelOK)
+	report = report.add("project", lock.TemplateVersion, LevelOK)
 
 	module, requiredGo, err := readModule(filepath.Join(root, "go.mod"))
 	if err != nil {

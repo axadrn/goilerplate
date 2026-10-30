@@ -23,11 +23,6 @@ type DeviceAuthorizer interface {
 	Wait(context.Context, string, github.DeviceAuthorization) (string, error)
 }
 
-type ProjectWizardResult struct {
-	Arguments   []string
-	OpenPricing bool
-}
-
 type ServiceClient interface {
 	LoginWithGitHub(context.Context, string) (api.GitHubLoginResponse, error)
 	WhoAmI(context.Context, string) (api.WhoAmIResponse, error)
@@ -55,7 +50,7 @@ type App struct {
 	APIURLOverride      string
 	Version             string
 	WorkingDirectory    string
-	RunNewProjectWizard func(context.Context, bool) (ProjectWizardResult, error)
+	RunNewProjectWizard func(context.Context) ([]string, error)
 	FetchReleases       func(context.Context) ([]github.Release, error)
 	RunDoctor           func(context.Context, string) doctor.Report
 }
@@ -135,6 +130,8 @@ func (a *App) help(arguments []string) error {
 		"new": {
 			"goilerplate new [options] <directory>",
 			"Run without options in a terminal to open interactive setup.",
+			"Needs an active license. Without one it opens pricing.",
+			"--payment stripe or polar, stripe by default.",
 			"--framework htmx, datastar, svelte or headless. --api adds the JSON API.",
 			"--framework svelte is a SvelteKit app on the JSON API, served by the Go binary. It needs Node.js 22.17 or newer and pnpm.",
 			"--headless is the Go backend with the JSON API and no native frontend.",
@@ -245,12 +242,9 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	access := "Free"
-	for _, license := range identity.Licenses {
-		if license.Status == api.LicenseStatusActive {
-			access = "Paid"
-			break
-		}
+	licenseStatus := "none, see " + a.pricingURL(configuration)
+	if hasActiveLicense(identity) {
+		licenseStatus = "active"
 	}
 	if a.StyledOutput {
 		theme := a.theme()
@@ -258,7 +252,7 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 		fmt.Fprintln(a.Out)
 		fmt.Fprintln(a.Out, theme.accent.Render("@"+identity.Account.GitHubLogin))
 		a.printField("Email", identity.Account.Email)
-		a.printField("Access", theme.accent.Render(access))
+		a.printField("License", theme.accent.Render(licenseStatus))
 		if len(identity.Licenses) == 0 {
 			fmt.Fprintln(a.Out)
 			a.printInfo("No licenses connected")
@@ -277,7 +271,7 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 		return nil
 	}
 	fmt.Fprintf(a.Out, "@%s <%s>\n", identity.Account.GitHubLogin, identity.Account.Email)
-	fmt.Fprintf(a.Out, "Access: %s\n", access)
+	fmt.Fprintf(a.Out, "License: %s\n", licenseStatus)
 	if len(identity.Licenses) == 0 {
 		return nil
 	}

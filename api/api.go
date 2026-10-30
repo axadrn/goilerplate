@@ -109,6 +109,9 @@ type GenerateRequest struct {
 
 const LockSchemaVersion = 1
 
+// EditionPaid is the only edition. goilerplate new always sends it.
+const EditionPaid = "paid"
+
 type ProjectLock struct {
 	SchemaVersion   int               `json:"schema_version"`
 	TemplateVersion string            `json:"template_version"`
@@ -116,17 +119,19 @@ type ProjectLock struct {
 }
 
 type GenerationAnswers struct {
-	ProjectName string   `json:"project_name"`
-	ModulePath  string   `json:"module_path"`
-	Edition     string   `json:"edition"`
-	Framework   string   `json:"framework"`
-	Database    string   `json:"database"`
-	Payment     string   `json:"payment"`
-	Mail        string   `json:"mail"`
-	Workspaces  bool     `json:"workspaces"`
-	OAuth       []string `json:"oauth"`
-	Storage     bool     `json:"storage"`
-	Content     []string `json:"content"`
-	API         bool     `json:"api"`
-	MCP         bool     `json:"mcp"`
+	ProjectName string `json:"project_name"`
+	ModulePath  string `json:"module_path"`
+	// Edition is legacy. New projects always carry "paid". It stays for the
+	// wire format and for goilerplate.lock files that still contain "free".
+	Edition    string   `json:"edition"`
+	Framework  string   `json:"framework"`
+	Database   string   `json:"database"`
+	Payment    string   `json:"payment"`
+	Mail       string   `json:"mail"`
+	Workspaces bool     `json:"workspaces"`
+	OAuth      []string `json:"oauth"`
+	Storage    bool     `json:"storage"`
+	Content    []string `json:"content"`
+	API        bool     `json:"api"`
+	MCP        bool     `json:"mcp"`
 }
