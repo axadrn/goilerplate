@@ -130,6 +130,8 @@ func (a *App) help(arguments []string) error {
 		"new": {
 			"goilerplate new [options] <directory>",
 			"Run without options in a terminal to open interactive setup.",
+			"Needs an active license. Without one it opens pricing.",
+			"--payment stripe or polar, stripe by default.",
 			"--framework htmx, datastar, svelte or headless. --api adds the JSON API.",
 			"--framework svelte is a SvelteKit app on the JSON API, served by the Go binary. It needs Node.js 22.17 or newer and pnpm.",
 			"--headless is the Go backend with the JSON API and no native frontend.",
