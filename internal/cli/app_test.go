@@ -644,6 +644,21 @@ func TestValidateSelectionRequiresTheJSONAPIForSvelteKit(t *testing.T) {
 	}
 }
 
+func TestNewHelpFlagShowsHelpNew(t *testing.T) {
+	for _, flag := range []string{"--help", "-h"} {
+		output := &bytes.Buffer{}
+		service := &fakeService{}
+		app := testApp(output, &memoryStore{}, &fakeDevice{}, service)
+		err := app.Run(context.Background(), []string{"new", flag})
+		if err != nil {
+			t.Fatalf("new %s error = %v", flag, err)
+		}
+		if !strings.HasPrefix(output.String(), "goilerplate new [options] <directory>\n") || service.generateCalled {
+			t.Fatalf("new %s output = %q", flag, output.String())
+		}
+	}
+}
+
 func TestHelpNewListsTheFrontendsAndTheJSONAPI(t *testing.T) {
 	output := &bytes.Buffer{}
 	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})

@@ -47,6 +47,9 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	headless := flags.Bool("headless", false, "Go backend with the JSON API and no native frontend")
 	mcp := flags.Bool("mcp", false, "include the MCP server, needs the JSON API")
 	err := flags.Parse(arguments)
+	if errors.Is(err, flag.ErrHelp) {
+		return a.help([]string{"new"})
+	}
 	if err != nil {
 		return err
 	}
