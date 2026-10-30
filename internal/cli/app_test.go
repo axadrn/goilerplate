@@ -653,7 +653,7 @@ func TestNewHelpFlagShowsHelpNew(t *testing.T) {
 		if err != nil {
 			t.Fatalf("new %s error = %v", flag, err)
 		}
-		if !strings.HasPrefix(output.String(), "goilerplate new [options] <directory>\n") || service.generateCalled {
+		if !strings.HasPrefix(output.String(), "goilerplate new --module <path> [options] <directory>\n") || service.generateCalled {
 			t.Fatalf("new %s output = %q", flag, output.String())
 		}
 	}
@@ -1017,4 +1017,18 @@ func runCLIGit(t *testing.T, directory string, arguments ...string) string {
 		t.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), err, output)
 	}
 	return string(output)
+}
+
+func TestHelpNewListsEveryOption(t *testing.T) {
+	output := &bytes.Buffer{}
+	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	err := app.Run(context.Background(), []string{"help", "new"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, option := range []string{"--module", "--name", "--framework", "--database", "--payment", "--mail", "--workspaces", "--oauth", "--storage", "--content", "--api", "--mcp", "--headless"} {
+		if !strings.Contains(output.String(), option) {
+			t.Errorf("help new does not mention %s", option)
+		}
+	}
 }

@@ -570,3 +570,14 @@ func press(t *testing.T, selection model, code rune) model {
 	updated, _ := selection.Update(tea.KeyPressMsg{Code: code})
 	return updated.(model)
 }
+
+func TestWizardTakesTypingOnTheFirstStep(t *testing.T) {
+	wizard := newModel()
+	if !wizard.inputs[0].Focused() {
+		t.Fatal("the project directory input is not focused on start")
+	}
+	updated, _ := wizard.Update(tea.KeyPressMsg{Text: "x", Code: 'x'})
+	if got := updated.(model).inputs[0].Value(); got != "./my-appx" {
+		t.Fatalf("directory after typing = %q, want ./my-appx", got)
+	}
+}
