@@ -37,6 +37,8 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
+	answers := lock.Config
+	answers.Edition = api.EditionPaid
 
 	workspace, err := os.MkdirTemp("", "goilerplate-update-*")
 	if err != nil {
@@ -50,7 +52,7 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 	defer oldArchive.Close()
 	oldVersion, err := client.UpdateTree(ctx, token, api.GenerateRequest{
 		TemplateVersion: lock.TemplateVersion,
-		Answers:         lock.Config,
+		Answers:         answers,
 	}, oldArchive)
 	if err != nil {
 		return err
@@ -64,7 +66,7 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 		return err
 	}
 	defer newArchive.Close()
-	targetVersion, err := client.UpdateTree(ctx, token, api.GenerateRequest{Answers: lock.Config}, newArchive)
+	targetVersion, err := client.UpdateTree(ctx, token, api.GenerateRequest{Answers: answers}, newArchive)
 	if err != nil {
 		return err
 	}

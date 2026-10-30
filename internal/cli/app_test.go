@@ -813,11 +813,39 @@ func TestGenerationAnswersEncodeAndDecodeTheMCPServer(t *testing.T) {
 }
 
 func TestUpdateCreatesGitBranchFromLockedConfig(t *testing.T) {
+	service, output := runUpdate(t, "paid")
+	if len(service.updateRequests) != 2 || service.updateRequests[0].TemplateVersion != "v3.0.0" || service.updateRequests[1].TemplateVersion != "" {
+		t.Fatalf("update requests = %#v", service.updateRequests)
+	}
+	for _, request := range service.updateRequests {
+		if request.Answers.Framework != "headless" || !request.Answers.API || !request.Answers.MCP {
+			t.Fatalf("update answers = %#v", request.Answers)
+		}
+	}
+	if !strings.Contains(output, "Created goilerplate-update-v3.1.0") {
+		t.Fatalf("output = %q", output)
+	}
+}
+
+func TestUpdateSendsPaidForALegacyFreeLock(t *testing.T) {
+	service, _ := runUpdate(t, "free")
+	if len(service.updateRequests) != 2 {
+		t.Fatalf("update requests = %#v", service.updateRequests)
+	}
+	for _, request := range service.updateRequests {
+		if request.Answers.Edition != "paid" {
+			t.Fatalf("update edition = %q, want paid", request.Answers.Edition)
+		}
+	}
+}
+
+func runUpdate(t *testing.T, edition string) (*fakeService, string) {
+	t.Helper()
 	lock := api.ProjectLock{
 		SchemaVersion:   api.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
 		Config: api.GenerationAnswers{
-			ProjectName: "Acme", ModulePath: "example.com/acme", Edition: "paid",
+			ProjectName: "Acme", ModulePath: "example.com/acme", Edition: edition,
 			Framework: "headless", Database: "sqlite", Payment: "stripe", Mail: "smtp", API: true, MCP: true,
 		},
 	}
@@ -854,23 +882,13 @@ func TestUpdateCreatesGitBranchFromLockedConfig(t *testing.T) {
 	if err := app.Run(context.Background(), []string{"update"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(service.updateRequests) != 2 || service.updateRequests[0].TemplateVersion != "v3.0.0" || service.updateRequests[1].TemplateVersion != "" {
-		t.Fatalf("update requests = %#v", service.updateRequests)
-	}
-	for _, request := range service.updateRequests {
-		if request.Answers.Framework != "headless" || !request.Answers.API || !request.Answers.MCP {
-			t.Fatalf("update answers = %#v", request.Answers)
-		}
-	}
 	if content := runCLIGit(t, repository, "show", "goilerplate-update-v3.1.0:app.txt"); content != "new\n" {
 		t.Fatalf("updated app = %q", content)
 	}
 	if branch := strings.TrimSpace(runCLIGit(t, repository, "branch", "--show-current")); branch != "main" {
 		t.Fatalf("current branch = %q", branch)
 	}
-	if !strings.Contains(output.String(), "Created goilerplate-update-v3.1.0") {
-		t.Fatalf("output = %q", output.String())
-	}
+	return service, output.String()
 }
 
 func testApp(output *bytes.Buffer, store *memoryStore, device *fakeDevice, service *fakeService) *App {
