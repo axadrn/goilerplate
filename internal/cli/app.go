@@ -23,11 +23,6 @@ type DeviceAuthorizer interface {
 	Wait(context.Context, string, github.DeviceAuthorization) (string, error)
 }
 
-type ProjectWizardResult struct {
-	Arguments   []string
-	OpenPricing bool
-}
-
 type ServiceClient interface {
 	LoginWithGitHub(context.Context, string) (api.GitHubLoginResponse, error)
 	WhoAmI(context.Context, string) (api.WhoAmIResponse, error)
@@ -55,7 +50,7 @@ type App struct {
 	APIURLOverride      string
 	Version             string
 	WorkingDirectory    string
-	RunNewProjectWizard func(context.Context, bool) (ProjectWizardResult, error)
+	RunNewProjectWizard func(context.Context) ([]string, error)
 	FetchReleases       func(context.Context) ([]github.Release, error)
 	RunDoctor           func(context.Context, string) doctor.Report
 }

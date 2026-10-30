@@ -17,8 +17,7 @@ var ErrCancelled = errors.New("project setup cancelled")
 type step int
 
 const (
-	stepEdition step = iota
-	stepDestination
+	stepDestination step = iota
 	stepModule
 	stepName
 	stepFramework
@@ -50,33 +49,25 @@ type styles struct {
 	active  lipgloss.Style
 }
 
-type Result struct {
-	Arguments   []string
-	OpenPricing bool
-}
-
 type model struct {
-	step        step
-	inputs      [3]textinput.Model
-	cursor      int
-	width       int
-	height      int
-	edition     string
-	framework   string
-	api         bool
-	mcp         bool
-	database    string
-	payment     string
-	mail        string
-	workspaces  bool
-	oauth       map[string]bool
-	storage     bool
-	content     map[string]bool
-	paidAccess  bool
-	submitted   bool
-	openPricing bool
-	cancelled   bool
-	styles      styles
+	step       step
+	inputs     [3]textinput.Model
+	cursor     int
+	width      int
+	height     int
+	framework  string
+	api        bool
+	mcp        bool
+	database   string
+	payment    string
+	mail       string
+	workspaces bool
+	oauth      map[string]bool
+	storage    bool
+	content    map[string]bool
+	submitted  bool
+	cancelled  bool
+	styles     styles
 }
 
 func newStyles(isDark bool) styles {
@@ -102,9 +93,10 @@ func newStyles(isDark bool) styles {
 	}
 }
 
-func Run(ctx context.Context, input io.Reader, output io.Writer, paidAccess bool) (Result, error) {
+// Run asks the project questions and returns the goilerplate new arguments.
+func Run(ctx context.Context, input io.Reader, output io.Writer) ([]string, error) {
 	program := tea.NewProgram(
-		newModel(paidAccess),
+		newModel(),
 		tea.WithContext(ctx),
 		tea.WithInput(input),
 		tea.WithOutput(output),
@@ -112,18 +104,18 @@ func Run(ctx context.Context, input io.Reader, output io.Writer, paidAccess bool
 	final, err := program.Run()
 	if err != nil {
 		if errors.Is(err, tea.ErrInterrupted) || errors.Is(err, context.Canceled) {
-			return Result{}, ErrCancelled
+			return nil, ErrCancelled
 		}
-		return Result{}, fmt.Errorf("run project setup: %w", err)
+		return nil, fmt.Errorf("run project setup: %w", err)
 	}
 	result, ok := final.(model)
-	if !ok || result.cancelled || !result.submitted && !result.openPricing {
-		return Result{}, ErrCancelled
+	if !ok || result.cancelled || !result.submitted {
+		return nil, ErrCancelled
 	}
-	return Result{Arguments: result.arguments(), OpenPricing: result.openPricing}, nil
+	return result.arguments(), nil
 }
 
-func newModel(paidAccess ...bool) model {
+func newModel() model {
 	destination := textinput.New()
 	destination.Prompt = "› "
 	destination.Placeholder = "./my-app"
@@ -146,18 +138,16 @@ func newModel(paidAccess ...bool) model {
 	name.SetWidth(48)
 
 	return model{
-		inputs:     [3]textinput.Model{destination, module, name},
-		width:      80,
-		height:     24,
-		edition:    "free",
-		framework:  "htmx",
-		database:   "sqlite",
-		payment:    "stripe",
-		mail:       "smtp",
-		oauth:      map[string]bool{"google": true, "github": true},
-		content:    map[string]bool{},
-		paidAccess: len(paidAccess) > 0 && paidAccess[0],
-		styles:     newStyles(true),
+		inputs:    [3]textinput.Model{destination, module, name},
+		width:     80,
+		height:    24,
+		framework: "htmx",
+		database:  "sqlite",
+		payment:   "stripe",
+		mail:      "smtp",
+		oauth:     map[string]bool{"google": true, "github": true},
+		content:   map[string]bool{},
+		styles:    newStyles(true),
 	}
 }
 
@@ -196,6 +186,10 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "esc":
+				if m.stepIndex() == 0 {
+					m.cancelled = true
+					return m, tea.Quit
+				}
 				m.moveBack()
 				return m, nil
 			}
@@ -210,10 +204,6 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.cancelled = true
 			return m, tea.Quit
 		case "esc", "left", "h":
-			if m.step == stepEdition {
-				m.cancelled = true
-				return m, tea.Quit
-			}
 			m.moveBack()
 			return m, nil
 		case "up", "k":
@@ -237,10 +227,6 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.selectCurrent()
-			if m.step == stepEdition && m.edition == "paid" && !m.paidAccess {
-				m.openPricing = true
-				return m, tea.Quit
-			}
 			m.moveForward()
 			return m, nil
 		}
@@ -348,15 +334,12 @@ func (m model) reviewView(lineWidth int) string {
 			m.styles.muted.Render(shorten("Module  "+strings.TrimSpace(m.inputs[1].Value()), lineWidth)),
 			m.styles.muted.Render(shorten("Folder  "+strings.TrimSpace(m.inputs[0].Value()), lineWidth)),
 		}
-		if m.edition == "free" {
-			return strings.Join(append(rows, m.styles.value.Render(shorten("Free · SQLite · SMTP · "+m.frontendSummary(" · "), lineWidth))), "\n")
-		}
 		storage := fmt.Sprintf("Storage %s · Content %d", yesNo(m.storage), len(selectedKeys(m.content)))
 		if m.apiOnly() {
 			storage = "Storage " + yesNo(m.storage)
 		}
 		return strings.Join(append(rows,
-			m.styles.value.Render(shorten("Paid · "+m.frontendSummary(" · ")+" · "+displayValue(m.database), lineWidth)),
+			m.styles.value.Render(shorten(m.frontendSummary(" · ")+" · "+displayValue(m.database), lineWidth)),
 			m.styles.value.Render(shorten(displayValue(m.payment)+" · "+displayValue(m.mail), lineWidth)),
 			m.styles.value.Render(shorten(fmt.Sprintf("Workspaces %s · OAuth %d", yesNo(m.workspaces), len(selectedKeys(m.oauth))), lineWidth)),
 			m.styles.value.Render(shorten(storage, lineWidth)),
@@ -367,17 +350,12 @@ func (m model) reviewView(lineWidth int) string {
 		m.styles.muted.Render(shorten("Module  "+strings.TrimSpace(m.inputs[1].Value()), lineWidth)),
 		m.styles.muted.Render(shorten("Folder  "+strings.TrimSpace(m.inputs[0].Value()), lineWidth)),
 	}
-	if m.edition == "free" {
-		return strings.Join(append(rows,
-			m.styles.value.Render(shorten("Free  ·  SQLite  ·  SMTP  ·  "+m.frontendSummary("  ·  "), lineWidth)),
-		), "\n")
-	}
 	storage := "Storage " + yesNo(m.storage) + "  ·  Content " + selectedValues(m.content)
 	if m.apiOnly() {
 		storage = "Storage " + yesNo(m.storage)
 	}
 	return strings.Join(append(rows,
-		m.styles.value.Render(shorten("Paid  ·  "+m.frontendSummary("  ·  ")+"  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail), lineWidth)),
+		m.styles.value.Render(shorten(m.frontendSummary("  ·  ")+"  ·  "+displayValue(m.database)+"  ·  "+displayValue(m.payment)+"  ·  "+displayValue(m.mail), lineWidth)),
 		m.styles.value.Render(shorten("Workspaces "+yesNo(m.workspaces)+"  ·  OAuth "+selectedValues(m.oauth), lineWidth)),
 		m.styles.value.Render(shorten(storage, lineWidth)),
 	), "\n")
@@ -416,8 +394,6 @@ func (m model) question() (string, string) {
 		return "What is the Go module path?", "Usually your repository path, for example github.com/acme/rocket."
 	case stepName:
 		return "What should the app be called?", "This is the human-readable product name."
-	case stepEdition:
-		return "Choose your edition", "Free is the complete foundation. Paid unlocks every product module and lifetime updates."
 	case stepFramework:
 		return "Choose a frontend", "htmx is the default. Datastar streams patches. SvelteKit runs on the JSON API. Headless ships only the Go backend and the JSON API."
 	case stepAPI:
@@ -445,15 +421,6 @@ func (m model) question() (string, string) {
 
 func (m model) options() []option {
 	switch m.step {
-	case stepEdition:
-		paid := option{label: "Paid", value: "paid", description: "Every module and lifetime updates."}
-		if !m.paidAccess {
-			paid.description = "Open pricing. Buy once, then run goilerplate new again."
-		}
-		return []option{
-			{label: "Free", value: "free", description: "Complete foundation with SQLite, SMTP, htmx, Datastar, SvelteKit or Headless, auth, and security."},
-			paid,
-		}
 	case stepFramework:
 		return []option{
 			{label: "htmx", value: "htmx", description: "Small, stable, and the default goilerplate frontend."},
@@ -482,7 +449,6 @@ func (m model) arguments() []string {
 	arguments := []string{
 		"--name", strings.TrimSpace(m.inputs[2].Value()),
 		"--module", strings.TrimSpace(m.inputs[1].Value()),
-		"--edition", m.edition,
 	}
 	switch {
 	case m.framework == "headless":
@@ -497,25 +463,23 @@ func (m model) arguments() []string {
 	if m.includesMCP() {
 		arguments = append(arguments, "--mcp")
 	}
-	if m.edition == "paid" {
-		arguments = append(arguments,
-			"--database", m.database,
-			"--payment", m.payment,
-			"--mail", m.mail,
-		)
-		if m.workspaces {
-			arguments = append(arguments, "--workspaces")
-		}
-		if values := selectedKeys(m.oauth); len(values) > 0 {
-			arguments = append(arguments, "--oauth", strings.Join(values, ","))
-		}
-		if m.storage {
-			arguments = append(arguments, "--storage")
-		}
-		content := selectedKeys(m.content)
-		if len(content) > 0 && !m.apiOnly() {
-			arguments = append(arguments, "--content", strings.Join(content, ","))
-		}
+	arguments = append(arguments,
+		"--database", m.database,
+		"--payment", m.payment,
+		"--mail", m.mail,
+	)
+	if m.workspaces {
+		arguments = append(arguments, "--workspaces")
+	}
+	if values := selectedKeys(m.oauth); len(values) > 0 {
+		arguments = append(arguments, "--oauth", strings.Join(values, ","))
+	}
+	if m.storage {
+		arguments = append(arguments, "--storage")
+	}
+	content := selectedKeys(m.content)
+	if len(content) > 0 && !m.apiOnly() {
+		arguments = append(arguments, "--content", strings.Join(content, ","))
 	}
 	return append(arguments, strings.TrimSpace(m.inputs[0].Value()))
 }
@@ -536,24 +500,21 @@ func (m model) inputIndex() int {
 	return int(m.step - stepDestination)
 }
 
-// steps lists the questions the current selection asks, in order. Free
-// skips the module questions. SvelteKit and Headless skip the JSON API
-// question because they always include the API, and skip content because
-// blog and docs are HTML products. The MCP server question follows only when
-// the JSON API is included.
+// steps lists the questions the current selection asks, in order. SvelteKit
+// and Headless skip the JSON API question because they always include the
+// API, and skip content because blog and docs are HTML products. The MCP
+// server question follows only when the JSON API is included.
 func (m model) steps() []step {
-	steps := []step{stepEdition, stepDestination, stepModule, stepName, stepFramework}
+	steps := []step{stepDestination, stepModule, stepName, stepFramework}
 	if !m.apiOnly() {
 		steps = append(steps, stepAPI)
 	}
 	if m.includesAPI() {
 		steps = append(steps, stepMCP)
 	}
-	if m.edition == "paid" {
-		steps = append(steps, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage)
-		if !m.apiOnly() {
-			steps = append(steps, stepContent)
-		}
+	steps = append(steps, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage)
+	if !m.apiOnly() {
+		steps = append(steps, stepContent)
 	}
 	return append(steps, stepReview)
 }
@@ -643,8 +604,6 @@ func (m *model) selectCurrent() {
 	}
 	value := options[m.cursor].value
 	switch m.step {
-	case stepEdition:
-		m.edition = value
 	case stepFramework:
 		m.framework = value
 		if m.apiOnly() {
@@ -683,8 +642,6 @@ func (m *model) toggleCurrent() {
 
 func (m model) optionSelected(value string) bool {
 	switch m.step {
-	case stepEdition:
-		return m.edition == value
 	case stepFramework:
 		return m.framework == value
 	case stepAPI:
@@ -740,10 +697,6 @@ func yesNo(value bool) string {
 
 func displayValue(value string) string {
 	switch value {
-	case "free":
-		return "Free"
-	case "paid":
-		return "Paid"
 	case "htmx":
 		return "htmx"
 	case "datastar":

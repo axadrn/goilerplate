@@ -10,30 +10,11 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func TestFreeArgumentsUseTheStableNewCommand(t *testing.T) {
-	model := newModel()
-	model.inputs[0].SetValue("./acme")
-	model.inputs[1].SetValue("example.com/acme")
-	model.inputs[2].SetValue("Acme")
-
-	want := []string{
-		"--name", "Acme",
-		"--module", "example.com/acme",
-		"--edition", "free",
-		"--framework", "htmx",
-		"./acme",
-	}
-	if got := model.arguments(); !reflect.DeepEqual(got, want) {
-		t.Fatalf("arguments = %#v, want %#v", got, want)
-	}
-}
-
-func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
+func TestArgumentsUseTheStableNewCommand(t *testing.T) {
 	model := newModel()
 	model.inputs[0].SetValue("./rocket")
 	model.inputs[1].SetValue("github.com/acme/rocket")
 	model.inputs[2].SetValue("Rocket")
-	model.edition = "paid"
 	model.framework = "datastar"
 	model.database = "postgres"
 	model.payment = "polar"
@@ -45,7 +26,6 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 	want := []string{
 		"--name", "Rocket",
 		"--module", "github.com/acme/rocket",
-		"--edition", "paid",
 		"--framework", "datastar",
 		"--database", "postgres",
 		"--payment", "polar",
@@ -61,39 +41,26 @@ func TestPaidArgumentsUseTheStableNewCommand(t *testing.T) {
 	}
 }
 
-func TestFreeSelectionSkipsPaidQuestions(t *testing.T) {
+func TestWizardStartsAtTheDestination(t *testing.T) {
 	model := newModel()
-	model.setStep(stepEdition)
-	model.selectCurrent()
-	model.moveForward()
-
+	if model.step != stepDestination || model.progress() != "1/13" {
+		t.Fatalf("step = %d, progress = %q", model.step, model.progress())
+	}
+	model.moveBack()
 	if model.step != stepDestination {
-		t.Fatalf("step = %d, want destination", model.step)
-	}
-	model.setStep(stepName)
-	model.moveForward()
-	if model.step != stepFramework {
-		t.Fatalf("step = %d, want framework", model.step)
-	}
-	model.moveForward()
-	if model.step != stepAPI {
-		t.Fatalf("step = %d, want JSON API", model.step)
-	}
-	model.moveForward()
-	if model.step != stepReview {
-		t.Fatalf("step = %d, want review", model.step)
-	}
-	model.moveBack()
-	if model.step != stepAPI {
-		t.Fatalf("back step = %d, want JSON API", model.step)
-	}
-	model.moveBack()
-	if model.step != stepFramework {
-		t.Fatalf("back step = %d, want framework", model.step)
+		t.Fatalf("back step = %d, want destination", model.step)
 	}
 }
 
-func TestFreeFrontendSelectionBuildsTheFrameworkFlag(t *testing.T) {
+func TestDefaultsIncludeBothOAuthProvidersAndStripe(t *testing.T) {
+	model := newModel()
+	arguments := strings.Join(model.arguments(), " ")
+	if !strings.Contains(arguments, "--payment stripe") || !strings.Contains(arguments, "--oauth google,github") {
+		t.Fatalf("arguments = %q", arguments)
+	}
+}
+
+func TestFrontendSelectionBuildsTheFrameworkFlag(t *testing.T) {
 	model := newModel()
 	model.setStep(stepFramework)
 	model.moveCursor(1)
@@ -102,58 +69,12 @@ func TestFreeFrontendSelectionBuildsTheFrameworkFlag(t *testing.T) {
 	if model.framework != "datastar" {
 		t.Fatalf("framework = %q", model.framework)
 	}
-	if arguments := strings.Join(model.arguments(), " "); !strings.Contains(arguments, "--edition free --framework datastar") {
+	if arguments := strings.Join(model.arguments(), " "); !strings.Contains(arguments, "--module example.com/my-app --framework datastar") {
 		t.Fatalf("arguments = %q", arguments)
 	}
 	model.setStep(stepReview)
 	if view := model.reviewView(model.contentWidth()); !strings.Contains(view, "Datastar") {
 		t.Fatalf("review = %q", view)
-	}
-}
-
-func TestFreePaidSelectionRequestsPricingImmediately(t *testing.T) {
-	selection := newModel(false)
-	selection.moveCursor(1)
-
-	updated, command := selection.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	result := updated.(model)
-	if !result.openPricing || result.submitted || result.step != stepEdition || command == nil {
-		t.Fatalf("pricing = %v, submitted = %v, step = %d, command = %v", result.openPricing, result.submitted, result.step, command)
-	}
-}
-
-func TestPaidAccountContinuesIntoProjectSetup(t *testing.T) {
-	selection := newModel(true)
-	selection.moveCursor(1)
-
-	updated, _ := selection.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	result := updated.(model)
-	if result.openPricing || result.edition != "paid" || result.step != stepDestination {
-		t.Fatalf("pricing = %v, edition = %q, step = %d", result.openPricing, result.edition, result.step)
-	}
-}
-
-func TestPaidDefaultsIncludeBothOAuthProviders(t *testing.T) {
-	model := newModel()
-	model.edition = "paid"
-	arguments := strings.Join(model.arguments(), " ")
-	if !strings.Contains(arguments, "--oauth google,github") {
-		t.Fatalf("arguments = %q", arguments)
-	}
-}
-
-func TestPaidFrontendSelectionBuildsTheFrameworkFlag(t *testing.T) {
-	model := newModel()
-	model.edition = "paid"
-	model.setStep(stepFramework)
-	model.moveCursor(1)
-	model.selectCurrent()
-
-	if model.framework != "datastar" {
-		t.Fatalf("framework = %q", model.framework)
-	}
-	if arguments := strings.Join(model.arguments(), " "); !strings.Contains(arguments, "--framework datastar") {
-		t.Fatalf("arguments = %q", arguments)
 	}
 }
 
@@ -204,7 +125,6 @@ func TestReviewFitsStandardAndNarrowTerminals(t *testing.T) {
 			selection.inputs[0].SetValue(strings.Repeat("d", 240))
 			selection.inputs[1].SetValue(strings.Repeat("m", 240))
 			selection.inputs[2].SetValue(strings.Repeat("n", 100))
-			selection.edition = "paid"
 			selection.workspaces = true
 			selection.storage = true
 			selection.content["blog"] = true
@@ -229,7 +149,6 @@ func TestWideSummaryFitsWithMaximumInputLengths(t *testing.T) {
 	selection.inputs[0].SetValue(strings.Repeat("d", 240))
 	selection.inputs[1].SetValue(strings.Repeat("m", 240))
 	selection.inputs[2].SetValue(strings.Repeat("n", 100))
-	selection.edition = "paid"
 	selection.workspaces = true
 	selection.storage = true
 	selection.content["blog"] = true
@@ -247,13 +166,12 @@ func TestWideSummaryFitsWithMaximumInputLengths(t *testing.T) {
 
 func TestLayoutDoesNotJumpBetweenSteps(t *testing.T) {
 	for _, width := range []int{40, 80, 100} {
-		selection := newModel(true)
+		selection := newModel()
 		selection.width = width
 		selection.height = 24
-		selection.edition = "paid"
 
 		var wantWidth, wantHeight int
-		for index, current := range []step{stepEdition, stepDestination, stepFramework, stepReview} {
+		for index, current := range []step{stepDestination, stepFramework, stepReview} {
 			selection.setStep(current)
 			content := selection.View().Content
 			gotWidth, gotHeight := lipgloss.Width(content), lipgloss.Height(content)
@@ -268,26 +186,27 @@ func TestLayoutDoesNotJumpBetweenSteps(t *testing.T) {
 	}
 }
 
-func TestEditionOptionsStayOnSingleLines(t *testing.T) {
-	selection := newModel(false)
+func TestFrontendOptionsStayOnSingleLines(t *testing.T) {
+	selection := newModel()
 	selection.width = 80
+	selection.setStep(stepFramework)
 
-	if height := lipgloss.Height(selection.questionView()); height != 5 {
-		t.Fatalf("edition question height = %d, want 5 single-line rows", height)
+	if height := lipgloss.Height(selection.questionView()); height != 7 {
+		t.Fatalf("frontend question height = %d, want 7 single-line rows", height)
 	}
 }
 
 func TestHeaderIsCompactAndFooterStaysAtTerminalEdge(t *testing.T) {
-	selection := newModel(false)
+	selection := newModel()
 	selection.width = 80
 	selection.height = 24
 
 	content := selection.View().Content
-	if !strings.Contains(content, "goilerplate") || !strings.Contains(content, " new  1/7") || strings.Contains(content, "━") {
+	if !strings.Contains(content, "goilerplate") || !strings.Contains(content, " new  1/13") || strings.Contains(content, "━") {
 		t.Fatalf("header = %q", strings.Split(content, "\n")[2])
 	}
 	lines := strings.Split(content, "\n")
-	if len(lines) != selection.height || !strings.Contains(lines[len(lines)-1], "choose") {
+	if len(lines) != selection.height || !strings.Contains(lines[len(lines)-1], "continue") {
 		t.Fatalf("view has %d lines and last line %q", len(lines), lines[len(lines)-1])
 	}
 }
@@ -308,14 +227,13 @@ func TestBackgroundMessageSelectsReadableLightTheme(t *testing.T) {
 	}
 }
 
-func TestPaidCopySeparatesTheLicenseFromAppBilling(t *testing.T) {
+func TestPaymentOffersStripeAndPolar(t *testing.T) {
 	selection := newModel()
-	selection.setStep(stepEdition)
-	selection.moveCursor(1)
-	if view := selection.questionView(); !strings.Contains(view, "Paid") || !strings.Contains(view, "Open pricing") {
-		t.Fatalf("edition view = %q", view)
-	}
 	selection.setStep(stepPayment)
+	options := selection.options()
+	if len(options) != 2 || options[0].value != "stripe" || options[1].value != "polar" || selection.cursor != 0 {
+		t.Fatalf("payment options = %#v, cursor = %d", options, selection.cursor)
+	}
 	title, _ := selection.question()
 	if title != "Choose your app's billing provider" {
 		t.Fatalf("payment title = %q", title)
@@ -339,52 +257,37 @@ func TestTinyTerminalShowsResizeMessage(t *testing.T) {
 	}
 }
 
-func TestFrontendOffersSvelteKitAndHeadlessInBothEditions(t *testing.T) {
-	for _, edition := range []string{"free", "paid"} {
-		t.Run(edition, func(t *testing.T) {
-			selection := newModel(true)
-			selection.edition = edition
-			selection.setStep(stepFramework)
-			options := selection.options()
-			values := make([]string, 0, len(options))
-			for _, option := range options {
-				values = append(values, option.value)
-			}
-			if !reflect.DeepEqual(values, []string{"htmx", "datastar", "svelte", "headless"}) {
-				t.Fatalf("frontends = %v", values)
-			}
-			if options[2].label != "SvelteKit" || options[2].description != "SvelteKit app on the JSON API, served by the Go binary." {
-				t.Fatalf("SvelteKit option = %#v", options[2])
-			}
-			if options[3].label != "Headless" || !strings.HasPrefix(options[3].description, "Go backend with a JSON API and no native frontend") {
-				t.Fatalf("headless option = %#v", options[3])
-			}
-			view := selection.questionView()
-			if !strings.Contains(view, "SvelteKit") || !strings.Contains(view, "Headless") {
-				t.Fatalf("frontend view = %q", view)
-			}
-		})
+func TestFrontendOffersSvelteKitAndHeadless(t *testing.T) {
+	selection := newModel()
+	selection.setStep(stepFramework)
+	options := selection.options()
+	values := make([]string, 0, len(options))
+	for _, option := range options {
+		values = append(values, option.value)
+	}
+	if !reflect.DeepEqual(values, []string{"htmx", "datastar", "svelte", "headless"}) {
+		t.Fatalf("frontends = %v", values)
+	}
+	if options[2].label != "SvelteKit" || options[2].description != "SvelteKit app on the JSON API, served by the Go binary." {
+		t.Fatalf("SvelteKit option = %#v", options[2])
+	}
+	if options[3].label != "Headless" || !strings.HasPrefix(options[3].description, "Go backend with a JSON API and no native frontend") {
+		t.Fatalf("headless option = %#v", options[3])
+	}
+	view := selection.questionView()
+	if !strings.Contains(view, "SvelteKit") || !strings.Contains(view, "Headless") {
+		t.Fatalf("frontend view = %q", view)
 	}
 }
 
 func TestJSONAPIStepFollowsHtmxAndDatastar(t *testing.T) {
-	for _, test := range []struct {
-		edition   string
-		framework int
-		next      step
-	}{
-		{edition: "free", framework: 0, next: stepMCP},
-		{edition: "free", framework: 1, next: stepMCP},
-		{edition: "paid", framework: 0, next: stepMCP},
-		{edition: "paid", framework: 1, next: stepMCP},
-	} {
-		selection := newModel(true)
-		selection.edition = test.edition
+	for _, framework := range []int{0, 1} {
+		selection := newModel()
 		selection.setStep(stepFramework)
-		selection.moveCursor(test.framework)
+		selection.moveCursor(framework)
 		selection = press(t, selection, tea.KeyEnter)
 		if selection.step != stepAPI {
-			t.Fatalf("%s %s: step = %d, want JSON API", test.edition, selection.framework, selection.step)
+			t.Fatalf("%s: step = %d, want JSON API", selection.framework, selection.step)
 		}
 		title, _ := selection.question()
 		if title != "Include the JSON API?" {
@@ -395,8 +298,8 @@ func TestJSONAPIStepFollowsHtmxAndDatastar(t *testing.T) {
 		}
 		selection.moveCursor(1)
 		selection = press(t, selection, tea.KeyEnter)
-		if !selection.api || selection.step != test.next {
-			t.Fatalf("%s %s: api = %v, step = %d, want %d", test.edition, selection.framework, selection.api, selection.step, test.next)
+		if !selection.api || selection.step != stepMCP {
+			t.Fatalf("%s: api = %v, step = %d, want MCP", selection.framework, selection.api, selection.step)
 		}
 		selection.moveBack()
 		if selection.step != stepAPI {
@@ -406,20 +309,16 @@ func TestJSONAPIStepFollowsHtmxAndDatastar(t *testing.T) {
 }
 
 func TestSvelteKitAndHeadlessSkipTheJSONAPIAndContentSteps(t *testing.T) {
+	want := []step{stepDestination, stepModule, stepName, stepFramework, stepMCP, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage, stepReview}
 	for _, test := range []struct {
-		edition   string
 		cursor    int
 		framework string
-		want      []step
 	}{
-		{edition: "free", cursor: 2, framework: "svelte", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepReview}},
-		{edition: "free", cursor: 3, framework: "headless", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepReview}},
-		{edition: "paid", cursor: 2, framework: "svelte", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage, stepReview}},
-		{edition: "paid", cursor: 3, framework: "headless", want: []step{stepEdition, stepDestination, stepModule, stepName, stepFramework, stepMCP, stepDatabase, stepPayment, stepMail, stepWorkspaces, stepOAuth, stepStorage, stepReview}},
+		{cursor: 2, framework: "svelte"},
+		{cursor: 3, framework: "headless"},
 	} {
-		t.Run(test.edition+" "+test.framework, func(t *testing.T) {
-			selection := newModel(true)
-			selection.edition = test.edition
+		t.Run(test.framework, func(t *testing.T) {
+			selection := newModel()
 			selection.setStep(stepFramework)
 			selection.moveCursor(test.cursor)
 			selection.selectCurrent()
@@ -427,23 +326,23 @@ func TestSvelteKitAndHeadlessSkipTheJSONAPIAndContentSteps(t *testing.T) {
 				t.Fatalf("framework = %q, api = %v", selection.framework, selection.api)
 			}
 
-			selection.setStep(stepEdition)
+			selection.setStep(stepDestination)
 			visited := []step{selection.step}
 			for selection.step != stepReview {
 				selection.moveForward()
 				visited = append(visited, selection.step)
 			}
-			if !reflect.DeepEqual(visited, test.want) {
-				t.Fatalf("visited = %v, want %v", visited, test.want)
+			if !reflect.DeepEqual(visited, want) {
+				t.Fatalf("visited = %v, want %v", visited, want)
 			}
-			for index := len(test.want) - 1; index > 0; index-- {
-				if selection.step != test.want[index] {
-					t.Fatalf("back step = %d, want %d", selection.step, test.want[index])
+			for index := len(want) - 1; index > 0; index-- {
+				if selection.step != want[index] {
+					t.Fatalf("back step = %d, want %d", selection.step, want[index])
 				}
 				selection.moveBack()
 			}
 			got := selection.progress()
-			if got != fmt.Sprintf("1/%d", len(test.want)) {
+			if got != fmt.Sprintf("1/%d", len(want)) {
 				t.Fatalf("progress = %q", got)
 			}
 		})
@@ -452,86 +351,58 @@ func TestSvelteKitAndHeadlessSkipTheJSONAPIAndContentSteps(t *testing.T) {
 
 func TestProgressCountsOnlyAskedQuestions(t *testing.T) {
 	for _, test := range []struct {
-		edition   string
 		framework string
+		api       bool
 		want      string
 	}{
-		{edition: "free", framework: "htmx", want: "7/7"},
-		{edition: "free", framework: "headless", want: "7/7"},
-		{edition: "free", framework: "svelte", want: "7/7"},
-		{edition: "paid", framework: "svelte", want: "13/13"},
-		{edition: "paid", framework: "datastar", want: "14/14"},
-		{edition: "paid", framework: "headless", want: "13/13"},
+		{framework: "htmx", want: "13/13"},
+		{framework: "datastar", want: "13/13"},
+		{framework: "datastar", api: true, want: "14/14"},
+		{framework: "svelte", api: true, want: "12/12"},
+		{framework: "headless", api: true, want: "12/12"},
 	} {
-		selection := newModel(true)
-		selection.edition = test.edition
+		selection := newModel()
 		selection.framework = test.framework
+		selection.api = test.api
 		selection.setStep(stepReview)
 		got := selection.progress()
 		if got != test.want {
-			t.Fatalf("%s %s progress = %q, want %q", test.edition, test.framework, got, test.want)
+			t.Fatalf("%s progress = %q, want %q", test.framework, got, test.want)
 		}
 	}
 }
 
 func TestArgumentsEmitHeadlessOrTheJSONAPI(t *testing.T) {
+	modules := []string{"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github"}
 	for _, test := range []struct {
 		name      string
-		edition   string
 		framework string
 		api       bool
-		want      []string
+		frontend  []string
+		content   bool
 	}{
-		{
-			name: "free headless", edition: "free", framework: "headless", api: true,
-			want: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--headless", "./acme"},
-		},
-		{
-			name: "free svelte", edition: "free", framework: "svelte", api: true,
-			want: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "svelte", "./acme"},
-		},
-		{
-			name: "paid svelte drops content", edition: "paid", framework: "svelte", api: true,
-			want: []string{
-				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--framework", "svelte",
-				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "./acme",
-			},
-		},
-		{
-			name: "free htmx with the JSON API", edition: "free", framework: "htmx", api: true,
-			want: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "htmx", "--api", "./acme"},
-		},
-		{
-			name: "free datastar without the JSON API", edition: "free", framework: "datastar",
-			want: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "datastar", "./acme"},
-		},
-		{
-			name: "paid headless drops content", edition: "paid", framework: "headless", api: true,
-			want: []string{
-				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--headless",
-				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "./acme",
-			},
-		},
-		{
-			name: "paid datastar with the JSON API", edition: "paid", framework: "datastar", api: true,
-			want: []string{
-				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--framework", "datastar", "--api",
-				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "--content", "blog", "./acme",
-			},
-		},
+		{name: "svelte drops content", framework: "svelte", api: true, frontend: []string{"--framework", "svelte"}},
+		{name: "headless drops content", framework: "headless", api: true, frontend: []string{"--headless"}},
+		{name: "htmx with the JSON API", framework: "htmx", api: true, frontend: []string{"--framework", "htmx", "--api"}, content: true},
+		{name: "datastar without the JSON API", framework: "datastar", frontend: []string{"--framework", "datastar"}, content: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			selection := newModel(true)
+			selection := newModel()
 			selection.inputs[0].SetValue("./acme")
 			selection.inputs[1].SetValue("example.com/acme")
 			selection.inputs[2].SetValue("Acme")
-			selection.edition = test.edition
 			selection.framework = test.framework
 			selection.api = test.api
 			selection.content["blog"] = true
+			want := append([]string{"--name", "Acme", "--module", "example.com/acme"}, test.frontend...)
+			want = append(want, modules...)
+			if test.content {
+				want = append(want, "--content", "blog")
+			}
+			want = append(want, "./acme")
 			got := selection.arguments()
-			if !reflect.DeepEqual(got, test.want) {
-				t.Fatalf("arguments = %#v, want %#v", got, test.want)
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("arguments = %#v, want %#v", got, want)
 			}
 		})
 	}
@@ -539,27 +410,21 @@ func TestArgumentsEmitHeadlessOrTheJSONAPI(t *testing.T) {
 
 func TestReviewShowsHeadlessAndTheJSONAPI(t *testing.T) {
 	for _, test := range []struct {
-		edition   string
 		framework string
 		api       bool
 		width     int
 		want      []string
 		reject    []string
 	}{
-		{edition: "free", framework: "headless", api: true, width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  Headless  ·  JSON API"}},
-		{edition: "free", framework: "htmx", api: true, width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  htmx  ·  JSON API"}},
-		{edition: "free", framework: "svelte", api: true, width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  SvelteKit  ·  JSON API"}},
-		{edition: "paid", framework: "svelte", api: true, width: 100, want: []string{"Paid  ·  SvelteKit  ·  JSON API  ·  SQLite", "Storage No"}, reject: []string{"Content"}},
-		{edition: "paid", framework: "svelte", api: true, width: 50, want: []string{"Paid · SvelteKit · JSON API", "Storage No"}, reject: []string{"Content"}},
-		{edition: "free", framework: "datastar", width: 80, want: []string{"Free  ·  SQLite  ·  SMTP  ·  Datastar"}, reject: []string{"JSON API"}},
-		{edition: "free", framework: "headless", api: true, width: 50, want: []string{"Free · SQLite · SMTP · Headless · JSON API"}},
-		{edition: "paid", framework: "headless", api: true, width: 100, want: []string{"Paid  ·  Headless  ·  JSON API  ·  SQLite", "Storage No"}, reject: []string{"Content"}},
-		{edition: "paid", framework: "htmx", api: true, width: 100, want: []string{"Paid  ·  htmx  ·  JSON API  ·  SQLite", "Content Blog"}},
-		{edition: "paid", framework: "headless", api: true, width: 50, want: []string{"Paid · Headless · JSON API", "Storage No"}, reject: []string{"Content"}},
+		{framework: "svelte", api: true, width: 100, want: []string{"SvelteKit  ·  JSON API  ·  SQLite", "Storage No"}, reject: []string{"Content"}},
+		{framework: "svelte", api: true, width: 50, want: []string{"SvelteKit · JSON API · SQLite", "Storage No"}, reject: []string{"Content"}},
+		{framework: "headless", api: true, width: 100, want: []string{"Headless  ·  JSON API  ·  SQLite", "Storage No"}, reject: []string{"Content"}},
+		{framework: "htmx", api: true, width: 100, want: []string{"htmx  ·  JSON API  ·  SQLite", "Content Blog"}},
+		{framework: "datastar", width: 100, want: []string{"Datastar  ·  SQLite", "Content Blog"}, reject: []string{"JSON API"}},
+		{framework: "headless", api: true, width: 50, want: []string{"Headless · JSON API · SQLite", "Storage No"}, reject: []string{"Content"}},
 	} {
-		selection := newModel(true)
+		selection := newModel()
 		selection.width = test.width
-		selection.edition = test.edition
 		selection.framework = test.framework
 		selection.api = test.api
 		selection.content["blog"] = true
@@ -567,12 +432,12 @@ func TestReviewShowsHeadlessAndTheJSONAPI(t *testing.T) {
 		view := selection.reviewView(selection.contentWidth())
 		for _, want := range test.want {
 			if !strings.Contains(view, want) {
-				t.Fatalf("%s %s width %d review = %q, want %q", test.edition, test.framework, test.width, view, want)
+				t.Fatalf("%s width %d review = %q, want %q", test.framework, test.width, view, want)
 			}
 		}
 		for _, reject := range test.reject {
 			if strings.Contains(view, reject) {
-				t.Fatalf("%s %s width %d review = %q, rejects %q", test.edition, test.framework, test.width, view, reject)
+				t.Fatalf("%s width %d review = %q, rejects %q", test.framework, test.width, view, reject)
 			}
 		}
 	}
@@ -580,18 +445,15 @@ func TestReviewShowsHeadlessAndTheJSONAPI(t *testing.T) {
 
 func TestMCPStepFollowsTheJSONAPI(t *testing.T) {
 	for _, test := range []struct {
-		edition   string
 		framework int
 		api       bool
-		next      step
 	}{
-		{edition: "free", framework: 0, api: true, next: stepReview},
-		{edition: "free", framework: 2, next: stepReview},
-		{edition: "paid", framework: 1, api: true, next: stepDatabase},
-		{edition: "paid", framework: 2, next: stepDatabase},
+		{framework: 0, api: true},
+		{framework: 1, api: true},
+		{framework: 2},
+		{framework: 3},
 	} {
-		selection := newModel(true)
-		selection.edition = test.edition
+		selection := newModel()
 		selection.setStep(stepFramework)
 		selection.moveCursor(test.framework)
 		selection = press(t, selection, tea.KeyEnter)
@@ -600,7 +462,7 @@ func TestMCPStepFollowsTheJSONAPI(t *testing.T) {
 			selection = press(t, selection, tea.KeyEnter)
 		}
 		if selection.step != stepMCP {
-			t.Fatalf("%s %s: step = %d, want MCP", test.edition, selection.framework, selection.step)
+			t.Fatalf("%s: step = %d, want MCP", selection.framework, selection.step)
 		}
 		title, hint := selection.question()
 		if title != "Include the MCP server?" || !strings.Contains(hint, "personal API token") {
@@ -611,8 +473,8 @@ func TestMCPStepFollowsTheJSONAPI(t *testing.T) {
 		}
 		selection.moveCursor(1)
 		selection = press(t, selection, tea.KeyEnter)
-		if !selection.mcp || selection.step != test.next {
-			t.Fatalf("%s %s: mcp = %v, step = %d, want %d", test.edition, selection.framework, selection.mcp, selection.step, test.next)
+		if !selection.mcp || selection.step != stepDatabase {
+			t.Fatalf("%s: mcp = %v, step = %d, want database", selection.framework, selection.mcp, selection.step)
 		}
 		selection.moveBack()
 		if selection.step != stepMCP || selection.cursor != 1 {
@@ -622,37 +484,35 @@ func TestMCPStepFollowsTheJSONAPI(t *testing.T) {
 }
 
 func TestMCPStepIsSkippedWithoutTheJSONAPI(t *testing.T) {
-	for _, edition := range []string{"free", "paid"} {
-		selection := newModel(true)
-		selection.edition = edition
-		selection.setStep(stepAPI)
-		selection = press(t, selection, tea.KeyEnter)
-		if selection.api || selection.step == stepMCP {
-			t.Fatalf("%s: api = %v, step = %d", edition, selection.api, selection.step)
-		}
+	selection := newModel()
+	selection.setStep(stepAPI)
+	selection = press(t, selection, tea.KeyEnter)
+	if selection.api || selection.step != stepDatabase {
+		t.Fatalf("api = %v, step = %d, want database", selection.api, selection.step)
 	}
 }
 
 func TestTurningTheJSONAPIOffDropsTheMCPServer(t *testing.T) {
-	selection := newModel(true)
+	modules := []string{"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "./acme"}
+	selection := newModel()
 	selection.inputs[0].SetValue("./acme")
 	selection.inputs[1].SetValue("example.com/acme")
 	selection.inputs[2].SetValue("Acme")
 	selection.api = true
 	selection.mcp = true
 	got := selection.arguments()
-	want := []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "htmx", "--api", "--mcp", "./acme"}
+	want := append([]string{"--name", "Acme", "--module", "example.com/acme", "--framework", "htmx", "--api", "--mcp"}, modules...)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("arguments = %#v, want %#v", got, want)
 	}
 	selection.setStep(stepAPI)
 	selection.moveCursor(-1)
 	selection = press(t, selection, tea.KeyEnter)
-	if selection.step != stepReview {
-		t.Fatalf("step = %d, want review", selection.step)
+	if selection.step != stepDatabase {
+		t.Fatalf("step = %d, want database", selection.step)
 	}
 	got = selection.arguments()
-	want = []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--framework", "htmx", "./acme"}
+	want = append([]string{"--name", "Acme", "--module", "example.com/acme", "--framework", "htmx"}, modules...)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("arguments = %#v, want %#v", got, want)
 	}
@@ -661,44 +521,36 @@ func TestTurningTheJSONAPIOffDropsTheMCPServer(t *testing.T) {
 func TestArgumentsAndReviewShowTheMCPServer(t *testing.T) {
 	for _, test := range []struct {
 		name      string
-		edition   string
 		framework string
-		api       bool
 		width     int
 		arguments []string
 		review    string
 	}{
 		{
-			name: "free headless", edition: "free", framework: "headless", api: true, width: 80,
-			arguments: []string{"--name", "Acme", "--module", "example.com/acme", "--edition", "free", "--headless", "--mcp", "./acme"},
-			review:    "Free  ·  SQLite  ·  SMTP  ·  Headless  ·  JSON API  ·  MCP",
-		},
-		{
-			name: "paid datastar", edition: "paid", framework: "datastar", api: true, width: 120,
+			name: "datastar", framework: "datastar", width: 120,
 			arguments: []string{
-				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--framework", "datastar", "--api", "--mcp",
+				"--name", "Acme", "--module", "example.com/acme", "--framework", "datastar", "--api", "--mcp",
 				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "./acme",
 			},
-			review: "Paid  ·  Datastar  ·  JSON API  ·  MCP  ·  SQLite",
+			review: "Datastar  ·  JSON API  ·  MCP  ·  SQLite",
 		},
 		{
-			name: "paid headless narrow", edition: "paid", framework: "headless", api: true, width: 50,
+			name: "headless narrow", framework: "headless", width: 50,
 			arguments: []string{
-				"--name", "Acme", "--module", "example.com/acme", "--edition", "paid", "--headless", "--mcp",
+				"--name", "Acme", "--module", "example.com/acme", "--headless", "--mcp",
 				"--database", "sqlite", "--payment", "stripe", "--mail", "smtp", "--oauth", "google,github", "./acme",
 			},
-			review: "Paid · Headless · JSON API · MCP",
+			review: "Headless · JSON API · MCP",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			selection := newModel(true)
+			selection := newModel()
 			selection.inputs[0].SetValue("./acme")
 			selection.inputs[1].SetValue("example.com/acme")
 			selection.inputs[2].SetValue("Acme")
 			selection.width = test.width
-			selection.edition = test.edition
 			selection.framework = test.framework
-			selection.api = test.api
+			selection.api = true
 			selection.mcp = true
 			got := selection.arguments()
 			if !reflect.DeepEqual(got, test.arguments) {

@@ -39,7 +39,7 @@ func TestStyledPricingUsesTheSharedTheme(t *testing.T) {
 
 	app.openPricing(context.Background(), config.Config{})
 	got := output.String()
-	for _, value := range []string{"\x1b[", "goilerplate", "paid", "✓", "Pricing opened", "›", "No new login needed"} {
+	for _, value := range []string{"\x1b[", "goilerplate", "license", "needs a license", "✓", "Pricing opened", "›", "No new login needed"} {
 		if !strings.Contains(got, value) {
 			t.Fatalf("styled pricing does not contain %q: %q", value, got)
 		}
