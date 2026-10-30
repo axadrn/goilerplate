@@ -1,29 +1,68 @@
 # goilerplate
 
-The production Go stack you own.
+**The Go SaaS starter kit.** One command generates a production Go app with login, billing, teams, admin, an API and tests. Every line is yours.
 
-The CLI for generating production-ready Go SaaS projects.
+[Website](https://goilerplate.com) · [Docs](https://goilerplate.com/docs) · [Pricing](https://goilerplate.com/#pricing) · [Changelog](https://goilerplate.com/changelog)
 
-## Install
+## What you get
+
+- **Auth:** passwords, magic links, Google and GitHub OAuth, revocable sessions
+- **Billing:** Stripe or Polar, subscriptions, customer portal, signed webhooks
+- **Teams:** workspaces, roles, invitations, seat limits
+- **Admin:** user search, metrics, session revocation, support impersonation
+- **API:** JSON API, personal API tokens, MCP server for your customers' agents
+- **Production:** tests, CI, Dockerfile, migrations, Sentry, a stack-aware `AGENTS.md`
+
+Stack: Go, templ, Tailwind CSS, shadcn-templ, with htmx, Datastar, SvelteKit or headless. SQLite or PostgreSQL.
+
+## Quick start
+
+You need Go 1.26+, Git and a [license](https://goilerplate.com/#pricing).
 
 ```bash
 go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest
+goilerplate login
+goilerplate new
 ```
 
-## Usage
+`goilerplate new` without options opens an interactive setup.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `new` | Generate a new project |
+| `update` | Update a generated project on a new Git branch |
+| `doctor` | Check a project's tools and `.env` |
+| `login` / `logout` | Sign in with GitHub, revoke the session |
+| `whoami` | Show your account and license |
+| `claim` | Connect a purchase made with another email |
+| `license` | Invite, list or remove license members |
+| `changelog` | Show release notes |
+| `version` | Show the CLI version |
+
+## Options for `new`
 
 ```bash
-goilerplate new [--framework htmx|datastar|svelte|headless] [--api] [--headless] [--mcp] [--payment stripe|polar] --module example.com/acme ./acme
+goilerplate new --module example.com/acme --framework htmx --database sqlite --payment stripe --workspaces ./acme
 ```
 
-`goilerplate new` needs an active license, see [goilerplate.com/pricing](https://goilerplate.com/pricing). Run it without options in a terminal for interactive setup. `--api` adds the JSON API to an htmx or Datastar project. `--framework svelte` generates a SvelteKit app on the JSON API, served by the Go binary. It includes the JSON API and needs Node.js 22.17 or newer and pnpm. `--headless` generates the Go backend with the JSON API and no native frontend. `--mcp` adds an MCP server so your users can connect their AI agents with a personal API token. It needs the JSON API.
+| Option | Values | Default |
+|---|---|---|
+| `--framework` | `htmx`, `datastar`, `svelte`, `headless` | `htmx` |
+| `--database` | `sqlite`, `postgres` | `sqlite` |
+| `--payment` | `stripe`, `polar` | `stripe` |
+| `--mail` | `smtp`, `resend` | `smtp` |
+| `--oauth` | `google`, `github` (comma separated) | none |
+| `--content` | `blog`, `docs` (comma separated) | none |
+| `--workspaces` | include teams | off |
+| `--storage` | include S3 file storage | off |
+| `--api` | add the JSON API | off |
+| `--mcp` | add the MCP server, needs `--api` | off |
+| `--headless` | Go backend with the JSON API, no frontend | off |
 
-Run `goilerplate doctor` inside a generated project to check its tools and `.env`. For SvelteKit it checks Node.js and pnpm.
-
-## Documentation
-
-Visit [goilerplate.com/docs](https://goilerplate.com/docs).
+SvelteKit projects also need Node.js 22.17+ and pnpm.
 
 ## License
 
-Licensed under the [MIT License](LICENSE).
+The CLI is [MIT](LICENSE). Generating projects needs a goilerplate license.
