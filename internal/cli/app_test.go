@@ -160,13 +160,13 @@ func TestLoginRevokesNewSessionWhenSavingFails(t *testing.T) {
 	}
 }
 
-func TestWhoAmIShowsPaidAccessAndLicenses(t *testing.T) {
+func TestWhoAmIShowsTheActiveLicense(t *testing.T) {
 	output := &bytes.Buffer{}
 	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
 	service := &fakeService{who: api.WhoAmIResponse{
 		Account: api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
 		Licenses: []api.License{
-			{ID: "paid", Status: api.LicenseStatusActive, Role: api.LicenseRoleMember},
+			{ID: "lic_1", Status: api.LicenseStatusActive, Role: api.LicenseRoleMember},
 		},
 	}}
 	app := testApp(output, store, &fakeDevice{}, service)
@@ -174,7 +174,24 @@ func TestWhoAmIShowsPaidAccessAndLicenses(t *testing.T) {
 	if err := app.Run(context.Background(), []string{"whoami"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "Access: Paid") || !strings.Contains(output.String(), "paid  active  member") {
+	if !strings.Contains(output.String(), "License: active\n") || !strings.Contains(output.String(), "lic_1  active  member") {
+		t.Fatalf("output = %q", output.String())
+	}
+}
+
+func TestWhoAmIPointsToPricingWithoutALicense(t *testing.T) {
+	output := &bytes.Buffer{}
+	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
+	service := &fakeService{who: api.WhoAmIResponse{
+		Account:  api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
+		Licenses: []api.License{{ID: "lic_1", Status: api.LicenseStatusRevoked, Role: api.LicenseRoleOwner}},
+	}}
+	app := testApp(output, store, &fakeDevice{}, service)
+
+	if err := app.Run(context.Background(), []string{"whoami"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "License: none, see https://goilerplate.com/pricing\n") {
 		t.Fatalf("output = %q", output.String())
 	}
 }

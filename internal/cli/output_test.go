@@ -15,7 +15,7 @@ func TestStyledWhoAmIUsesTheSharedTheme(t *testing.T) {
 	output := &bytes.Buffer{}
 	service := &fakeService{who: api.WhoAmIResponse{
 		Account:  api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-		Licenses: []api.License{{ID: "paid", Status: api.LicenseStatusActive, Role: api.LicenseRoleMember}},
+		Licenses: []api.License{{ID: "lic_1", Status: api.LicenseStatusActive, Role: api.LicenseRoleMember}},
 	}}
 	app := testApp(output, &memoryStore{configuration: config.Config{SessionToken: "session"}}, &fakeDevice{}, service)
 	app.StyledOutput = true
@@ -24,7 +24,7 @@ func TestStyledWhoAmIUsesTheSharedTheme(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := output.String()
-	for _, value := range []string{"\x1b[", "goilerplate", "account", "@axadrn", "Email", "Access", "Paid", "Licenses", "active", "member"} {
+	for _, value := range []string{"\x1b[", "goilerplate", "account", "@axadrn", "Email", "License", "active", "Licenses", "active", "member"} {
 		if !strings.Contains(got, value) {
 			t.Fatalf("styled whoami does not contain %q: %q", value, got)
 		}

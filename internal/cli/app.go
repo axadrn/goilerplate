@@ -240,12 +240,9 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	access := "Free"
-	for _, license := range identity.Licenses {
-		if license.Status == api.LicenseStatusActive {
-			access = "Paid"
-			break
-		}
+	licenseStatus := "none, see " + a.pricingURL(configuration)
+	if hasActiveLicense(identity) {
+		licenseStatus = "active"
 	}
 	if a.StyledOutput {
 		theme := a.theme()
@@ -253,7 +250,7 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 		fmt.Fprintln(a.Out)
 		fmt.Fprintln(a.Out, theme.accent.Render("@"+identity.Account.GitHubLogin))
 		a.printField("Email", identity.Account.Email)
-		a.printField("Access", theme.accent.Render(access))
+		a.printField("License", theme.accent.Render(licenseStatus))
 		if len(identity.Licenses) == 0 {
 			fmt.Fprintln(a.Out)
 			a.printInfo("No licenses connected")
@@ -272,7 +269,7 @@ func (a *App) whoAmI(ctx context.Context, arguments []string) error {
 		return nil
 	}
 	fmt.Fprintf(a.Out, "@%s <%s>\n", identity.Account.GitHubLogin, identity.Account.Email)
-	fmt.Fprintf(a.Out, "Access: %s\n", access)
+	fmt.Fprintf(a.Out, "License: %s\n", licenseStatus)
 	if len(identity.Licenses) == 0 {
 		return nil
 	}
