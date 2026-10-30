@@ -19,7 +19,7 @@ func TestInspectChecksProjectAndSelectedTools(t *testing.T) {
 		TemplateVersion: "v3.0.0",
 		Config: api.GenerationAnswers{
 			ModulePath: "example.com/acme",
-			Edition:    "paid",
+			Edition:    "free",
 			Database:   "postgres",
 			Mail:       "resend",
 		},
@@ -39,6 +39,9 @@ func TestInspectChecksProjectAndSelectedTools(t *testing.T) {
 	if !hasCheck(report, "project", LevelOK) || !hasCheck(report, "docker", LevelOK) || !hasCheck(report, ".env", LevelWarning) {
 		t.Fatalf("checks = %#v", report.Checks)
 	}
+	if report.Checks[0].Message != "v3.0.0" {
+		t.Fatalf("project check = %#v, want the template version only", report.Checks[0])
+	}
 }
 
 func TestInspectReportsModuleVersionsAndMissingTools(t *testing.T) {
@@ -46,7 +49,7 @@ func TestInspectReportsModuleVersionsAndMissingTools(t *testing.T) {
 	writeProject(t, root, api.ProjectLock{
 		SchemaVersion:   api.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Config:          api.GenerationAnswers{ModulePath: "example.com/wanted", Edition: "free", Database: "sqlite", Mail: "resend"},
+		Config:          api.GenerationAnswers{ModulePath: "example.com/wanted", Database: "sqlite", Mail: "resend"},
 	})
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/wrong\n\ngo 1.25.0\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -109,7 +112,7 @@ func TestInspectChecksTheFrontendToolsOfTheSelection(t *testing.T) {
 			writeProject(t, root, api.ProjectLock{
 				SchemaVersion:   api.LockSchemaVersion,
 				TemplateVersion: "v3.1.0",
-				Config:          api.GenerationAnswers{ModulePath: "example.com/acme", Edition: "free", Framework: test.framework, API: test.framework != "htmx", Database: "sqlite", Mail: "resend"},
+				Config:          api.GenerationAnswers{ModulePath: "example.com/acme", Framework: test.framework, API: test.framework != "htmx", Database: "sqlite", Mail: "resend"},
 			})
 			report := fakeInspector(test.outputs).Inspect(context.Background(), root)
 			if report.Errors != len(test.errors) {
@@ -137,7 +140,7 @@ func TestInspectAllowsCommentsAndNoGoVersionGate(t *testing.T) {
 	writeProject(t, root, api.ProjectLock{
 		SchemaVersion:   api.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Config:          api.GenerationAnswers{ModulePath: "example.com/acme", Edition: "free", Database: "sqlite", Mail: "resend"},
+		Config:          api.GenerationAnswers{ModulePath: "example.com/acme", Database: "sqlite", Mail: "resend"},
 	})
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/acme // generated project\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -155,7 +158,6 @@ func TestInspectValidatesSelectedEnvironment(t *testing.T) {
 		TemplateVersion: "v3.0.0",
 		Config: api.GenerationAnswers{
 			ModulePath: "example.com/acme",
-			Edition:    "paid",
 			Database:   "sqlite",
 			Mail:       "resend",
 			Payment:    "stripe",
