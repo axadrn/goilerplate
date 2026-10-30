@@ -109,7 +109,7 @@ type GenerateRequest struct {
 
 const LockSchemaVersion = 1
 
-// EditionPaid is the only edition. GenerationAnswers.Edition always carries it.
+// EditionPaid is the only edition. goilerplate new always sends it.
 const EditionPaid = "paid"
 
 type ProjectLock struct {
@@ -121,8 +121,8 @@ type ProjectLock struct {
 type GenerationAnswers struct {
 	ProjectName string `json:"project_name"`
 	ModulePath  string `json:"module_path"`
-	// Edition is legacy and always "paid". It stays for the wire format and
-	// for goilerplate.lock files that still contain "free".
+	// Edition is legacy. New projects always carry "paid". It stays for the
+	// wire format and for goilerplate.lock files that still contain "free".
 	Edition    string   `json:"edition"`
 	Framework  string   `json:"framework"`
 	Database   string   `json:"database"`

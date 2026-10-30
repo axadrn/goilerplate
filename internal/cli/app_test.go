@@ -757,14 +757,14 @@ func TestUpdateCreatesGitBranchFromLockedConfig(t *testing.T) {
 	}
 }
 
-func TestUpdateSendsPaidForALegacyFreeLock(t *testing.T) {
+func TestUpdateSendsTheLockedEditionUnchanged(t *testing.T) {
 	service, _ := runUpdate(t, "free")
 	if len(service.updateRequests) != 2 {
 		t.Fatalf("update requests = %#v", service.updateRequests)
 	}
 	for _, request := range service.updateRequests {
-		if request.Answers.Edition != "paid" {
-			t.Fatalf("update edition = %q, want paid", request.Answers.Edition)
+		if request.Answers.Edition != "free" || request.Answers.Payment != "stripe" {
+			t.Fatalf("update answers = %#v, want the lock config unchanged", request.Answers)
 		}
 	}
 }
