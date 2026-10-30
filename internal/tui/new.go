@@ -137,7 +137,7 @@ func newModel() model {
 	name.CharLimit = 100
 	name.SetWidth(48)
 
-	return model{
+	m := model{
 		inputs:    [3]textinput.Model{destination, module, name},
 		width:     80,
 		height:    24,
@@ -149,6 +149,9 @@ func newModel() model {
 		content:   map[string]bool{},
 		styles:    newStyles(true),
 	}
+	// The first step takes text, so it needs focus from the start.
+	m.setStep(stepDestination)
+	return m
 }
 
 func (m model) Init() tea.Cmd {
