@@ -61,10 +61,7 @@ templ homeActions() {
 templ homeHero() {
 	<section class="pt-16 sm:pt-28">
 		<div class={ homeWrap }>
-			@badge.Badge(badge.Props{Href: "/changelog", Variant: badge.VariantSecondary}) {
-				Free and open source now
-				@icon.ArrowRight(icon.Props{Attributes: templ.Attributes{"data-icon": "inline-end"}})
-			}
+			@homeOpsPill()
 			<h1 class={ homeDisplay, "mt-8 text-[clamp(3.2rem,10vw,7.6rem)]" }>
 				<span class="block">Your SaaS.</span>
 				<span class="block">Without the</span>
@@ -89,6 +86,17 @@ templ homeHero() {
 			</div>
 		</div>
 	</section>
+}
+
+// homeOpsPill is the small news above the headline: ops is out.
+templ homeOpsPill() {
+	@badge.Badge(badge.Props{Href: blocks.OpsURL, Variant: badge.VariantOutline, Class: "h-8 gap-2 pl-1 text-[13px]"}) {
+		@badge.Badge(badge.Props{Class: "h-6 px-2.5"}) {
+			New
+		}
+		<span>ops, deploy to your own server</span>
+		@icon.ArrowRight(icon.Props{Class: "text-muted-foreground", Attributes: templ.Attributes{"data-icon": "inline-end"}})
+	}
 }
 
 // homeInstall is the one line to copy.
@@ -418,17 +426,26 @@ templ homeOps() {
 	<section id="ops" class={ homeSection }>
 		<div class={ homeWrap }>
 			@card.Card() {
-				@card.Content(card.ContentProps{Class: "grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-end"}) {
+				@card.Content(card.ContentProps{Class: "grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16"}) {
 					<div>
 						<p class="text-sm font-semibold text-muted-foreground">ops</p>
 						<h2 class={ homeH2, "mt-4" }>Ship it. ops keeps it running.</h2>
-						<p class={ homeLead, "mt-6 max-w-xl" }>Deploys, backups, updates and a database UI for your Go and SQLite app. On your own server, with no open ports and no SSH keys. Open source too.</p>
+						<p class={ homeLead, "mt-6 max-w-md" }>Deploys, backups, updates and a database UI for your Go and SQLite app. On your own server, with no open ports and no SSH keys. Open source too.</p>
+						<div class="mt-10">
+							@button.Button(button.Props{Href: blocks.OpsURL, Size: button.SizeLg}) {
+								Visit ops
+								@icon.ArrowRight()
+							}
+						</div>
 					</div>
-					<div>
-						@button.Button(button.Props{Href: blocks.OpsURL, Size: button.SizeLg}) {
-							Visit ops
-							@icon.ArrowRight()
-						}
+					<div class="ops-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]" aria-label="A terminal session with ops">
+						<p><span class="text-terminal-foreground/45">$ </span>ops deploy</p>
+						<p class="text-terminal-foreground/60">→ building on web-1</p>
+						<p class="text-terminal-foreground/60">→ snapshot of /data/app.db: before-v14</p>
+						<p class="text-terminal-foreground/60">→ health check /healthz</p>
+						<p class="text-live">✓ v14 of acme is live in 38s</p>
+						<p class="mt-4"><span class="text-terminal-foreground/45">$ </span>ops restore --at "14:01:59"</p>
+						<p class="text-live">✓ Restored. acme runs again.</p>
 					</div>
 				}
 			}
@@ -439,18 +456,15 @@ templ homeOps() {
 // ---------------------------------------------------------------- founder
 templ homeFounder() {
 	<section id="shadcn-templ" class={ homeSection }>
-		<div class={ homeWrap, "grid gap-10 md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:gap-16" }>
+		<div class={ homeWrap, "grid gap-10 md:grid-cols-[auto_minmax(0,1fr)] md:gap-16" }>
 			<a href="https://x.com/axadrn" target="_blank" rel="me noopener" aria-label="Axel Adrian on X" class="shrink-0">
 				<img src="https://github.com/axadrn.png?size=320" alt="Axel Adrian" width="320" height="320" loading="lazy" class="size-32 rounded-4xl object-cover sm:size-40"/>
 			</a>
-			<div class="max-w-2xl">
+			<div class="max-w-3xl">
 				<h2 class="font-display text-[clamp(2.2rem,5vw,3.75rem)] leading-none text-balance">Built by the maker of shadcn-templ.</h2>
-				<p class={ homeLead, "mt-5" }>I'm Axel. I maintain shadcn-templ, the Go port of shadcn/ui, and I run my own products on goilerplate. Every component in your project comes from the library I ship every week.</p>
-				<div class="mt-6 flex flex-wrap items-center gap-2">
-					@button.Button(button.Props{Href: blocks.ShadcnTemplURL, Target: "_blank", Variant: button.VariantSecondary, Attributes: templ.Attributes{"rel": "noopener"}}) {
-						Explore shadcn-templ
-						@icon.ArrowRight()
-					}
+				<p class={ homeLead, "mt-5" }>I'm Axel. I maintain shadcn-templ, the Go port of shadcn/ui, I run my own products on goilerplate and I deploy them with ops. Every component in your project comes from the library I ship every week.</p>
+				@blocks.MakerProjects("mt-8")
+				<div class="mt-6 flex items-center gap-1">
 					@button.Button(button.Props{Href: "https://x.com/axadrn", Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Attributes: templ.Attributes{"rel": "me noopener", "aria-label": "Axel Adrian on X"}}) {
 						@icons.X(16)
 					}
