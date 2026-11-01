@@ -668,7 +668,7 @@ func Configurator() templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<p class=\"text-[17px] leading-7 text-muted-foreground\">Open the new folder. Copy <code class=\"font-mono text-foreground\">.env.example</code> to <code class=\"font-mono text-foreground\">.env</code>, fill in the settings of your providers, then run <code class=\"font-mono text-foreground\">task dev</code>. Your coding agent reads <code class=\"font-mono text-foreground\">AGENTS.md</code> first.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<p class=\"text-[15px] leading-7 text-muted-foreground\">Open the new folder. Copy <code class=\"font-mono text-foreground\">.env.example</code> to <code class=\"font-mono text-foreground\">.env</code>, fill in the settings of your providers, then run <code class=\"font-mono text-foreground\">task dev</code>. Your coding agent reads <code class=\"font-mono text-foreground\">AGENTS.md</code> first.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
