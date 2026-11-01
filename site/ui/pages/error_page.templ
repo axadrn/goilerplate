@@ -2,25 +2,39 @@ package pages
 
 import (
 	"github.com/axadrn/goilerplate/v4/site/ui/components/button"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/empty"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
 	"github.com/axadrn/goilerplate/v4/site/ui/layouts"
 )
 
-// NotFound is the 404 page the server answers for every unknown path.
+// NotFound is the 404 page the server answers for every unknown path,
+// built from the empty component: an icon, what happened in words, the
+// way back and the code as a small log line.
 templ NotFound() {
 	@layouts.Home(layouts.SEOProps{Title: "Page not found", Description: "This page does not exist.", Path: "/404", NoIndex: true}) {
 		<main class="flex min-h-[70svh] items-center justify-center px-5 py-20">
-			<div class="max-w-lg text-center">
-				<p class="font-mono text-sm text-muted-foreground">404</p>
-				<h1 class={ homeDisplay, "mt-6 text-[clamp(3rem,10vw,5.5rem)] text-balance" }>This route shipped somewhere else.</h1>
-				<p class="mx-auto mt-8 max-w-md text-lg leading-8 text-muted-foreground text-pretty">The page is gone or the URL is wrong. The product is still right where it should be.</p>
-				<div class="mt-10 flex justify-center">
-					@button.Button(button.Props{Href: "/", Size: button.SizeLg}) {
-						@icon.ArrowLeft()
+			@empty.Empty() {
+				@empty.Header() {
+					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+						@icon.SearchX()
+					}
+					@empty.Title() {
+						Page not found
+					}
+					@empty.Description() {
+						The address does not exist or has moved.
+					}
+				}
+				@empty.Content(empty.ContentProps{Class: "flex-row flex-wrap justify-center gap-2"}) {
+					@button.Button(button.Props{Href: "/"}) {
 						Back to goilerplate
 					}
-				</div>
-			</div>
+					@button.Button(button.Props{Href: "/docs", Variant: button.VariantOutline}) {
+						Read the docs
+					}
+				}
+				<p class="font-mono text-xs text-muted-foreground">404 Page not found</p>
+			}
 		</main>
 	}
 }
