@@ -1,4 +1,4 @@
-# Builds goilerplate.com: the static pages and the small server for them.
+# Builds goilerplate.com: one server that renders the pages.
 # Build from the repository root: docker build -f site/Dockerfile .
 FROM golang:1.26 AS build
 WORKDIR /src
@@ -16,14 +16,15 @@ RUN ARCH=$([ "$(uname -m)" = "aarch64" ] && echo arm64 || echo x64) && \
   chmod +x /usr/local/bin/tailwindcss && \
   tailwindcss -i site/assets/css/globals.css -o site/assets/css/output.css --minify
 
-RUN go run ./site/cmd/build -out /out/dist
 RUN CGO_ENABLED=0 go build -trimpath -o /out/server ./site/cmd/server
 
 FROM gcr.io/distroless/static-debian13:nonroot
 WORKDIR /app
 COPY --from=build /out/server /app/server
-COPY --from=build /out/dist /app/dist
+COPY --from=build /src/content /app/content
+COPY --from=build /src/CHANGELOG.md /app/CHANGELOG.md
+COPY --from=build /src/site/assets /app/site/assets
 
 EXPOSE 8090
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=6 CMD ["/app/server", "healthcheck"]
-CMD ["/app/server", "-dir", "/app/dist"]
+CMD ["/app/server"]

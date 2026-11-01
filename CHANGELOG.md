@@ -10,6 +10,14 @@ Unreleased
 
 The CLI, the generator with every module, the docs and this website are now one public repository. No license, no account, no server.
 
+#### Why
+
+A few days ago I ended the Free edition, because AI changed how people build apps: an agent writes login, billing and a dashboard in an afternoon. The numbers since then said the same thing. Selling a boilerplate no longer makes sense.
+
+So I am following that thought to its end instead of going back and forth. goilerplate is free and open source, like shadcn-templ. I no longer sell code. I build ops, which deploys and backs up the apps goilerplate makes, on your own servers. Code is free, running it is the business.
+
+If you bought goilerplate or templUI Pro: thank you. Everything you generated keeps working, and you get ops Hosted at half price for as long as you use it.
+
 - `goilerplate new` renders the project on your machine. It needs no login and no network.
 - `goilerplate update` downloads the template your project was made with from the Go module proxy and merges with Git on your machine, as before. Updates work for projects made with v4 or newer. Projects made with v3 keep working; they do not update to v4.
 - `login`, `logout`, `whoami`, `claim`, `license` and `account` are gone.

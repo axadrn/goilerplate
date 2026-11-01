@@ -97,10 +97,14 @@ jobs:
       - name: Test the stack builder script
         run: node --test site/test/configurator.test.js
 
-      - name: Build the site
+      - name: Build the CSS and start the site
         run: |
           tailwindcss -i site/assets/css/globals.css -o site/assets/css/output.css --minify
-          go run ./site/cmd/build -stars=false
+          go build -o "$RUNNER_TEMP/site" ./site/cmd/server
+          "$RUNNER_TEMP/site" -stars=false -addr 127.0.0.1:8090 &
+          for i in $(seq 30); do curl --fail --silent --output /dev/null http://127.0.0.1:8090/healthz && break; sleep 1; done
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8090/
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8090/docs/installation
 
   generated-project:
     name: generated / ${{ matrix.config }}

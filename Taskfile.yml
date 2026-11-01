@@ -2,21 +2,48 @@ version: "3"
 
 tasks:
   dev:
-    desc: Build the website and serve it on the first free port from 8090, or APP_PORT
+    desc: Run the website with hot reload, also reachable from other machines
     vars:
       APP_PORT:
         sh: go run ./site/cmd/devport {{if .APP_PORT}}-port '{{.APP_PORT}}'{{else}}-start 8090{{end}}
+      DEV_PORT:
+        sh: go run ./site/cmd/devport {{if .DEV_PORT}}-port '{{.DEV_PORT}}'{{else}}-start 7331{{end}}
     cmds:
-      - task: site:build
-      - 'echo "Local: http://localhost:{{.APP_PORT}}"'
-      - go run ./site/cmd/server -dir site/dist -addr 127.0.0.1:{{.APP_PORT}}
+      - 'echo "Local:   http://localhost:{{.DEV_PORT}}"'
+      - 'echo "Network: http://$(hostname):{{.DEV_PORT}}"'
+      - task: dev:run
+        vars: {APP_PORT: "{{.APP_PORT}}", DEV_PORT: "{{.DEV_PORT}}"}
 
-  site:build:
-    desc: Build the website into site/dist
+  dev:run:
+    internal: true
+    deps:
+      - task: tailwind
+      - task: templ
+        vars: {APP_PORT: "{{.APP_PORT}}", DEV_PORT: "{{.DEV_PORT}}"}
+      - task: dev:reload
+        vars: {DEV_PORT: "{{.DEV_PORT}}"}
+
+  templ:
+    desc: Run templ with the server and hot reload
     cmds:
-      - go tool templ generate -path site
-      - tailwindcss -i site/assets/css/globals.css -o site/assets/css/output.css --minify
-      - go run ./site/cmd/build
+      - go tool templ generate --path site --watch --proxy="http://localhost:{{.APP_PORT}}" --proxyport={{.DEV_PORT}} --proxybind=0.0.0.0 --open-browser=false --cmd="sh -c 'cd .. && go run ./site/cmd/server -dev -stars=false -addr 127.0.0.1:{{.APP_PORT}}'"
+
+  tailwind:
+    desc: Build the CSS and keep it current
+    cmds:
+      - tailwindcss -i site/assets/css/globals.css -o site/assets/css/output.css --watch=always
+
+  # The server reads the Markdown again on every request in dev. A changed
+  # page or stylesheet only needs the browser to reload.
+  dev:reload:
+    internal: true
+    watch: true
+    sources:
+      - content/**/*.md
+      - CHANGELOG.md
+      - site/assets/css/output.css
+    cmds:
+      - go tool templ generate --notify-proxy --proxyport={{.DEV_PORT}}
 
   test:
     desc: Run every check CI runs on Go code

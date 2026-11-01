@@ -25,6 +25,5 @@
 /generator/_template/web.svelte/node_modules/
 /generator/_template/web.svelte/.svelte-kit/
 
-# Built by the site build: the CSS and the rendered pages.
+# Built by Tailwind.
 /site/assets/css/output.css
-/site/dist/

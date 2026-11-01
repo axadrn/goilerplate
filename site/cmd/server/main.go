@@ -1,40 +1,68 @@
-// Command server serves the built website: the files in a directory, the
-// redirects of old URLs, a 404 page and a plain answer for CLIs from before
-// v4, which still call the retired API.
+// Command server is the goilerplate website: it renders the templ pages on
+// every request, serves the assets, the docs also as Markdown, the sitemap,
+// robots.txt and llms.txt, redirects old URLs, and gives CLIs from before v4,
+// which still call the retired API, a plain answer. Run it from the
+// repository root after templ generate and the Tailwind build.
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/a-h/templ"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
+
 	"github.com/axadrn/goilerplate/v4/site/brand"
+	"github.com/axadrn/goilerplate/v4/site/docs"
+	"github.com/axadrn/goilerplate/v4/site/githubstars"
+	"github.com/axadrn/goilerplate/v4/site/sitectx"
+	"github.com/axadrn/goilerplate/v4/site/ui/pages"
 )
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		os.Exit(healthcheck())
 	}
-	dir := flag.String("dir", "dist", "directory with the built site")
 	addr := flag.String("addr", ":8090", "address to listen on")
+	content := flag.String("content", "content", "directory with the docs and legal Markdown")
+	changelog := flag.String("changelog", "CHANGELOG.md", "the changelog to publish")
+	assets := flag.String("assets", "site/assets", "directory with the built assets")
+	stars := flag.Bool("stars", true, "ask GitHub for the star count of the repo every hour")
+	dev := flag.Bool("dev", false, "read the Markdown again on every request")
 	flag.Parse()
 
+	site, err := newSite(*content, *changelog, *assets, *dev)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if *stars {
+		go site.fetchStars()
+	}
 	server := &http.Server{
 		Addr:              *addr,
-		Handler:           newSite(*dir),
+		Handler:           site,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	log.Printf("serving %s on %s", *dir, *addr)
+	log.Printf("serving the site on %s", *addr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
@@ -75,11 +103,151 @@ var prefixRedirects = []struct{ prefix, target string }{
 }
 
 type site struct {
-	dir string
+	content, changelog, assets string
+	dev                        bool
+	stars                      atomic.Int64
+
+	mu    sync.Mutex
+	pages *markdown
 }
 
-func newSite(dir string) http.Handler {
-	return &site{dir: dir}
+// markdown is everything the site reads from Markdown files.
+type markdown struct {
+	docs      map[string]docsPage
+	tree      *docs.DocPage
+	privacy   *docs.LegalPage
+	changelog string
+	llms      string
+	sitemap   []byte
+}
+
+type docsPage struct {
+	page, prev, next *docs.DocPage
+}
+
+func newSite(content, changelog, assets string, dev bool) (*site, error) {
+	if _, err := os.Stat(filepath.Join(assets, "css", "output.css")); err != nil {
+		return nil, errors.New(assets + "/css/output.css is missing: build the CSS with Tailwind first")
+	}
+	s := &site{content: content, changelog: changelog, assets: assets, dev: dev}
+	read, err := s.read()
+	if err != nil {
+		return nil, err
+	}
+	s.pages = read
+	return s, nil
+}
+
+// markdown returns the Markdown pages, read again in dev so an edit shows
+// on the next reload.
+func (s *site) markdown() (*markdown, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.dev {
+		read, err := s.read()
+		if err != nil {
+			return nil, err
+		}
+		s.pages = read
+	}
+	return s.pages, nil
+}
+
+func (s *site) read() (*markdown, error) {
+	result := &markdown{docs: map[string]docsPage{}}
+
+	source, err := os.ReadFile(s.changelog)
+	if err != nil {
+		return nil, fmt.Errorf("read changelog: %w", err)
+	}
+	converter := goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithRendererOptions(html.WithUnsafe()))
+	var rendered bytes.Buffer
+	if err := converter.Convert(source, &rendered); err != nil {
+		return nil, fmt.Errorf("render changelog: %w", err)
+	}
+	result.changelog = rendered.String()
+
+	service := docs.NewDocsService(s.content, brand.SupportEmail)
+	result.tree, err = service.DocsTree()
+	if err != nil {
+		return nil, fmt.Errorf("read docs: %w", err)
+	}
+	var llms strings.Builder
+	fmt.Fprintf(&llms, "# %s\n\n> %s. One command writes a production Go SaaS onto your machine: login, billing, teams, admin, an API and tests.\n\n## Documentation\n\n", brand.Name, brand.Tagline)
+	paths := []string{"/", "/new", "/changelog"}
+	for _, page := range service.FlatDocsList() {
+		urlPath := docsPath(page)
+		prev, next := service.PrevNextPages(page)
+		result.docs[urlPath] = docsPage{page: page, prev: prev, next: next}
+		paths = append(paths, urlPath)
+		description := strings.TrimSpace(page.Description)
+		if description == "" {
+			description = "goilerplate documentation"
+		}
+		fmt.Fprintf(&llms, "- [%s](%s%s.md): %s\n", page.Title, brand.URL, urlPath, description)
+	}
+	fmt.Fprintf(&llms, "\n## Product\n\n- [Stack builder](%s/new): Choose the stack and copy the matching goilerplate new command.\n- [Changelog](%s/changelog): What shipped, newest first.\n- [Source](https://github.com/%s): The CLI, the generator and this website.\n", brand.URL, brand.URL, githubstars.Repo)
+	result.llms = llms.String()
+
+	legal := docs.NewLegalService(s.content, brand.SupportEmail)
+	if err := legal.LoadPages(); err != nil {
+		return nil, fmt.Errorf("read legal pages: %w", err)
+	}
+	result.privacy, err = legal.Page("privacy")
+	if err != nil {
+		return nil, fmt.Errorf("read privacy policy: %w", err)
+	}
+	paths = append(paths, "/legal/privacy")
+
+	result.sitemap, err = sitemap(paths)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// docsPath is the URL of a docs page; the introduction is /docs.
+func docsPath(page *docs.DocPage) string {
+	if page.Slug == "" || page.Slug == "introduction" {
+		return "/docs"
+	}
+	return "/docs/" + page.Slug
+}
+
+func sitemap(paths []string) ([]byte, error) {
+	type url struct {
+		Loc string `xml:"loc"`
+	}
+	type urlset struct {
+		XMLName xml.Name `xml:"urlset"`
+		XMLNS   string   `xml:"xmlns,attr"`
+		URLs    []url    `xml:"url"`
+	}
+	set := urlset{XMLNS: "http://www.sitemaps.org/schemas/sitemap/0.9"}
+	for _, p := range paths {
+		set.URLs = append(set.URLs, url{Loc: brand.URL + strings.TrimSuffix(p, "/")})
+	}
+	content, err := xml.MarshalIndent(set, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(xml.Header), append(content, '\n')...), nil
+}
+
+// fetchStars keeps the star count in the navbar fresh. Without GitHub the
+// navbar shows none.
+func (s *site) fetchStars() {
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		count, err := githubstars.Fetch(ctx, &http.Client{})
+		cancel()
+		if err != nil {
+			log.Printf("GitHub stars unavailable: %v", err)
+		} else {
+			s.stars.Store(int64(count))
+		}
+		time.Sleep(time.Hour)
+	}
 }
 
 func (s *site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -112,51 +280,93 @@ func (s *site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	name, ok := s.resolve(clean)
-	if !ok {
-		s.notFound(w, r)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if strings.HasPrefix(clean, "/assets/") {
+		s.asset(w, r, strings.TrimPrefix(clean, "/assets/"))
 		return
 	}
-	if strings.HasPrefix(clean, "/assets/") {
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-	} else {
-		w.Header().Set("Cache-Control", "public, max-age=300")
-	}
-	if strings.HasSuffix(name, ".md") {
-		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-	}
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	http.ServeFile(w, r, name)
-}
 
-// resolve finds the file for a clean path: the file itself, or the page
-// rendered for it, such as docs/installation.html for /docs/installation.
-func (s *site) resolve(clean string) (string, bool) {
-	if clean == "/" {
-		clean = "/index"
-	}
-	base := filepath.Join(s.dir, filepath.FromSlash(clean))
-	for _, candidate := range []string{base, base + ".html"} {
-		info, err := os.Stat(candidate)
-		if err == nil && info.Mode().IsRegular() {
-			return candidate, true
-		}
-	}
-	return "", false
-}
-
-func (s *site) notFound(w http.ResponseWriter, r *http.Request) {
-	page, err := os.ReadFile(filepath.Join(s.dir, "404.html"))
+	md, err := s.markdown()
 	if err != nil {
-		http.NotFound(w, r)
+		log.Printf("read Markdown: %v", err)
+		http.Error(w, "the site cannot read its pages", http.StatusInternalServerError)
+		return
+	}
+	switch clean {
+	case "/":
+		s.render(w, r, http.StatusOK, pages.Landing())
+		return
+	case "/new":
+		s.render(w, r, http.StatusOK, pages.Configurator())
+		return
+	case "/changelog":
+		s.render(w, r, http.StatusOK, pages.Changelog(md.changelog))
+		return
+	case "/legal/privacy":
+		s.render(w, r, http.StatusOK, pages.Legal(md.privacy))
+		return
+	case "/robots.txt":
+		s.text(w, r, "text/plain; charset=utf-8", []byte("User-agent: *\nAllow: /\nSitemap: "+brand.URL+"/sitemap.xml\n"))
+		return
+	case "/sitemap.xml":
+		s.text(w, r, "application/xml; charset=utf-8", md.sitemap)
+		return
+	case "/llms.txt":
+		s.text(w, r, "text/plain; charset=utf-8", []byte(md.llms))
+		return
+	}
+	if page, ok := md.docs[clean]; ok {
+		s.render(w, r, http.StatusOK, pages.Docs(page.page, md.tree, page.prev, page.next))
+		return
+	}
+	if page, ok := md.docs[strings.TrimSuffix(clean, ".md")]; ok && strings.HasSuffix(clean, ".md") {
+		s.text(w, r, "text/markdown; charset=utf-8", []byte(page.page.Content))
+		return
+	}
+	s.render(w, r, http.StatusNotFound, pages.NotFound())
+}
+
+func (s *site) render(w http.ResponseWriter, r *http.Request, status int, component templ.Component) {
+	ctx := sitectx.With(r.Context(), sitectx.Page{Path: r.URL.Path, Stars: int(s.stars.Load())})
+	var buffer bytes.Buffer
+	if err := component.Render(ctx, &buffer); err != nil {
+		log.Printf("render %s: %v", r.URL.Path, err)
+		http.Error(w, "the page could not be rendered", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusNotFound)
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	w.WriteHeader(status)
 	if r.Method != http.MethodHead {
-		_, _ = w.Write(page)
+		_, _ = w.Write(buffer.Bytes())
 	}
+}
+
+func (s *site) text(w http.ResponseWriter, r *http.Request, contentType string, body []byte) {
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(body)
+	}
+}
+
+// asset serves what the pages load. The Tailwind input files and any Go or
+// Markdown files stay private; output.css is the stylesheet.
+func (s *site) asset(w http.ResponseWriter, r *http.Request, name string) {
+	private := strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".go") ||
+		(strings.HasPrefix(name, "css/") && name != "css/output.css")
+	file := filepath.Join(s.assets, filepath.FromSlash(name))
+	info, err := os.Stat(file)
+	if private || err != nil || !info.Mode().IsRegular() {
+		s.render(w, r, http.StatusNotFound, pages.NotFound())
+		return
+	}
+	if s.dev {
+		w.Header().Set("Cache-Control", "no-cache")
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+	}
+	http.ServeFile(w, r, file)
 }
 
 // retiredAPI answers CLIs from before v4 in the error format they print.
