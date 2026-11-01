@@ -116,7 +116,7 @@ func renderTree(template generator.Template, configuration generator.Config, des
 func (a *App) printUpdateResult(result projectupdate.Result) {
 	if !a.StyledOutput {
 		fmt.Fprintf(a.Out, "Created %s\n", result.Branch)
-		fmt.Fprintf(a.Out, "%d files updated cleanly\n", len(result.Updated))
+		fmt.Fprintf(a.Out, "%s updated cleanly\n", files(len(result.Updated)))
 		for _, name := range result.Updated {
 			fmt.Fprintf(a.Out, "  %s\n", name)
 		}
@@ -124,7 +124,7 @@ func (a *App) printUpdateResult(result projectupdate.Result) {
 			fmt.Fprintf(a.Out, "Review it with: git switch %s\n", result.Branch)
 			return
 		}
-		fmt.Fprintf(a.Out, "%d files need conflict resolution\n", len(result.Conflicts))
+		fmt.Fprintf(a.Out, "%s conflict resolution\n", needFiles(len(result.Conflicts)))
 		for _, name := range result.Conflicts {
 			fmt.Fprintf(a.Out, "  %s\n", name)
 		}
@@ -135,7 +135,7 @@ func (a *App) printUpdateResult(result projectupdate.Result) {
 	a.printHeading("update")
 	fmt.Fprintln(a.Out)
 	a.printSuccess("Created " + result.Branch)
-	a.printField("Updated", fmt.Sprintf("%d files", len(result.Updated)))
+	a.printField("Updated", files(len(result.Updated)))
 	for _, name := range result.Updated {
 		a.printListItem(name)
 	}
@@ -143,10 +143,26 @@ func (a *App) printUpdateResult(result projectupdate.Result) {
 		a.printField("Review with", "git switch "+result.Branch)
 		return
 	}
-	a.printWarning(fmt.Sprintf("%d files need conflict resolution", len(result.Conflicts)))
+	a.printWarning(needFiles(len(result.Conflicts)) + " conflict resolution")
 	for _, name := range result.Conflicts {
 		a.printListItem(name)
 	}
 	a.printField("Switch with", "git switch "+result.Branch)
 	a.printInfo("Resolve the normal Git conflict markers, then commit the result")
+}
+
+// files counts files in plain English: "1 file", "3 files".
+func files(n int) string {
+	if n == 1 {
+		return "1 file"
+	}
+	return fmt.Sprintf("%d files", n)
+}
+
+// needFiles is "1 file needs" or "3 files need".
+func needFiles(n int) string {
+	if n == 1 {
+		return "1 file needs"
+	}
+	return files(n) + " need"
 }

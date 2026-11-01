@@ -135,8 +135,9 @@ templ configuratorStep(number, title string) {
 
 // configuratorCode is a command with a copy button, the ids the script uses.
 templ configuratorCode(id, command, label string) {
-	<div class="ops-term relative overflow-hidden rounded-[18px] bg-terminal text-terminal-foreground">
-		<button type="button" id={ id + "-copy" } class="absolute top-2.5 right-2.5 inline-flex size-8 cursor-pointer items-center justify-center rounded-full text-terminal-foreground/60 transition-colors hover:bg-terminal-foreground/10 hover:text-terminal-foreground" aria-label={ label }>
+	<div class="ops-term flex items-start overflow-hidden rounded-[18px] bg-terminal text-terminal-foreground">
+		<pre class="min-w-0 flex-1 overflow-x-auto py-4 pl-5 font-mono text-[13px] leading-6 sm:text-[14px]"><code id={ id + "-command" }>{ command }</code></pre>
+		<button type="button" id={ id + "-copy" } class="m-2.5 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-terminal-foreground/60 transition-colors hover:bg-terminal-foreground/10 hover:text-terminal-foreground" aria-label={ label }>
 			<span data-copy-icon>
 				@icon.Copy(icon.Props{Class: "size-4"})
 			</span>
@@ -144,7 +145,6 @@ templ configuratorCode(id, command, label string) {
 				@icon.Check(icon.Props{Class: "size-4"})
 			</span>
 		</button>
-		<pre class="overflow-x-auto px-5 py-4 pr-14 font-mono text-[13px] leading-6 sm:text-[14px]"><code id={ id + "-command" }>{ command }</code></pre>
 		<p id={ id + "-copy-status" } class="sr-only" aria-live="polite">{ label }</p>
 	</div>
 }

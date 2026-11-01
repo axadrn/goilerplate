@@ -64,9 +64,9 @@ October 30, 2026
 
 AI made a free starter pointless: anyone can generate the easy 80% in an afternoon. What takes weeks is the last 20%: billing that survives webhooks, tenant isolation, admin tools, and updates that keep coming. That is the product, so it is the only thing goilerplate sells now.
 
-- The Free edition is closed. Every account that existed before today got the full license, for free. Run `goilerplate whoami` to see it.
+- The Free edition is closed. Every account that existed before today got the full license, for free.
 - `goilerplate new` needs a license and has no `--edition` flag anymore. The wizard starts at the project directory and asks every module question. `--payment` is `stripe` or `polar`.
-- `goilerplate whoami` shows your license status. `goilerplate doctor` shows only the template version.
+- `goilerplate doctor` shows only the template version.
 - `goilerplate new --help` prints the help for `new`.
 - Projects generated with the Free edition cannot run `goilerplate update`, because there is no Free template to update to. Generate a new project with `goilerplate new` and move your code over.
 - shadcn-templ v2.0.0 is stable.
@@ -236,15 +236,13 @@ Free is $0 forever with unlimited local projects.
 
 It includes Go, templ, Tailwind CSS, shadcn-templ, htmx 4 or Datastar 1, SQLite, SMTP, authentication, security defaults, tests, and CI.
 
-Generate it. Run it. Read every file. Pay only when the Paid modules earn their place.
+Generate it. Run it. Read every file.
 
 ### v1, v2, and templUI Pro customers are already in
 
 Every goilerplate v1, goilerplate v2, and templUI Pro license is already a Paid v3 license with lifetime updates.
 
 No new purchase. No renewal. Your v3 access is already active.
-
-Sign in with GitHub and run `goilerplate whoami`. If the GitHub email differs from the purchase email, run `goilerplate claim <purchase email>`.
 
 The legacy repository stays archived and read-only with its complete releases and tags.
 
