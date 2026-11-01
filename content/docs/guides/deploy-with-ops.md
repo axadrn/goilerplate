@@ -31,7 +31,7 @@ Your database stays a plain SQLite file on that server. ops copies every change 
 - A data browser: tables, rows and SQL, in the browser, the CLI, a terminal UI and MCP.
 - Deploy logs, app logs and roll back in one click.
 
-Postgres projects deploy too. Backups, restore and the data browser are for SQLite.
+This guide is for SQLite projects. In a Postgres project, compose.yml only starts the local dev database, so ops would deploy that instead of your app. Deploy a Postgres project with the [Deployment](/docs/guides/deployment) guide.
 
 ## 1. Install the CLI
 
