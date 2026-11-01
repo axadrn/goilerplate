@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -30,7 +31,13 @@ type Result struct {
 	Conflicts []string
 }
 
+// minimumGitMinor is the first Git 2.x release with merge-tree --write-tree.
+const minimumGitMinor = 38
+
 func Open(ctx context.Context, directory string) (Repository, error) {
+	if err := checkGitVersion(ctx, directory); err != nil {
+		return Repository{}, err
+	}
 	output, err := runGit(ctx, directory, nil, "rev-parse", "--show-toplevel", "HEAD", "HEAD^{tree}")
 	if err != nil {
 		return Repository{}, errors.New("goilerplate update requires a Git repository with at least one commit")
@@ -48,6 +55,42 @@ func Open(ctx context.Context, directory string) (Repository, error) {
 		return Repository{}, errors.New("goilerplate update requires a clean Git worktree")
 	}
 	return Repository{Root: root, Head: strings.TrimSpace(lines[1]), HeadTree: strings.TrimSpace(lines[2])}, nil
+}
+
+func checkGitVersion(ctx context.Context, directory string) error {
+	output, err := runGit(ctx, directory, nil, "version")
+	if err != nil {
+		return errors.New("goilerplate update requires Git, but running git failed: " + err.Error())
+	}
+	version, ok := gitVersion(output)
+	if !ok {
+		return nil
+	}
+	if version[0] < 2 || version[0] == 2 && version[1] < minimumGitMinor {
+		return fmt.Errorf("goilerplate update requires Git 2.%d or newer, this machine has Git %d.%d. Update Git and run goilerplate update again", minimumGitMinor, version[0], version[1])
+	}
+	return nil
+}
+
+// gitVersion reads major and minor from output like "git version 2.39.5 (Apple Git-154)".
+func gitVersion(output string) ([2]int, bool) {
+	fields := strings.Fields(output)
+	if len(fields) < 3 || fields[0] != "git" || fields[1] != "version" {
+		return [2]int{}, false
+	}
+	parts := strings.SplitN(fields[2], ".", 3)
+	if len(parts) < 2 {
+		return [2]int{}, false
+	}
+	var version [2]int
+	for index := range version {
+		number, err := strconv.Atoi(parts[index])
+		if err != nil {
+			return [2]int{}, false
+		}
+		version[index] = number
+	}
+	return version, true
 }
 
 func Merge(ctx context.Context, repository Repository, oldRoot, newRoot, targetVersion string) (Result, error) {

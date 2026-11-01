@@ -172,3 +172,20 @@ func runTestGit(t *testing.T, directory string, arguments ...string) string {
 	}
 	return string(output)
 }
+
+func TestGitVersion(t *testing.T) {
+	cases := map[string][2]int{
+		"git version 2.34.1\n":                 {2, 34},
+		"git version 2.39.5 (Apple Git-154)\n": {2, 39},
+		"git version 2.45.2.windows.1\n":       {2, 45},
+	}
+	for output, want := range cases {
+		got, ok := gitVersion(output)
+		if !ok || got != want {
+			t.Fatalf("gitVersion(%q) = %v, %v", output, got, ok)
+		}
+	}
+	if _, ok := gitVersion("something else"); ok {
+		t.Fatal("gitVersion accepted unknown output")
+	}
+}
