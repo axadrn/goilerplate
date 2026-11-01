@@ -20,7 +20,8 @@ import (
 )
 
 // Footer is the brand with the tagline, three link groups, the credits and
-// the social links.
+// the social links. It lays out by its own width, not the viewport: in the
+// docs it sits next to the sidebar.
 func Footer() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -38,14 +39,14 @@ func Footer() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<footer class=\"border-t\"><div class=\"mx-auto w-full max-w-[1240px] px-4 py-12 sm:px-8 md:py-16\"><div class=\"grid gap-10 md:grid-cols-[1.35fr_1fr_1fr_1fr]\"><div><a href=\"/\" aria-label=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<footer class=\"@container border-t\"><div class=\"mx-auto w-full max-w-[1240px] px-4 py-12 sm:px-8 md:py-16\"><div class=\"grid gap-10 @3xl:grid-cols-[1.35fr_1fr_1fr_1fr]\"><div><a href=\"/\" aria-label=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(brand.Name + " home").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 20, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 21, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -66,7 +67,7 @@ func Footer() templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(brand.Tagline)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 23, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 24, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -162,20 +163,20 @@ func Footer() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"mt-12 grid gap-4 border-t pt-6 text-sm text-muted-foreground md:grid-cols-[auto_1fr_auto] md:items-center\"><p>© ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"mt-12 grid gap-4 border-t pt-6 text-sm text-muted-foreground @3xl:grid-cols-[auto_1fr_auto] @3xl:items-center\"><p>© ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(time.Now().Year()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 42, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 43, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " <a href=\"https://x.com/axadrn\" target=\"_blank\" rel=\"me noopener\" class=\"transition-colors hover:text-foreground\">Axel Adrian</a></p><p class=\"md:text-center\">Go Gopher by <a href=\"https://go.dev/blog/gopher\" target=\"_blank\" rel=\"noopener\" class=\"transition-colors hover:text-foreground\">Renée French</a>, adapted under <a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\" rel=\"license noopener\" class=\"transition-colors hover:text-foreground\">CC BY 4.0</a>.</p><div class=\"flex items-center gap-1 md:justify-end\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " <a href=\"https://x.com/axadrn\" target=\"_blank\" rel=\"me noopener\" class=\"transition-colors hover:text-foreground\">Axel Adrian</a></p><p class=\"@3xl:text-center\">Go Gopher by <a href=\"https://go.dev/blog/gopher\" target=\"_blank\" rel=\"noopener\" class=\"transition-colors hover:text-foreground\">Renée French</a>, adapted under <a href=\"https://creativecommons.org/licenses/by/4.0/\" target=\"_blank\" rel=\"license noopener\" class=\"transition-colors hover:text-foreground\">CC BY 4.0</a>.</p><div class=\"flex items-center gap-1 @3xl:justify-end\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -256,7 +257,7 @@ func footerGroup(title string) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 63, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 64, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -303,7 +304,7 @@ func footerLink(href, label string, external bool) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(href)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 70, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 71, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 			if templ_7745c5c3_Err != nil {
@@ -316,7 +317,7 @@ func footerLink(href, label string, external bool) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 71, Col: 10}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 72, Col: 10}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -338,7 +339,7 @@ func footerLink(href, label string, external bool) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(href)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 75, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 76, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 			if templ_7745c5c3_Err != nil {
@@ -351,7 +352,7 @@ func footerLink(href, label string, external bool) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 75, Col: 119}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/footer.templ`, Line: 76, Col: 119}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {

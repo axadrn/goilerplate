@@ -38,10 +38,10 @@ templ Docs(currentPage *docs.DocPage, docsTree *docs.DocPage, prevPage *docs.Doc
 				</div>
 				<nav class="flex items-center gap-1" aria-label="Documentation navigation">
 					@docsSearch(docsTree)
-					@button.Button(button.Props{Href: "/new", Variant: button.VariantGhost, Class: "hidden text-muted-foreground md:inline-flex"}) {
+					@button.Button(button.Props{Href: "/new", Variant: button.VariantGhost, Class: "hidden text-muted-foreground lg:inline-flex"}) {
 						Builder
 					}
-					@button.Button(button.Props{Href: "/changelog", Variant: button.VariantGhost, Class: "hidden text-muted-foreground md:inline-flex"}) {
+					@button.Button(button.Props{Href: "/changelog", Variant: button.VariantGhost, Class: "hidden text-muted-foreground lg:inline-flex"}) {
 						Changelog
 					}
 					@button.Button(button.Props{Href: blocks.GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Class: "hidden text-muted-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": brand.Name + " on GitHub"}}) {
@@ -325,7 +325,7 @@ templ docsPageActions(node *docs.DocPage) {
 
 templ docsPager(page *docs.DocPage, label string, next bool) {
 	<a href={ templ.SafeURL(docsPageURL(page)) } class="group">
-		@card.Card(card.Props{Size: card.SizeSm, Class: utils.IfElse(next, "sm:items-end sm:text-right", "")}) {
+		@card.Card(card.Props{Size: card.SizeSm, Class: utils.IfElse(next, "sm:text-right", "")}) {
 			@card.Header(card.HeaderProps{Class: utils.IfElse(next, "sm:justify-items-end", "")}) {
 				@card.Description() {
 					{ label }

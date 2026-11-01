@@ -47,7 +47,7 @@ templ Navbar() {
 				<a href="/" class="text-[1.3rem] leading-none transition-opacity hover:opacity-75 sm:text-[1.45rem]" aria-label={ brand.Name + " home" }>
 					@Brand("navbar", "")
 				</a>
-				<div class="hidden items-center gap-0.5 md:flex">
+				<div class="hidden items-center gap-0.5 lg:flex">
 					for _, item := range navItems {
 						@button.Button(button.Props{Href: item.Href, Variant: button.VariantGhost, Class: "text-muted-foreground"}) {
 							{ item.Label }
@@ -56,20 +56,20 @@ templ Navbar() {
 				</div>
 			</div>
 			<div class="flex items-center gap-1">
-				@button.Button(button.Props{Href: GitHubURL, Target: "_blank", Variant: button.VariantGhost, Class: "hidden text-muted-foreground md:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": brand.Name + " on GitHub"}}) {
+				@button.Button(button.Props{Href: GitHubURL, Target: "_blank", Variant: button.VariantGhost, Class: "hidden text-muted-foreground lg:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": brand.Name + " on GitHub"}}) {
 					@icons.GitHub(18)
 					if stars := sitectx.Stars(ctx); stars > 0 {
 						<span class="tabular-nums">{ githubstars.Short(stars) }</span>
 					}
 				}
-				<div class="hidden md:block">
+				<div class="hidden lg:block">
 					@ThemeSwitcher(ThemeSwitcherProps{Class: "text-muted-foreground"})
 				</div>
-				@button.Button(button.Props{Href: "/docs/installation", Size: button.SizeLg, Class: "ml-1"}) {
+				@button.Button(button.Props{Href: "/docs/installation", Size: button.SizeLg, Class: "ml-1 hidden sm:inline-flex"}) {
 					Get started
 				}
 				@sheet.Sheet(sheet.Props{ID: "mobile-nav"}) {
-					@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeIconLg, Class: "md:hidden", Attributes: utils.MergeAttributes(sheet.Trigger(ctx), templ.Attributes{"aria-label": "Open menu"})}) {
+					@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeIconLg, Class: "lg:hidden", Attributes: utils.MergeAttributes(sheet.Trigger(ctx), templ.Attributes{"aria-label": "Open menu"})}) {
 						@icon.Menu(icon.Props{Class: "size-5"})
 					}
 					@sheet.Content(sheet.ContentProps{Side: sheet.SideRight, Class: "w-full gap-0 sm:max-w-sm"}) {

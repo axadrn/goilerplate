@@ -11,11 +11,12 @@ import (
 )
 
 // Footer is the brand with the tagline, three link groups, the credits and
-// the social links.
+// the social links. It lays out by its own width, not the viewport: in the
+// docs it sits next to the sidebar.
 templ Footer() {
-	<footer class="border-t">
+	<footer class="@container border-t">
 		<div class="mx-auto w-full max-w-[1240px] px-4 py-12 sm:px-8 md:py-16">
-			<div class="grid gap-10 md:grid-cols-[1.35fr_1fr_1fr_1fr]">
+			<div class="grid gap-10 @3xl:grid-cols-[1.35fr_1fr_1fr_1fr]">
 				<div>
 					<a href="/" aria-label={ brand.Name + " home" } class="inline-flex text-[1.8rem] leading-none transition-opacity hover:opacity-75">
 						@Brand("footer", "")
@@ -37,15 +38,15 @@ templ Footer() {
 					@footerLink("/docs/support", "Support", false)
 				}
 			</div>
-			<div class="mt-12 grid gap-4 border-t pt-6 text-sm text-muted-foreground md:grid-cols-[auto_1fr_auto] md:items-center">
+			<div class="mt-12 grid gap-4 border-t pt-6 text-sm text-muted-foreground @3xl:grid-cols-[auto_1fr_auto] @3xl:items-center">
 				<p>
 					© { strconv.Itoa(time.Now().Year()) }
 					<a href="https://x.com/axadrn" target="_blank" rel="me noopener" class="transition-colors hover:text-foreground">Axel Adrian</a>
 				</p>
-				<p class="md:text-center">
+				<p class="@3xl:text-center">
 					Go Gopher by <a href="https://go.dev/blog/gopher" target="_blank" rel="noopener" class="transition-colors hover:text-foreground">Renée French</a>, adapted under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="license noopener" class="transition-colors hover:text-foreground">CC BY 4.0</a>.
 				</p>
-				<div class="flex items-center gap-1 md:justify-end">
+				<div class="flex items-center gap-1 @3xl:justify-end">
 					@button.Button(button.Props{Href: "https://x.com/goilerplate", Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Class: "text-muted-foreground", Attributes: templ.Attributes{"rel": "me noopener", "aria-label": brand.Name + " on X"}}) {
 						@icons.X(16)
 					}
