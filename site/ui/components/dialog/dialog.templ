@@ -174,7 +174,7 @@ templ Overlay(props ...OverlayProps) {
 		data-slot="dialog-overlay"
 		role="presentation"
 		style="user-select: none; -webkit-user-select: none;"
-		class={ utils.CN("data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs fixed inset-0 isolate z-50", p.Class) }
+		class={ utils.CN("data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/30 duration-100 supports-backdrop-filter:backdrop-blur-sm fixed inset-0 isolate z-50", p.Class) }
 		{ p.Attributes... }
 	></div>
 }
@@ -208,7 +208,7 @@ templ Content(props ...ContentProps) {
 			}
 			class={
 				utils.CN(
-					"bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-5 rounded-[22px] p-6 text-sm ring-1 shadow-[0_24px_64px_-16px_oklch(0_0_0/0.35)] duration-100 sm:max-w-sm fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
+					"bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/5 dark:ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-6 rounded-4xl p-6 text-sm shadow-xl ring-1 duration-100 sm:max-w-md fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
 					p.Class,
 				),
 			}
@@ -219,7 +219,7 @@ templ Content(props ...ContentProps) {
 				@button.Button(button.Props{
 					Variant: button.VariantGhost,
 					Size:    button.SizeIconSm,
-					Class:   "absolute top-2 right-2",
+					Class:   "absolute top-4 right-4 bg-secondary",
 					Attributes: templ.Attributes{
 						"data-slot":             "dialog-close",
 						"data-templ-dialog-close": "",
@@ -243,7 +243,7 @@ templ Header(props ...HeaderProps) {
 			id={ p.ID }
 		}
 		data-slot="dialog-header"
-		class={ utils.CN("gap-2 flex flex-col", p.Class) }
+		class={ utils.CN("gap-1.5 flex flex-col", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
@@ -260,7 +260,7 @@ templ Footer(props ...FooterProps) {
 			id={ p.ID }
 		}
 		data-slot="dialog-footer"
-		class={ utils.CN("bg-muted/40 -mx-6 -mb-6 rounded-b-[22px] border-t px-6 py-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", p.Class) }
+		class={ utils.CN("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
@@ -280,7 +280,7 @@ templ Title(props ...TitleProps) {
 		}
 		data-slot="dialog-title"
 		data-templ-dialog-title
-		class={ utils.CN("text-lg leading-none font-semibold tracking-tight", p.Class) }
+		class={ utils.CN("text-base leading-none font-medium font-heading", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }

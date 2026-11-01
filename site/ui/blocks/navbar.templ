@@ -1,60 +1,71 @@
 package blocks
 
 import (
-	"fmt"
-
 	"github.com/axadrn/goilerplate/v4/site/brand"
 	"github.com/axadrn/goilerplate/v4/site/githubstars"
 	"github.com/axadrn/goilerplate/v4/site/sitectx"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/button"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/sheet"
 	"github.com/axadrn/goilerplate/v4/site/ui/icons"
+	"github.com/axadrn/goilerplate/v4/site/ui/utils"
 )
 
 // GitHubURL is the open source repository of goilerplate.
 const GitHubURL = "https://github.com/" + githubstars.Repo
 
-// Wordmark is the brand name in the display face with a terminal cursor.
-templ Wordmark(class ...string) {
-	<span class={ "inline-flex items-baseline gap-[0.12em] font-display text-foreground", class }>
-		{ brand.Name }
-		<span aria-hidden="true" class="inline-block h-[1ex] w-[0.34em] rounded-[1.5px] bg-foreground"></span>
-	</span>
+// OpsURL is ops, which deploys and backs up the apps goilerplate makes.
+const OpsURL = "https://ops.goilerplate.com"
+
+// ShadcnTemplURL is the component library every page is built with.
+const ShadcnTemplURL = "https://shadcn-templ.com"
+
+// navItem is one link of the main navigation.
+type navItem struct {
+	Href, Label string
 }
 
-templ navLink(href, label string) {
-	<a href={ templ.SafeURL(href) } class="rounded-full px-3.5 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">{ label }</a>
+var navItems = []navItem{
+	{"/docs", "Docs"},
+	{"/new", "Builder"},
+	{OpsURL, "Ops"},
+	{"/changelog", "Changelog"},
 }
 
+// Navbar is the floating pill with the egg emblem, the main links, GitHub,
+// the theme and the way in.
 templ Navbar() {
 	<header class="sticky top-0 z-50 px-3 pt-3 sm:px-6">
-		<nav class="mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-4 rounded-full bg-card pr-2 pl-6 sm:h-16 sm:pl-7" aria-label="Main">
+		<nav class="mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-4 rounded-full bg-card pr-2 pl-5 sm:h-16 sm:pl-7" aria-label="Main">
 			<div class="flex items-center gap-6">
-				<a href="/" class="text-[21px] leading-none" aria-label={ brand.Name + " home" }>
-					@Wordmark()
+				<a href="/" class="text-[1.3rem] leading-none transition-opacity hover:opacity-75 sm:text-[1.45rem]" aria-label={ brand.Name + " home" }>
+					@Brand("navbar", "")
 				</a>
 				<div class="hidden items-center gap-0.5 md:flex">
-					@navLink("/docs", "Docs")
-					@navLink("/new", "Stack builder")
-					@navLink("/changelog", "Changelog")
+					for _, item := range navItems {
+						@button.Button(button.Props{Href: item.Href, Variant: button.VariantGhost, Class: "text-muted-foreground"}) {
+							{ item.Label }
+						}
+					}
 				</div>
 			</div>
 			<div class="flex items-center gap-1">
-				{{ stars := sitectx.Stars(ctx) }}
-				<a href={ templ.SafeURL(GitHubURL) } target="_blank" rel="noopener" class={ "hidden h-10 items-center justify-center gap-1.5 rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:inline-flex", templ.KV("w-10", stars == 0), templ.KV("px-3.5", stars > 0) } aria-label={ brand.Name + " on GitHub" } data-github-stars={ fmt.Sprint(stars) }>
-					@icons.Github(icons.Props{Class: "size-[18px]"})
-					if stars > 0 {
-						<span class="text-[13px] font-semibold tabular-nums">{ githubstars.Short(stars) }</span>
+				@button.Button(button.Props{Href: GitHubURL, Target: "_blank", Variant: button.VariantGhost, Class: "hidden text-muted-foreground md:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": brand.Name + " on GitHub"}}) {
+					@icons.GitHub(18)
+					if stars := sitectx.Stars(ctx); stars > 0 {
+						<span class="tabular-nums">{ githubstars.Short(stars) }</span>
 					}
-				</a>
+				}
 				<div class="hidden md:block">
-					@ThemeSwitcher(ThemeSwitcherProps{Class: "size-10 rounded-full text-muted-foreground hover:text-foreground"})
+					@ThemeSwitcher(ThemeSwitcherProps{Class: "text-muted-foreground"})
 				</div>
-				<a href="/docs/installation" class="ml-1 inline-flex h-10 items-center rounded-full bg-brand px-5 text-[14px] font-semibold text-brand-foreground transition-opacity hover:opacity-85 sm:h-12 sm:px-6">Get started</a>
+				@button.Button(button.Props{Href: "/docs/installation", Size: button.SizeLg, Class: "ml-1"}) {
+					Get started
+				}
 				@sheet.Sheet(sheet.Props{ID: "mobile-nav"}) {
-					<button type="button" class="inline-flex size-10 items-center justify-center rounded-full text-foreground hover:bg-secondary md:hidden" aria-label="Open menu" { sheet.Trigger(ctx)... }>
+					@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeIconLg, Class: "md:hidden", Attributes: utils.MergeAttributes(sheet.Trigger(ctx), templ.Attributes{"aria-label": "Open menu"})}) {
 						@icon.Menu(icon.Props{Class: "size-5"})
-					</button>
+					}
 					@sheet.Content(sheet.ContentProps{Side: sheet.SideRight, Class: "w-full gap-0 sm:max-w-sm"}) {
 						@MobileNav()
 					}
@@ -73,17 +84,19 @@ templ MobileLink(href, label string) {
 
 templ MobileNav() {
 	<div class="flex h-full flex-col">
-		<div class="flex h-16 shrink-0 items-center border-b px-6 text-[22px] leading-none">
-			@Wordmark()
+		<div class="flex h-16 shrink-0 items-center border-b px-6 text-[1.45rem] leading-none">
+			@Brand("mobile-nav", "")
 		</div>
 		<div class="flex-1 overflow-y-auto px-6 pt-1">
-			@MobileLink("/docs", "Docs")
-			@MobileLink("/new", "Stack builder")
-			@MobileLink("/changelog", "Changelog")
+			for _, item := range navItems {
+				@MobileLink(item.Href, item.Label)
+			}
 			@MobileLink(GitHubURL, "GitHub")
 		</div>
 		<div class="space-y-2.5 border-t p-6">
-			<a href="/docs/installation" class="flex h-12 w-full items-center justify-center rounded-full bg-brand text-[15px] font-semibold text-brand-foreground">Get started</a>
+			@button.Button(button.Props{Href: "/docs/installation", Size: button.SizeLg, Class: "flex w-full"}) {
+				Get started
+			}
 			<div class="flex items-center justify-between pt-3">
 				<span class="text-sm text-muted-foreground">Theme</span>
 				@ThemeSwitcher()

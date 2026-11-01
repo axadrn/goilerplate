@@ -1,0 +1,21 @@
+{
+  "scripts": {
+    "dir": "assets/js",
+    "path": "/assets/js"
+  },
+  "$schema": "https://shadcn-templ.com/schema/components.json",
+  "style": "base-luma",
+  "tailwind": {
+    "css": "assets/css/globals.css",
+    "baseColor": "stone",
+    "cssVariables": true
+  },
+  "rtl": false,
+  "iconLibrary": "lucide",
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "aliases": {
+    "components": "github.com/axadrn/goilerplate/v4/site/ui/components",
+    "utils": "github.com/axadrn/goilerplate/v4/site/ui/utils"
+  }
+}

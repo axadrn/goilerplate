@@ -3,8 +3,17 @@ package pages
 import (
 	"github.com/axadrn/goilerplate/v4/generator"
 	"github.com/axadrn/goilerplate/v4/site/brand"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/badge"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/button"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/card"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/checkbox"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/field"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/input"
+	selectcomp "github.com/axadrn/goilerplate/v4/site/ui/components/select"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/separator"
 	"github.com/axadrn/goilerplate/v4/site/ui/layouts"
+	"github.com/axadrn/goilerplate/v4/site/ui/utils"
 )
 
 // Configurator is the stack builder: the form writes the goilerplate new
@@ -17,32 +26,68 @@ templ Configurator() {
 	}) {
 		<main>
 			<section class="pt-16 sm:pt-28">
-				<div class={ homeWrap }>
-					<h1 class={ homeDisplay, "text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
-						<span class="block">Your stack.</span>
-						<span class="block">One command.</span>
-					</h1>
-					<p class="mt-7 max-w-[34rem] text-lg leading-8 text-muted-foreground sm:mt-9 sm:text-xl sm:leading-9">
-						Pick what your app needs. Copy the command. It runs on your machine, with no account.
-					</p>
+				<div class={ homeWrap, "grid gap-12 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end" }>
+					<div>
+						<h1 class={ homeDisplay, "text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
+							<span class="block">Your stack.</span>
+							<span class="block">One command.</span>
+						</h1>
+						<p class="mt-7 max-w-[34rem] text-lg leading-8 text-muted-foreground sm:mt-9 sm:text-xl sm:leading-9">
+							Pick your stack. Generate only what you need. It runs on your machine, with no account.
+						</p>
+						<div class="mt-8 flex flex-wrap gap-2">
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								1 install
+							}
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								2 choose
+							}
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								3 run
+							}
+							@badge.Badge() {
+								AGENTS.md included
+							}
+						</div>
+					</div>
+					@card.Card(card.Props{Class: "hidden lg:flex", Attributes: templ.Attributes{"aria-hidden": "true"}}) {
+						@card.Header() {
+							@card.Description() {
+								Example stack
+							}
+						}
+						@card.Content() {
+							<dl class="divide-y text-sm">
+								@stackSpec("Frontend", "Datastar 1.0")
+								@stackSpec("Database", "PostgreSQL")
+								@stackSpec("Payments", "Stripe")
+								@stackSpec("Email", "Resend")
+								@stackSpec("Modules", "Workspaces")
+								@stackSpec("OAuth", "Google and GitHub")
+							</dl>
+						}
+					}
 				</div>
 			</section>
 			<section id="configurator" class="pt-12 pb-32 sm:pt-16 sm:pb-44">
 				<div class={ homeWrap, "grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]" }>
 					<div class="grid min-w-0 gap-3">
-						@configuratorStep("1", "Install") {
+						@configuratorStep("1", "Install the CLI") {
 							@configuratorCode("configurator-install", brand.Install, "Copy the install command")
 							<p class="mt-4 text-[15px] leading-7 text-muted-foreground">Go 1.26 or newer, Git and Task, on macOS, Linux or WSL. <a href="/docs/installation" class="font-medium text-foreground underline underline-offset-4">Installation guide</a></p>
 						}
-						@configuratorStep("2", "Choose") {
+						@configuratorStep("2", "Choose your stack") {
 							<form id="configurator-form" class="grid gap-8" autocomplete="off">
 								<div class="grid gap-4 sm:grid-cols-2">
 									@configuratorInput("name", "Project name", "My App", "sm:col-span-2", false)
 									@configuratorInput("module", "Go module", "example.com/my-app", "", true)
 									@configuratorInput("destination", "New folder", "./my-app", "", true)
 								</div>
-								<div class="grid gap-4 border-t border-border pt-8">
-									<p class="text-[15px] font-semibold">Frontend and API</p>
+								@field.Separator()
+								@field.Set() {
+									@field.Legend() {
+										Frontend and API
+									}
 									@configuratorSelect("framework", "Frontend", []configuratorChoice{{string(generator.FrameworkHTMX), "htmx 4.0"}, {string(generator.FrameworkDatastar), "Datastar 1.0"}, {string(generator.FrameworkSvelte), "SvelteKit"}, {string(generator.FrameworkHeadless), "Headless"}})
 									<div class="grid gap-3 sm:grid-cols-2">
 										@configuratorToggle("api", "JSON API", "Endpoints under /api/v1 for mobile apps and integrations, on the same services as your web app.", false)
@@ -50,17 +95,23 @@ templ Configurator() {
 									</div>
 									<p data-headless-note hidden class="text-[15px] leading-7 text-muted-foreground">Headless is the Go backend with the JSON API and no native frontend. It always includes the API. Blog and docs need a native frontend.</p>
 									<p data-svelte-note hidden class="text-[15px] leading-7 text-muted-foreground">SvelteKit is a static app in <code class="font-mono">web/</code> on the JSON API, embedded and served by the Go binary. It always includes the API. Blog and docs need a server rendered frontend.</p>
-								</div>
-								<div class="grid gap-4 border-t border-border pt-8">
-									<p class="text-[15px] font-semibold">Providers</p>
+								}
+								@field.Separator()
+								@field.Set() {
+									@field.Legend() {
+										Providers
+									}
 									<div class="grid gap-4 sm:grid-cols-3">
 										@configuratorSelect("database", "Database", []configuratorChoice{{string(generator.DatabaseSQLite), "SQLite"}, {string(generator.DatabasePostgres), "PostgreSQL"}})
 										@configuratorSelect("payment", "Payments", []configuratorChoice{{string(generator.PaymentStripe), "Stripe"}, {string(generator.PaymentPolar), "Polar"}})
 										@configuratorSelect("mail", "Email", []configuratorChoice{{string(generator.MailSMTP), "SMTP"}, {string(generator.MailResend), "Resend"}})
 									</div>
-								</div>
-								<div class="grid gap-4 border-t border-border pt-8">
-									<p class="text-[15px] font-semibold">Modules</p>
+								}
+								@field.Separator()
+								@field.Set() {
+									@field.Legend() {
+										Modules
+									}
 									<div class="grid gap-3 sm:grid-cols-2">
 										@configuratorToggle("workspaces", "Workspaces", "Shared workspaces with members, roles, invitations, seats and workspace billing.", false)
 										@configuratorToggle("storage", "File storage", "S3 compatible uploads with ownership and validation.", false)
@@ -69,33 +120,27 @@ templ Configurator() {
 										@configuratorToggle("content-blog", "Blog", "Markdown posts, SEO, tags and newsletter capture.", false)
 										@configuratorToggle("content-docs", "Docs", "Markdown docs, navigation and syntax highlighting.", false)
 									</div>
-								</div>
+								}
 							</form>
 						}
-						@configuratorStep("3", "Run") {
+						@configuratorStep("3", "Start your app") {
 							<p class="text-[17px] leading-7 text-muted-foreground">Open the new folder. Copy <code class="font-mono text-foreground">.env.example</code> to <code class="font-mono text-foreground">.env</code>, fill in the settings of your providers, then run <code class="font-mono text-foreground">task dev</code>. Your coding agent reads <code class="font-mono text-foreground">AGENTS.md</code> first.</p>
 						}
 					</div>
 					<aside class="min-w-0">
 						<div class="grid gap-3 lg:sticky lg:top-28">
-							<div class="ops-term overflow-hidden rounded-[24px] bg-terminal text-terminal-foreground">
+							<div class="ops-term overflow-hidden rounded-4xl bg-terminal text-terminal-foreground">
 								<div class="flex items-center justify-between gap-3 border-b border-terminal-foreground/10 px-5 py-3.5">
 									<span class="text-xs text-terminal-foreground/50">macOS · Linux · WSL</span>
-									<button type="button" id="configurator-copy" class="inline-flex size-8 cursor-pointer items-center justify-center rounded-full text-terminal-foreground/60 transition-colors hover:bg-terminal-foreground/10 hover:text-terminal-foreground" aria-label="Copy command">
-										<span data-copy-icon>
-											@icon.Copy(icon.Props{Class: "size-4"})
-										</span>
-										<span data-copy-check class="hidden">
-											@icon.Check(icon.Props{Class: "size-4"})
-										</span>
-									</button>
+									@configuratorCopyButton("configurator-copy", "Copy command", "")
 								</div>
 								<div class="px-5 py-5">
 									<code id="configurator-command" class="block min-w-0 font-mono text-[13px] leading-6 break-words whitespace-pre-wrap sm:text-[14px]">goilerplate new --name 'My App' --module example.com/my-app --framework htmx --database sqlite --payment stripe --mail smtp --oauth google,github ./my-app</code>
 									<p id="configurator-copy-status" class="sr-only" aria-live="polite">Copy command</p>
 								</div>
 							</div>
-							<div class={ homeSurface, "p-6" }>
+							@card.Card() {
+								@card.Content() {
 								<p class="text-sm font-semibold text-muted-foreground">Your stack</p>
 								<div data-stack-preview class="mt-3 flex flex-wrap gap-1.5">
 									@stackChip("htmx 4.0")
@@ -106,12 +151,14 @@ templ Configurator() {
 									@stackChip("Google OAuth")
 									@stackChip("GitHub OAuth")
 								</div>
-								<div class="mt-6 border-t border-border pt-5 font-mono text-[12px] leading-5">
+								@separator.Separator(separator.Props{Class: "mt-6"})
+								<div class="pt-5 font-mono text-[12px] leading-5">
 									<p class="font-semibold">AGENTS.md</p>
 									<p class="text-muted-foreground">## Stack</p>
 									<p data-agents-preview class="text-muted-foreground">- templ, htmx 4.0, vanilla JavaScript, and Tailwind CSS.</p>
 								</div>
-							</div>
+								}
+							}
 						</div>
 					</aside>
 				</div>
@@ -122,44 +169,72 @@ templ Configurator() {
 }
 
 templ configuratorStep(number, title string) {
-	<div class={ homeSurface, "min-w-0 p-7 sm:p-10" }>
-		<p class="flex items-baseline gap-4">
-			<span class="font-mono text-sm text-muted-foreground">{ number }</span>
-			<span class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ title }</span>
-		</p>
-		<div class="mt-6">
+	@card.Card(card.Props{Class: "min-w-0"}) {
+		@card.Header() {
+			@card.Title(card.TitleProps{Class: "flex items-baseline gap-4"}) {
+				<span class="font-mono text-sm font-normal text-muted-foreground">{ number }</span>
+				<span class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ title }</span>
+			}
+		}
+		@card.Content() {
 			{ children... }
-		</div>
-	</div>
+		}
+	}
 }
 
 // configuratorCode is a command with a copy button, the ids the script uses.
 templ configuratorCode(id, command, label string) {
-	<div class="ops-term flex items-start overflow-hidden rounded-[18px] bg-terminal text-terminal-foreground">
+	<div class="ops-term flex items-start overflow-hidden rounded-3xl bg-terminal text-terminal-foreground">
 		<pre class="min-w-0 flex-1 overflow-x-auto py-4 pl-5 font-mono text-[13px] leading-6 sm:text-[14px]"><code id={ id + "-command" }>{ command }</code></pre>
-		<button type="button" id={ id + "-copy" } class="m-2.5 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-terminal-foreground/60 transition-colors hover:bg-terminal-foreground/10 hover:text-terminal-foreground" aria-label={ label }>
-			<span data-copy-icon>
-				@icon.Copy(icon.Props{Class: "size-4"})
-			</span>
-			<span data-copy-check class="hidden">
-				@icon.Check(icon.Props{Class: "size-4"})
-			</span>
-		</button>
+		@configuratorCopyButton(id+"-copy", label, "m-2.5")
 		<p id={ id + "-copy-status" } class="sr-only" aria-live="polite">{ label }</p>
 	</div>
 }
 
+// stackChip is one part of the chosen stack. configurator.js copies the
+// classes of the first chip for the chips it renders.
 templ stackChip(label string) {
-	<span class="rounded-full bg-secondary px-3 py-1 font-mono text-[12px]">{ label }</span>
+	@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "stack-tag font-mono"}) {
+		{ label }
+	}
 }
 
-const configuratorControl = "h-11 w-full rounded-xl border border-input bg-background px-3.5 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+// configuratorCopyButton is the copy button of a command. configurator.js
+// finds it by id and swaps the two icons.
+templ configuratorCopyButton(id, label, class string) {
+	@button.Button(button.Props{
+		ID:         id,
+		Variant:    button.VariantGhost,
+		Size:       button.SizeIcon,
+		Class:      utils.CN("shrink-0 text-terminal-foreground/60 hover:text-terminal-foreground dark:hover:text-terminal-foreground", class),
+		Attributes: templ.Attributes{"aria-label": label},
+	}) {
+		<span data-copy-icon>
+			@icon.Copy(icon.Props{Class: "size-4"})
+		</span>
+		<span data-copy-check class="hidden">
+			@icon.Check(icon.Props{Class: "size-4"})
+		</span>
+	}
+}
+
+// configuratorControl lets the inputs and select triggers fill their column.
+const configuratorControl = "w-full"
 
 templ configuratorInput(name, label, value, class string, mono bool) {
-	<label class={ "grid gap-2", class }>
-		<span class="text-sm font-medium text-muted-foreground">{ label }</span>
-		<input id={ "configurator-" + name } name={ name } value={ value } required maxlength="240" spellcheck="false" class={ configuratorControl, templ.KV("font-mono", mono) }/>
-	</label>
+	@field.Field(field.Props{Class: class}) {
+		@field.Label(field.LabelProps{For: "configurator-" + name}) {
+			{ label }
+		}
+		@input.Input(input.Props{
+			ID:         "configurator-" + name,
+			Name:       name,
+			Value:      value,
+			Required:   true,
+			Class:      utils.CN(configuratorControl, utils.IfElse(mono, "font-mono", "")),
+			Attributes: templ.Attributes{"maxlength": "240", "spellcheck": "false"},
+		})
+	}
 }
 
 type configuratorChoice struct {
@@ -167,23 +242,58 @@ type configuratorChoice struct {
 	Label string
 }
 
+// configuratorSelect is a select of the library. Its hidden input carries
+// the name, so the form reads it like a native select.
 templ configuratorSelect(name, label string, choices []configuratorChoice) {
-	<label class="grid gap-2">
-		<span class="text-sm font-medium text-muted-foreground">{ label }</span>
-		<select id={ "configurator-" + name } name={ name } class={ configuratorControl, "cursor-pointer" }>
-			for _, choice := range choices {
-				<option value={ choice.Value }>{ choice.Label }</option>
+	@field.Field() {
+		@field.Label(field.LabelProps{For: "configurator-" + name}) {
+			{ label }
+		}
+		@selectcomp.Select(selectcomp.Props{
+			Name:         name,
+			DefaultValue: choices[0].Value,
+			Items:        utils.Map(choices, func(c configuratorChoice) selectcomp.ItemData { return selectcomp.ItemData{Value: c.Value, Label: c.Label} }),
+		}) {
+			@selectcomp.Trigger(selectcomp.TriggerProps{ID: "configurator-" + name, Class: configuratorControl}) {
+				@selectcomp.Value()
 			}
-		</select>
-	</label>
+			@selectcomp.Content(selectcomp.ContentProps{AlignItemWithTrigger: utils.Ptr(false), Align: selectcomp.AlignStart}) {
+				@selectcomp.Group() {
+					@selectcomp.Label() {
+						{ label }
+					}
+					for _, choice := range choices {
+						@selectcomp.Item(selectcomp.ItemProps{Value: choice.Value}) {
+							{ choice.Label }
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
+// configuratorToggle is a checkbox card. configurator.js locks it through
+// the hidden input and the checkbox root right before it.
 templ configuratorToggle(name, label, description string, checked bool) {
-	<label for={ "configurator-" + name } class="flex cursor-pointer items-start gap-3.5 rounded-[18px] bg-background p-4 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
-		<input type="checkbox" id={ "configurator-" + name } name={ name } checked?={ checked } class="mt-1 size-4 shrink-0 cursor-pointer accent-foreground"/>
-		<span class="grid gap-1">
-			<span class="text-[15px] font-semibold">{ label }</span>
-			<span class="text-[14px] leading-6 text-muted-foreground">{ description }</span>
-		</span>
-	</label>
+	@field.Label(field.LabelProps{For: "configurator-" + name}) {
+		@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
+			@checkbox.Checkbox(checkbox.Props{ID: "configurator-" + name, Name: name, DefaultChecked: checked})
+			@field.Content() {
+				@field.Title() {
+					{ label }
+				}
+				@field.Description() {
+					{ description }
+				}
+			}
+		}
+	}
+}
+
+templ stackSpec(label, value string) {
+	<div class="flex items-center justify-between gap-4 py-3">
+		<dt class="text-muted-foreground">{ label }</dt>
+		<dd class="font-medium">{ value }</dd>
+	</div>
 }

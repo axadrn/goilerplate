@@ -1,69 +1,26 @@
 package pages
 
 import (
-	"strconv"
-
-	"github.com/axadrn/goilerplate/v4/site/ui/layouts"
-
-	"github.com/axadrn/goilerplate/v4/site/ui/blocks"
-	"github.com/axadrn/goilerplate/v4/site/ui/components"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/button"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
+	"github.com/axadrn/goilerplate/v4/site/ui/layouts"
 )
-
-templ ErrorPage(status int, title, description string) {
-	<!DOCTYPE html>
-	<html lang="en" data-nonce={ templ.GetNonce(ctx) }>
-		<head>
-			<meta charset="UTF-8"/>
-			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<meta name="robots" content="noindex, nofollow"/>
-			<title>{ title }</title>
-			<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"/>
-			<script nonce={ templ.GetNonce(ctx) }>
-				const theme = localStorage.getItem('theme') || 'system';
-				const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-				document.documentElement.classList.toggle('dark', dark);
-			</script>
-			<link href="/assets/css/output.css" rel="stylesheet"/>
-			@components.Scripts()
-		</head>
-		<body class="style-nova min-h-screen">
-			@StatusScreen(strconv.Itoa(status), title, description, strconv.Itoa(status)+" "+title)
-		</body>
-	</html>
-}
-
-// StatusScreen is the full page for 404s and errors: a big code, what
-// happened in words, and the way back.
-templ StatusScreen(code, title, description, line string) {
-	<div class="flex min-h-svh flex-col bg-background">
-		<header class="mx-auto flex h-20 w-full max-w-6xl items-center px-5 sm:px-8">
-			<a href="/" class="text-[22px] leading-none">
-				@blocks.Wordmark()
-			</a>
-		</header>
-		<main class="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-5 pb-24 sm:px-8">
-			<p class="font-display text-[clamp(5rem,18vw,12rem)] leading-none text-foreground/[0.12]">{ code }</p>
-			<h1 class="mt-6 max-w-2xl font-display text-[clamp(2rem,5vw,3.25rem)] leading-[1.02] tracking-[-0.03em] text-balance">{ title }</h1>
-			<p class="mt-4 max-w-lg text-lg leading-7 text-muted-foreground">{ description }</p>
-			<p class="mt-8 inline-flex max-w-full items-center gap-2 self-start overflow-hidden rounded-full bg-terminal px-4 py-2 font-mono text-[12px] text-terminal-foreground">
-				<span class="text-failed">✗</span>
-				<span class="truncate">{ line }</span>
-			</p>
-			<div class="mt-10 flex flex-wrap gap-3">
-				<a href="/" class="inline-flex h-12 items-center gap-2 rounded-full bg-brand px-6 text-[15px] font-semibold text-brand-foreground transition-opacity hover:opacity-85">
-					@icon.ArrowLeft(icon.Props{Class: "size-4"})
-					Back to home
-				</a>
-				<a href="/docs" class="inline-flex h-12 items-center rounded-full border px-6 text-[15px] font-medium transition-colors hover:bg-accent">Read the docs</a>
-			</div>
-		</main>
-	</div>
-}
 
 // NotFound is the 404 page the server answers for every unknown path.
 templ NotFound() {
-	@layouts.Base(layouts.SEOProps{Title: "Not found", Description: "This page does not exist.", Path: "/404", NoIndex: true}) {
-		@StatusScreen("404", "This page does not exist.", "The address is wrong or the page has moved.", "404 not found")
+	@layouts.Home(layouts.SEOProps{Title: "Page not found", Description: "This page does not exist.", Path: "/404", NoIndex: true}) {
+		<main class="flex min-h-[70svh] items-center justify-center px-5 py-20">
+			<div class="max-w-lg text-center">
+				<p class="font-mono text-sm text-muted-foreground">404</p>
+				<h1 class={ homeDisplay, "mt-6 text-[clamp(3rem,10vw,5.5rem)] text-balance" }>This route shipped somewhere else.</h1>
+				<p class="mx-auto mt-8 max-w-md text-lg leading-8 text-muted-foreground text-pretty">The page is gone or the URL is wrong. The product is still right where it should be.</p>
+				<div class="mt-10 flex justify-center">
+					@button.Button(button.Props{Href: "/", Size: button.SizeLg}) {
+						@icon.ArrowLeft()
+						Back to goilerplate
+					}
+				</div>
+			</div>
+		</main>
 	}
 }

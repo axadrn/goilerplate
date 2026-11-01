@@ -1,163 +1,140 @@
 package pages
 
 import (
+	"fmt"
+
 	"github.com/axadrn/goilerplate/v4/site/brand"
 	"github.com/axadrn/goilerplate/v4/site/sitectx"
 	"github.com/axadrn/goilerplate/v4/site/docs"
 	"github.com/axadrn/goilerplate/v4/site/ui/blocks"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/breadcrumb"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/button"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/card"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/separator"
+	"github.com/axadrn/goilerplate/v4/site/ui/utils"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/collapsible"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
 	"github.com/axadrn/goilerplate/v4/site/ui/icons"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/sidebar"
 	"github.com/axadrn/goilerplate/v4/site/ui/layouts"
-	"fmt"
 )
 
 templ Docs(currentPage *docs.DocPage, docsTree *docs.DocPage, prevPage *docs.DocPage, nextPage *docs.DocPage) {
 	@layouts.Base(layouts.SEOProps{
-		Title:        fmt.Sprintf("%s - Documentation", currentPage.Title),
+		Title:        currentPage.Title + " docs",
 		Description:  currentPage.Description,
 		Path:         sitectx.URLPath(ctx),
 		MarkdownPath: docsMarkdownURL(currentPage),
 	}) {
-		@sidebar.Provider() {
-			@sidebar.Sidebar() {
-				@sidebar.Header(sidebar.HeaderProps{Class: "h-14 justify-center border-b px-4"}) {
-					<a href="/" class="flex items-center gap-2.5 text-[19px] leading-none">
-						@blocks.Wordmark()
-						<span class="rounded-full bg-secondary px-2.5 py-1 text-[12px] font-semibold text-muted-foreground">Docs</span>
+		<header class="fixed inset-x-0 top-0 z-50 border-b bg-background">
+			<div class="flex h-14 w-full items-center justify-between gap-3 px-3 sm:px-5">
+				<div class="flex min-w-0 items-center gap-3">
+					@sidebar.Trigger(sidebar.TriggerProps{Target: "docs-sidebar", Class: "md:hidden"})
+					<a href="/" aria-label={ brand.Name + " home" } class="inline-flex text-[1.3rem] leading-none transition-opacity hover:opacity-75 sm:text-[1.45rem]">
+						@blocks.Brand("docs-header", "")
 					</a>
-				}
-				@sidebar.Content(sidebar.ContentProps{Class: "pt-2"}) {
-					@renderDocsNav(docsTree, currentPage)
+					@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "hidden h-5 sm:block"})
+					<a href="/docs" class="hidden text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground sm:block">Docs</a>
+				</div>
+				<nav class="flex items-center gap-1" aria-label="Documentation navigation">
+					@docsSearch(docsTree)
+					@button.Button(button.Props{Href: "/new", Variant: button.VariantGhost, Class: "hidden text-muted-foreground md:inline-flex"}) {
+						Builder
+					}
+					@button.Button(button.Props{Href: "/changelog", Variant: button.VariantGhost, Class: "hidden text-muted-foreground md:inline-flex"}) {
+						Changelog
+					}
+					@button.Button(button.Props{Href: blocks.GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Class: "hidden text-muted-foreground sm:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": brand.Name + " on GitHub"}}) {
+						@icons.GitHub(17)
+					}
+					@blocks.ThemeSwitcher(blocks.ThemeSwitcherProps{Class: "text-muted-foreground"})
+				</nav>
+			</div>
+		</header>
+		@sidebar.Provider(sidebar.ProviderProps{ID: "docs-sidebar"}) {
+			@sidebar.Sidebar(sidebar.Props{ID: "docs-sidebar", Class: "top-14! h-[calc(100svh-3.5rem)]!"}) {
+				@sidebar.Content(sidebar.ContentProps{Class: "pt-4"}) {
+					<nav aria-label="Documentation pages">
+						@renderDocsNav(docsTree, currentPage)
+					</nav>
 				}
 				@sidebar.Footer(sidebar.FooterProps{Class: "border-t"}) {
 					@sidebar.Menu() {
 						@sidebar.MenuItem() {
-							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: blocks.GitHubURL, Size: sidebar.MenuButtonSizeSm, Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
-								@icons.Github(icons.Props{Class: "size-4"})
-								<span>GitHub</span>
+							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/docs/support", Size: sidebar.MenuButtonSizeSm}) {
+								@icon.MessageCircleQuestionMark()
+								<span>Support</span>
 							}
 						}
 						@sidebar.MenuItem() {
 							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/llms.txt", Size: sidebar.MenuButtonSizeSm, Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
-								@icon.FileText(icon.Props{Class: "size-4"})
+								@icon.FileText()
 								<span>llms.txt</span>
-							}
-						}
-						@sidebar.MenuItem() {
-							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/docs/support", Size: sidebar.MenuButtonSizeSm}) {
-								@icon.MessageCircleQuestionMark(icon.Props{Class: "size-4"})
-								<span>Support</span>
 							}
 						}
 					}
 				}
-				@sidebar.Rail()
 			}
-			@sidebar.Inset(sidebar.InsetProps{Class: "min-w-0 bg-background"}) {
-				// Top Navigation Bar
-				<header class="sticky top-0 z-10 bg-background">
-					<div class="flex h-14 items-center gap-3 px-4 sm:px-6">
-						@sidebar.Trigger()
-						<span class="h-4 w-px bg-border"></span>
-						@templ.Fragment("docs-breadcrumb") {
-							<div id="docs-breadcrumb" class="min-w-0">
-								@breadcrumb.Breadcrumb() {
-									@breadcrumb.List(breadcrumb.ListProps{Class: "flex-nowrap"}) {
-										@breadcrumb.Item(breadcrumb.ItemProps{Class: "hidden sm:inline-flex"}) {
-											@breadcrumb.Link(breadcrumb.LinkProps{Href: "/"}) {
-												{ brand.Name }
-											}
+			@sidebar.Inset(sidebar.InsetProps{Class: "min-w-0 bg-background pt-14"}) {
+				<div class="xl:grid xl:grid-cols-[minmax(0,1fr)_15rem]">
+					<main class="mx-auto min-h-[calc(100svh-3.5rem)] w-full min-w-0 max-w-4xl px-5 py-12 sm:px-8 sm:py-16 lg:px-12">
+						@breadcrumb.Breadcrumb(breadcrumb.Props{Class: "mb-7"}) {
+							@breadcrumb.List() {
+								@breadcrumb.Item() {
+									if docsPageURL(currentPage) != "/docs" {
+										@breadcrumb.Link(breadcrumb.LinkProps{Href: "/docs"}) {
+											Docs
 										}
-										@breadcrumb.Item() {
-											@breadcrumb.Separator(breadcrumb.SeparatorProps{Class: "hidden sm:inline-flex"})
-											if docsPageURL(currentPage) != "/docs" {
-												@breadcrumb.Link(breadcrumb.LinkProps{Href: "/docs"}) {
-													Docs
-												}
-											} else {
-												@breadcrumb.Page() {
-													Docs
-												}
-											}
-										}
-										if docsPageURL(currentPage) != "/docs" {
-											@breadcrumb.Item(breadcrumb.ItemProps{Class: "min-w-0"}) {
-												@breadcrumb.Separator()
-												@breadcrumb.Page() {
-													<span class="block max-w-[46vw] truncate sm:max-w-none">{ currentPage.Title }</span>
-												}
-											}
+									} else {
+										@breadcrumb.Page() {
+											Docs
 										}
 									}
 								}
-							</div>
-						}
-						<div class="ml-auto flex items-center gap-1">
-							@docsSearch(docsTree)
-							<a href={ templ.SafeURL(blocks.GitHubURL) } target="_blank" rel="noopener" class="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground sm:inline-flex" aria-label="goilerplate on GitHub">
-								@icons.Github(icons.Props{Class: "size-4"})
-							</a>
-							@blocks.ThemeSwitcher(blocks.ThemeSwitcherProps{Class: "text-muted-foreground hover:text-foreground"})
-							<a href="/new" class="ml-1.5 inline-flex h-9 items-center rounded-full bg-brand px-4 text-[13.5px] font-semibold text-brand-foreground transition-opacity hover:opacity-85">Stack builder</a>
-						</div>
-					</div>
-				</header>
-				<div class="xl:grid xl:grid-cols-[minmax(0,1fr)_15rem]">
-					<div class="min-w-0">
-						<main class="min-h-[calc(100svh-3.5rem)]">
-							// Documentation content with the partial-navigation target wrapper
-							<div class="mx-auto max-w-[46rem] px-5 pt-10 pb-16 sm:px-8 sm:pt-14 xl:mx-0 xl:ml-[max(2rem,calc((100%-46rem)/2))]" id="docs-content-wrapper">
-								@templ.Fragment("docs-content") {
-									// Documentation Content
-									<article id="docs-content" style="--docs-heading-offset: 80px;">
-										// Page Title
-										<div class="mb-10 border-b border-border pb-8">
-											<h1 class="font-display text-[2.1rem] leading-[1.05] tracking-[-0.03em] text-balance sm:text-[2.6rem]">{ currentPage.Title }</h1>
-											if currentPage.Description != "" {
-												<p class="mt-3 text-lg leading-7 text-muted-foreground text-pretty">{ currentPage.Description }</p>
-											}
-											@docsPageActions(currentPage)
-										</div>
-										// Content
-										<div class="[&_h2]:scroll-mt-[var(--docs-heading-offset)] [&_h3]:scroll-mt-[var(--docs-heading-offset)]">
-											@blocks.Typeset(currentPage.HTMLContent)
-										</div>
-										// Navigation Footer
-										if prevPage != nil || nextPage != nil {
-											<nav class="mt-16 grid gap-3 sm:grid-cols-2" aria-label="Pages">
-												if prevPage != nil {
-													@docsPager(prevPage, "Previous", false)
-												} else {
-													<span class="hidden sm:block"></span>
-												}
-												if nextPage != nil {
-													@docsPager(nextPage, "Next", true)
-												}
-											</nav>
+								if docsPageURL(currentPage) != "/docs" {
+									@breadcrumb.Separator()
+									@breadcrumb.Item(breadcrumb.ItemProps{Class: "min-w-0"}) {
+										@breadcrumb.Page() {
+											<span class="block max-w-[60vw] truncate">{ currentPage.Title }</span>
 										}
-									</article>
+									}
 								}
-							</div>
-						</main>
-						<footer class="border-t border-border">
-							<div class="mx-auto flex max-w-[46rem] flex-col gap-3 px-5 py-6 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8 xl:mx-0 xl:ml-[max(2rem,calc((100%-46rem)/2))]">
-								<a href="/" class="text-[18px] leading-none">
-									@blocks.Wordmark()
-								</a>
-								<div class="flex flex-wrap gap-x-5 gap-y-2">
-									<a href={ templ.SafeURL(blocks.GitHubURL) } target="_blank" rel="noopener" class="transition-colors hover:text-foreground">GitHub</a>
-									<a href="/legal/privacy" class="transition-colors hover:text-foreground">Privacy</a>
+							}
+						}
+						<article id="docs-content" style="--docs-heading-offset: 80px;">
+							<header class="mb-10 border-b pb-8">
+								<div class="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+									<div class="min-w-0">
+										<h1 class="font-display text-[2.1rem] leading-[1.05] text-balance sm:text-5xl">{ currentPage.Title }</h1>
+										if currentPage.Description != "" {
+											<p class="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground text-pretty">{ currentPage.Description }</p>
+										}
+									</div>
+									@docsPageActions(currentPage)
 								</div>
+							</header>
+							<div class="[&_h2]:scroll-mt-[var(--docs-heading-offset)] [&_h3]:scroll-mt-[var(--docs-heading-offset)]">
+								@blocks.Typeset(currentPage.HTMLContent)
 							</div>
-						</footer>
-					</div>
+							if prevPage != nil || nextPage != nil {
+								<nav class="mt-16 grid gap-3 sm:grid-cols-2" aria-label="Previous and next page">
+									if prevPage != nil {
+										@docsPager(prevPage, "Previous", false)
+									} else {
+										<span class="hidden sm:block"></span>
+									}
+									if nextPage != nil {
+										@docsPager(nextPage, "Next", true)
+									}
+								</nav>
+							}
+						</article>
+					</main>
 					@renderPageTOC(currentPage.Headings)
 				</div>
+				@blocks.Footer()
 			}
-			// Partial-navigation active state updater
+		}
 			<script nonce={ templ.GetNonce(ctx) }>
 				let docsTOCScrollHandler = null;
 				// A clicked TOC entry stays active until the reader scrolls
@@ -300,7 +277,6 @@ templ Docs(currentPage *docs.DocPage, docsTree *docs.DocPage, prevPage *docs.Doc
 
 				initDocsTOC();
 			</script>
-		}
 		@blocks.HighlightScripts()
 	}
 }
@@ -330,38 +306,41 @@ func docsMarkdownURL(node *docs.DocPage) string {
 }
 
 templ docsPageActions(node *docs.DocPage) {
-	<div class="mt-5 flex flex-wrap items-center gap-2">
-		<button type="button" data-docs-copy={ docsMarkdownURL(node) } class="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3.5 text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-foreground">
+	<div class="flex shrink-0 flex-wrap items-center gap-2">
+		@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: templ.Attributes{"data-docs-copy": docsMarkdownURL(node)}}) {
 			<span data-copy-default>
-				@icon.Copy(icon.Props{Class: "size-3.5"})
+				@icon.Copy()
 			</span>
-			<span data-copy-success class="hidden text-live">
-				@icon.Check(icon.Props{Class: "size-3.5"})
+			<span data-copy-success class="hidden">
+				@icon.Check()
 			</span>
 			Copy page
-		</button>
-		<a href={ templ.SafeURL(docsMarkdownURL(node)) } target="_blank" rel="noopener" class="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3.5 text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-foreground">
-			@icon.FileText(icon.Props{Class: "size-3.5"})
-			Markdown
-		</a>
+		}
+		@button.Button(button.Props{Href: docsMarkdownURL(node), Target: "_blank", Variant: button.VariantSecondary, Size: button.SizeSm, Attributes: templ.Attributes{"rel": "noopener"}}) {
+			@icon.FileText()
+			View Markdown
+		}
 	</div>
 }
 
 templ docsPager(page *docs.DocPage, label string, next bool) {
-	<a
-		href={ templ.SafeURL(docsPageURL(page)) }
-		class={ "group flex flex-col gap-1 rounded-[20px] bg-card px-6 py-5 transition-opacity hover:opacity-80", templ.KV("sm:items-end sm:text-right", next) }
-	>
-		<span class="text-[13px] text-muted-foreground">{ label }</span>
-		<span class="flex items-center gap-1.5 font-medium">
-			if !next {
-				@icon.ArrowLeft(icon.Props{Class: "size-3.5 text-muted-foreground transition-transform group-hover:-translate-x-0.5"})
+	<a href={ templ.SafeURL(docsPageURL(page)) } class="group">
+		@card.Card(card.Props{Size: card.SizeSm, Class: utils.IfElse(next, "sm:items-end sm:text-right", "")}) {
+			@card.Header(card.HeaderProps{Class: utils.IfElse(next, "sm:justify-items-end", "")}) {
+				@card.Description() {
+					{ label }
+				}
+				@card.Title(card.TitleProps{Class: "flex items-center gap-2"}) {
+					if !next {
+						@icon.ArrowLeft(icon.Props{Class: "size-4 transition-transform group-hover:-translate-x-0.5"})
+					}
+					{ page.Title }
+					if next {
+						@icon.ArrowRight(icon.Props{Class: "size-4 transition-transform group-hover:translate-x-0.5"})
+					}
+				}
 			}
-			{ page.Title }
-			if next {
-				@icon.ArrowRight(icon.Props{Class: "size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5"})
-			}
-		</span>
+		}
 	</a>
 }
 

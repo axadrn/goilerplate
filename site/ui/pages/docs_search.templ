@@ -2,26 +2,29 @@ package pages
 
 import (
 	"github.com/axadrn/goilerplate/v4/site/docs"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/button"
+	"github.com/axadrn/goilerplate/v4/site/ui/utils"
 	commandmenu "github.com/axadrn/goilerplate/v4/site/ui/components/command"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/dialog"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/kbd"
 )
 
 // docsSearch is the ⌘K search of the docs, the same as shadcn's: the
 // library's command dialog with its fuzzy filter over every page and every
 // section of a page. ⌘K, ctrl+K or "/" opens it; enter goes there.
 templ docsSearch(tree *docs.DocPage) {
-	<button
-		type="button"
-		class="inline-flex h-8 w-9 cursor-pointer items-center justify-center gap-2 rounded-lg bg-muted text-[13px] text-muted-foreground transition-colors hover:text-foreground sm:w-56 sm:justify-start sm:px-3"
-		aria-label="Search the docs"
-		data-docs-search-open
-		{ dialog.TriggerFor("docs-search")... }
-	>
-		@icon.Search(icon.Props{Class: "size-4 shrink-0"})
+	@button.Button(button.Props{
+		Variant:    button.VariantSecondary,
+		Class:      "font-normal text-muted-foreground sm:w-56 sm:justify-start",
+		Attributes: utils.MergeAttributes(templ.Attributes{"aria-label": "Search the docs", "data-docs-search-open": true}, dialog.TriggerFor("docs-search")),
+	}) {
+		@icon.Search()
 		<span class="hidden sm:inline">Search the docs…</span>
-		<kbd class="ml-auto hidden rounded border bg-background px-1.5 font-sans text-[11px] font-medium sm:inline">⌘K</kbd>
-	</button>
+		@kbd.Kbd(kbd.Props{Class: "ml-auto hidden sm:inline-flex"}) {
+			⌘K
+		}
+	}
 	@commandmenu.Dialog(commandmenu.DialogProps{
 		ID:          "docs-search",
 		Title:       "Search the docs",

@@ -128,12 +128,16 @@
       "- SvelteKit: a static single-page app in `web/` that the Go binary embeds and serves on the same origin as the JSON API under `/api/v1`.",
   };
 
+  // The server renders the first chips as badges; new chips copy their look.
+  const chipClass = preview && preview.firstElementChild ? preview.firstElementChild.className : "stack-tag";
+
   function renderPreview(currentState) {
     if (preview) {
       preview.replaceChildren(
         ...stackItems(currentState).map((label, index) => {
           const tag = document.createElement("span");
-          tag.className = "stack-tag rounded-full bg-secondary px-3 py-1 font-mono text-[12px]";
+          tag.className = chipClass;
+          tag.dataset.slot = "badge";
           tag.style.setProperty("--i", index);
           tag.textContent = label;
           return tag;

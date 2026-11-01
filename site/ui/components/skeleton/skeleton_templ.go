@@ -69,7 +69,7 @@ func Skeleton(props ...Props) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var3 = []any{utils.CN("bg-muted rounded-md animate-pulse", p.Class)}
+			var templ_7745c5c3_Var3 = []any{utils.CN("bg-muted rounded-2xl animate-pulse", p.Class)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var3...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

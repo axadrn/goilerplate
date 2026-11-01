@@ -71,7 +71,7 @@ templ List(props ...ListProps) {
 		data-slot="breadcrumb-list"
 		class={
 			utils.CN(
-				"text-muted-foreground gap-1.5 text-sm flex flex-wrap items-center wrap-break-word",
+				"text-muted-foreground gap-1.5 text-sm sm:gap-2.5 flex flex-wrap items-center wrap-break-word",
 				p.Class,
 			),
 		}
@@ -93,7 +93,7 @@ templ Item(props ...ItemProps) {
 		data-slot="breadcrumb-item"
 		class={
 			utils.CN(
-				"gap-1 inline-flex items-center",
+				"gap-1.5 inline-flex items-center",
 				p.Class,
 			),
 		}

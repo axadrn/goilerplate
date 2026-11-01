@@ -5,27 +5,73 @@ import (
 	"time"
 
 	"github.com/axadrn/goilerplate/v4/site/brand"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/button"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
+	"github.com/axadrn/goilerplate/v4/site/ui/icons"
 )
 
+// Footer is the brand with the tagline, three link groups, the credits and
+// the social links.
 templ Footer() {
-	<footer class="border-t border-border">
-		<div class="mx-auto flex max-w-[1240px] flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-			<a href="/" class="text-[22px] leading-none" aria-label={ brand.Name + " home" }>
-				@Wordmark()
-			</a>
-			<nav class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground" aria-label="Footer">
-				@footerLink("/docs", "Docs")
-				@footerLink("/changelog", "Changelog")
-				@footerLink(GitHubURL, "GitHub")
-				@footerLink("https://github.com/axadrn/shadcn-templ", "shadcn-templ")
-				@footerLink("https://ops.goilerplate.com", "ops")
-				@footerLink("/legal/privacy", "Privacy")
-				<span>© { strconv.Itoa(time.Now().Year()) } { brand.Name }</span>
-			</nav>
+	<footer class="border-t">
+		<div class="mx-auto w-full max-w-[1240px] px-4 py-12 sm:px-8 md:py-16">
+			<div class="grid gap-10 md:grid-cols-[1.35fr_1fr_1fr_1fr]">
+				<div>
+					<a href="/" aria-label={ brand.Name + " home" } class="inline-flex text-[1.8rem] leading-none transition-opacity hover:opacity-75">
+						@Brand("footer", "")
+					</a>
+					<p class="mt-4 max-w-xs text-sm leading-6 text-muted-foreground">{ brand.Tagline }.</p>
+				</div>
+				@footerGroup("Product") {
+					@footerLink("/new", "Builder", false)
+					@footerLink("/changelog", "Changelog", false)
+					@footerLink(GitHubURL, "GitHub", true)
+				}
+				@footerGroup("Learn") {
+					@footerLink("/docs", "Documentation", false)
+					@footerLink(ShadcnTemplURL, "shadcn-templ", true)
+					@footerLink(OpsURL, "ops", true)
+				}
+				@footerGroup("Legal") {
+					@footerLink("/legal/privacy", "Privacy", false)
+					@footerLink("/docs/support", "Support", false)
+				}
+			</div>
+			<div class="mt-12 grid gap-4 border-t pt-6 text-sm text-muted-foreground md:grid-cols-[auto_1fr_auto] md:items-center">
+				<p>
+					© { strconv.Itoa(time.Now().Year()) }
+					<a href="https://x.com/axadrn" target="_blank" rel="me noopener" class="transition-colors hover:text-foreground">Axel Adrian</a>
+				</p>
+				<p class="md:text-center">
+					Go Gopher by <a href="https://go.dev/blog/gopher" target="_blank" rel="noopener" class="transition-colors hover:text-foreground">Renée French</a>, adapted under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="license noopener" class="transition-colors hover:text-foreground">CC BY 4.0</a>.
+				</p>
+				<div class="flex items-center gap-1 md:justify-end">
+					@button.Button(button.Props{Href: "https://x.com/goilerplate", Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Class: "text-muted-foreground", Attributes: templ.Attributes{"rel": "me noopener", "aria-label": brand.Name + " on X"}}) {
+						@icons.X(16)
+					}
+					@button.Button(button.Props{Href: GitHubURL, Target: "_blank", Variant: button.VariantGhost, Size: button.SizeIcon, Class: "text-muted-foreground", Attributes: templ.Attributes{"rel": "noopener", "aria-label": brand.Name + " on GitHub"}}) {
+						@icons.GitHub(18)
+					}
+				</div>
+			</div>
 		</div>
 	</footer>
 }
 
-templ footerLink(href, label string) {
-	<a href={ templ.SafeURL(href) } class="transition-colors hover:text-foreground">{ label }</a>
+templ footerGroup(title string) {
+	<div class="flex flex-col items-start gap-3">
+		<p class="text-sm font-semibold">{ title }</p>
+		{ children... }
+	</div>
+}
+
+templ footerLink(href, label string, external bool) {
+	if external {
+		<a href={ templ.SafeURL(href) } target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
+			{ label }
+			@icon.ArrowUpRight(icon.Props{Class: "size-3"})
+		</a>
+	} else {
+		<a href={ templ.SafeURL(href) } class="text-sm text-muted-foreground transition-colors hover:text-foreground">{ label }</a>
+	}
 }

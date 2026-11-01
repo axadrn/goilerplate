@@ -204,7 +204,7 @@ func List(props ...ListProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 = []any{utils.CN(
-				"text-muted-foreground gap-1.5 text-sm flex flex-wrap items-center wrap-break-word",
+				"text-muted-foreground gap-1.5 text-sm sm:gap-2.5 flex flex-wrap items-center wrap-break-word",
 				p.Class,
 			),
 			}
@@ -309,7 +309,7 @@ func Item(props ...ItemProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var11 = []any{utils.CN(
-				"gap-1 inline-flex items-center",
+				"gap-1.5 inline-flex items-center",
 				p.Class,
 			),
 			}

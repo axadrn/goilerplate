@@ -120,7 +120,7 @@ templ Command(props ...Props) {
 		data-slot="command"
 		cmdk-root
 		tabindex="-1"
-		class={ utils.CN("bg-popover text-popover-foreground rounded-xl! p-1 flex size-full flex-col overflow-hidden", p.Class) }
+		class={ utils.CN("bg-popover text-popover-foreground rounded-4xl p-1 flex size-full flex-col overflow-hidden", p.Class) }
 		{ p.Attributes... }
 	>
 		// cmdk renders a screen-reader-only label tied to the input.
@@ -157,7 +157,7 @@ templ Dialog(props ...DialogProps) {
 			}
 		}
 		@dialog.Content(dialog.ContentProps{
-			Class:           utils.CN("rounded-xl! top-1/3 translate-y-0 overflow-hidden p-0", p.Class),
+			Class:           utils.CN("rounded-4xl! top-1/3 translate-y-0 overflow-hidden p-0", p.Class),
 			HideCloseButton: !p.ShowCloseButton,
 		}) {
 			{ children... }
@@ -175,7 +175,7 @@ templ Input(props ...InputProps) {
 		{{ p.ID = s.id + "-input" }}
 	}
 	<div data-slot="command-input-wrapper" class="p-1 pb-0">
-		@inputgroup.InputGroup(inputgroup.Props{Class: "bg-input/30 border-input/30 h-8! rounded-lg! shadow-none! *:data-[slot=input-group-addon]:pl-2!"}) {
+		@inputgroup.InputGroup(inputgroup.Props{Class: "bg-input/50 h-9"}) {
 			// A bare input like cmdk's, not inputgroup.Input: shadcn renders
 			// CommandPrimitive.Input directly inside the InputGroup. The
 			// combobox-like aria comes from cmdk (the list is always
@@ -270,7 +270,7 @@ templ Group(props ...GroupProps) {
 		if p.Heading != "" {
 			data-value={ p.Heading }
 		}
-		class={ utils.CN("text-foreground **:[[cmdk-group-heading]]:text-muted-foreground overflow-hidden p-1 **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium", p.Class) }
+		class={ utils.CN("text-foreground **:[[cmdk-group-heading]]:text-muted-foreground overflow-hidden p-1.5 **:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium", p.Class) }
 		{ p.Attributes... }
 	>
 		if p.Heading != "" {
@@ -309,7 +309,7 @@ templ Item(props ...ItemProps) {
 		data-disabled={ utils.IfElse(p.Disabled, "true", "false") }
 		aria-selected="false"
 		data-selected="false"
-		class={ utils.CN("data-selected:bg-muted data-selected:text-foreground data-selected:*:[svg]:text-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! [&_svg:not([class*='size-'])]:size-4 group/command-item data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0", p.Class) }
+		class={ utils.CN("data-selected:bg-muted data-selected:text-foreground data-selected:*:[svg]:text-foreground relative flex cursor-default items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium outline-hidden select-none in-data-[slot=dialog-content]:rounded-3xl [&_svg:not([class*='size-'])]:size-4 group/command-item data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
@@ -345,7 +345,7 @@ templ Separator(props ...SeparatorProps) {
 		if p.AlwaysRender {
 			data-templ-always-render
 		}
-		class={ utils.CN("bg-border -mx-1 h-px", p.Class) }
+		class={ utils.CN("bg-border/50 my-1.5 h-px", p.Class) }
 		{ p.Attributes... }
 	></div>
 }

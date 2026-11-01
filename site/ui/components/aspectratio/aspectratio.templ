@@ -1,0 +1,31 @@
+package aspectratio
+
+import "github.com/axadrn/goilerplate/v4/site/ui/utils"
+
+type Props struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	// Ratio is the aspect ratio as a CSS ratio value, e.g. "16/9".
+	Ratio string
+}
+
+templ AspectRatio(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="aspect-ratio"
+		if p.Ratio != "" {
+			style={ "--ratio: " + p.Ratio }
+		}
+		class={ utils.CN("relative aspect-(--ratio)", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}

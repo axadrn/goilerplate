@@ -1,0 +1,37 @@
+package label
+
+import "github.com/axadrn/goilerplate/v4/site/ui/utils"
+
+type Props struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	For        string
+}
+
+templ Label(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<label
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		if p.For != "" {
+			for={ p.For }
+		}
+		data-slot="label"
+		class={
+			utils.CN(
+				// 1:1 base/ui/label.tsx: structure lives here, the look comes from
+				// the active style-*.css via.
+				"gap-2 text-sm leading-none font-medium group-data-[disabled=true]:opacity-50 peer-disabled:opacity-50 flex items-center select-none group-data-[disabled=true]:pointer-events-none peer-disabled:cursor-not-allowed",
+				p.Class,
+			),
+		}
+		{ p.Attributes... }
+	>
+		{ children... }
+	</label>
+}

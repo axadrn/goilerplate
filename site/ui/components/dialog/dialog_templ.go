@@ -297,7 +297,7 @@ func Overlay(props ...OverlayProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var5 = []any{utils.CN("data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs fixed inset-0 isolate z-50", p.Class)}
+			var templ_7745c5c3_Var5 = []any{utils.CN("data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/30 duration-100 supports-backdrop-filter:backdrop-blur-sm fixed inset-0 isolate z-50", p.Class)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var5...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -455,7 +455,7 @@ func Content(props ...ContentProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var12 = []any{utils.CN(
-					"bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-5 rounded-[22px] p-6 text-sm ring-1 shadow-[0_24px_64px_-16px_oklch(0_0_0/0.35)] duration-100 sm:max-w-sm fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
+					"bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/5 dark:ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-6 rounded-4xl p-6 text-sm shadow-xl ring-1 duration-100 sm:max-w-md fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
 					p.Class,
 				),
 				}
@@ -524,7 +524,7 @@ func Content(props ...ContentProps) templ.Component {
 				templ_7745c5c3_Err = button.Button(button.Props{
 					Variant: button.VariantGhost,
 					Size:    button.SizeIconSm,
-					Class:   "absolute top-2 right-2",
+					Class:   "absolute top-4 right-4 bg-secondary",
 					Attributes: templ.Attributes{
 						"data-slot":               "dialog-close",
 						"data-templ-dialog-close": "",
@@ -601,7 +601,7 @@ func Header(props ...HeaderProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var17 = []any{utils.CN("gap-2 flex flex-col", p.Class)}
+			var templ_7745c5c3_Var17 = []any{utils.CN("gap-1.5 flex flex-col", p.Class)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var17...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -702,7 +702,7 @@ func Footer(props ...FooterProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var21 = []any{utils.CN("bg-muted/40 -mx-6 -mb-6 rounded-b-[22px] border-t px-6 py-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", p.Class)}
+			var templ_7745c5c3_Var21 = []any{utils.CN("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", p.Class)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var21...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -803,7 +803,7 @@ func Title(props ...TitleProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var25 = []any{utils.CN("text-lg leading-none font-semibold tracking-tight", p.Class)}
+			var templ_7745c5c3_Var25 = []any{utils.CN("text-base leading-none font-medium font-heading", p.Class)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var25...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

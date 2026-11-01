@@ -22,8 +22,6 @@ const (
 	VariantSecondary   Variant = "secondary"
 	VariantGhost       Variant = "ghost"
 	VariantLink        Variant = "link"
-	// VariantBrand is the one primary action of a view, in the accent color.
-	VariantBrand Variant = "brand"
 )
 
 const (
@@ -58,7 +56,7 @@ type Props struct {
 
 // 1:1 base/ui/button.tsx: structure lives here, the look comes from the
 // active style-*.css via the classes.
-const baseClasses = "focus-visible:ring-ring/60 focus-visible:ring-offset-background aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-full border border-transparent bg-clip-padding text-sm font-medium tracking-[-0.01em] focus-visible:ring-2 focus-visible:ring-offset-1 aria-invalid:ring-3 active:not-aria-[haspopup]:scale-[0.97] [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-150 outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+const baseClasses = "focus-visible:border-ring focus-visible:ring-ring/30 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-4xl border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
 
 func Button(props ...Props) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -112,7 +110,7 @@ func Button(props ...Props) templ.Component {
 					var templ_7745c5c3_Var2 string
 					templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.ID).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 73, Col: 13}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 71, Col: 13}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 					if templ_7745c5c3_Err != nil {
@@ -130,7 +128,7 @@ func Button(props ...Props) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(p.Href)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 75, Col: 31}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 73, Col: 31}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 				if templ_7745c5c3_Err != nil {
@@ -148,7 +146,7 @@ func Button(props ...Props) templ.Component {
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.Target).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 77, Col: 21}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 75, Col: 21}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 					if templ_7745c5c3_Err != nil {
@@ -242,7 +240,7 @@ func Button(props ...Props) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.ID).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 96, Col: 13}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 94, Col: 13}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 					if templ_7745c5c3_Err != nil {
@@ -295,7 +293,7 @@ func Button(props ...Props) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(string(p.Type)).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 106, Col: 25}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 104, Col: 25}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 					if templ_7745c5c3_Err != nil {
@@ -314,7 +312,7 @@ func Button(props ...Props) templ.Component {
 					var templ_7745c5c3_Var11 string
 					templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.Form).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 109, Col: 17}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/button/button.templ`, Line: 107, Col: 17}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 					if templ_7745c5c3_Err != nil {
@@ -376,41 +374,39 @@ func Variants(p Props) string {
 
 func (b Props) variantClasses() string {
 	switch b.Variant {
-	case VariantBrand:
-		return "bg-brand text-brand-foreground font-semibold hover:bg-brand/85"
 	case VariantDestructive:
-		return "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/40 dark:bg-destructive/15 text-destructive dark:hover:bg-destructive/25"
+		return "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30"
 	case VariantOutline:
-		return "bg-secondary font-semibold text-secondary-foreground hover:bg-[color-mix(in_oklab,var(--secondary),var(--foreground)_8%)] aria-expanded:bg-secondary"
+		return "border-border bg-background dark:bg-transparent hover:bg-muted hover:text-foreground dark:hover:bg-input/30 aria-expanded:bg-muted aria-expanded:text-foreground"
 	case VariantSecondary:
-		return "bg-secondary font-semibold text-secondary-foreground hover:bg-[color-mix(in_oklab,var(--secondary),var(--foreground)_8%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground"
+		return "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground"
 	case VariantGhost:
-		return "text-foreground/80 hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
+		return "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground"
 	case VariantLink:
 		return "text-primary underline-offset-4 hover:underline"
 	default:
-		return "bg-primary text-primary-foreground font-semibold hover:bg-primary/85"
+		return "bg-primary text-primary-foreground hover:bg-primary/80"
 	}
 }
 
 func (b Props) sizeClasses() string {
 	switch b.Size {
 	case SizeXs:
-		return "h-7 gap-1.5 px-3 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3"
+		return "h-6 gap-1 px-2.5 text-xs has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3"
 	case SizeSm:
-		return "h-8 gap-1.5 px-3.5 text-[0.8125rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5"
+		return "h-8 gap-1 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
 	case SizeLg:
-		return "h-10 gap-2 px-5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+		return "h-10 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3"
 	case SizeIcon:
 		return "size-9"
 	case SizeIconXs:
-		return "size-7 in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3.5"
+		return "size-6 [&_svg:not([class*='size-'])]:size-3"
 	case SizeIconSm:
-		return "size-8 in-data-[slot=button-group]:rounded-lg"
+		return "size-8"
 	case SizeIconLg:
 		return "size-10"
 	default:
-		return "h-9 gap-2 px-4 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+		return "h-9 gap-1.5 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5"
 	}
 }
 

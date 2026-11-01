@@ -1,5 +1,4 @@
 package icon
-
 // This file is auto generated
 // Using Lucide icons version 0.576.0
 var AArrowDown = Icon("a-arrow-down")
