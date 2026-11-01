@@ -1,0 +1,171 @@
+package api
+
+import (
+{{- if .IsSvelte }}
+	"errors"
+{{- end }}
+	"net/http"
+	"time"
+
+	"{{.ModulePath}}/internal/ctxkeys"
+{{- if .IsSvelte }}
+	"{{.ModulePath}}/internal/repository"
+{{- end }}
+	"{{.ModulePath}}/internal/service"
+)
+
+// WorkspaceInvitationHandler shows and accepts workspace invitations by
+// the token from the invitation email.
+type WorkspaceInvitationHandler struct {
+	workspaces *service.WorkspaceService
+{{- if .IsSvelte }}
+	cookie     InvitationCookie
+{{- end }}
+}
+
+{{ if .IsSvelte -}}
+func NewWorkspaceInvitationHandler(workspaces *service.WorkspaceService, cookie InvitationCookie) *WorkspaceInvitationHandler {
+	return &WorkspaceInvitationHandler{workspaces: workspaces, cookie: cookie}
+}
+{{- else -}}
+func NewWorkspaceInvitationHandler(workspaces *service.WorkspaceService) *WorkspaceInvitationHandler {
+	return &WorkspaceInvitationHandler{workspaces: workspaces}
+}
+{{- end }}
+
+// InvitationPreview is what the holder of an invitation token may see
+// before accepting it.
+type InvitationPreview struct {
+	WorkspaceName string    `json:"workspace_name"`
+	InviterName   string    `json:"inviter_name"`
+	Role          string    `json:"role"`
+	ExpiresAt     time.Time `json:"expires_at"`
+}
+
+// Show returns the workspace name, the inviter, the role and the expiry of
+// an open invitation. It needs no session.{{ if .IsSvelte }} A guest or an account without
+// a name gets the token in the pending_invitation cookie, so sign-in and
+// onboarding return to it; a signed-in account that sees the invitation
+// clears it.{{ end }}
+func (h *WorkspaceInvitationHandler) Show(w http.ResponseWriter, r *http.Request) {
+{{- if .IsSvelte }}
+	token := r.PathValue("token")
+	invitation, err := h.workspaces.WorkspaceInvitation(token)
+	if err != nil {
+		h.forget(w, r, token, err)
+		ServiceError(w, err)
+		return
+	}
+	user := ctxkeys.User(r.Context())
+	if user == nil || user.Name == "" {
+		h.cookie.Set(w, token)
+	} else if h.cookie.Token(r) == token {
+		h.cookie.Clear(w)
+	}
+{{- else }}
+	invitation, err := h.workspaces.WorkspaceInvitation(r.PathValue("token"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+{{- end }}
+	JSON(w, http.StatusOK, InvitationPreview{
+		WorkspaceName: invitation.WorkspaceName,
+		InviterName:   invitation.InviterName,
+		Role:          invitation.Role,
+		ExpiresAt:     invitation.ExpiresAt.UTC(),
+	})
+}
+
+// Accept adds the signed-in user to the workspace of the invitation and
+// returns the membership.
+func (h *WorkspaceInvitationHandler) Accept(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+{{- if .IsSvelte }}
+	token := r.PathValue("token")
+	workspace, err := h.workspaces.AcceptInvitation(token, user)
+	h.forget(w, r, token, err)
+{{- else }}
+	workspace, err := h.workspaces.AcceptInvitation(r.PathValue("token"), user)
+{{- end }}
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	_, member, err := h.workspaces.BySlugForUser(workspace.Slug, user.ID)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, Membership{Workspace: NewWorkspace(workspace), Role: member.Role})
+}
+{{- if .IsSvelte }}
+
+// forget clears the pending_invitation cookie when it holds token and err
+// is nil or says the invitation cannot be accepted by this browser any more.
+func (h *WorkspaceInvitationHandler) forget(w http.ResponseWriter, r *http.Request, token string, err error) {
+	if h.cookie.Token(r) != token {
+		return
+	}
+	if err == nil ||
+		errors.Is(err, repository.ErrWorkspaceInvitationNotFound) ||
+		errors.Is(err, repository.ErrWorkspaceInvitationExpired) ||
+		errors.Is(err, repository.ErrWorkspaceInvitationRevoked) ||
+		errors.Is(err, repository.ErrWorkspaceInvitationUsed) ||
+		errors.Is(err, repository.ErrWorkspaceInvitationEmail) ||
+		errors.Is(err, repository.ErrAlreadyMember) ||
+		errors.Is(err, repository.ErrSeatLimit) {
+		h.cookie.Clear(w)
+	}
+}
+
+const invitationCookieName = "pending_invitation"
+
+// InvitationCookie keeps the workspace invitation a guest opened in the
+// HttpOnly pending_invitation cookie, like the HTML app. Sign-in and
+// onboarding in another tab of the same browser still lead to it.
+type InvitationCookie struct {
+	secure bool
+}
+
+// NewInvitationCookie returns the cookie helper. secure marks the cookie
+// Secure, which production needs.
+func NewInvitationCookie(secure bool) InvitationCookie {
+	return InvitationCookie{secure: secure}
+}
+
+// Set remembers token for seven days.
+func (c InvitationCookie) Set(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     invitationCookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   7 * 24 * 60 * 60,
+		HttpOnly: true,
+		Secure:   c.secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// Clear forgets the pending invitation.
+func (c InvitationCookie) Clear(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     invitationCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   c.secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// Token returns the pending invitation token of the request, or "".
+func (c InvitationCookie) Token(r *http.Request) string {
+	cookie, err := r.Cookie(invitationCookieName)
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
+}
+{{- end }}

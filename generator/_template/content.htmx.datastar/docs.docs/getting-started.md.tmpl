@@ -1,0 +1,44 @@
+---
+title: "Getting Started"
+description: "A minimal first-run guide with a successful health check"
+order: 2
+---
+
+## Before you begin
+
+This page is intentionally short. A real getting-started guide should get the reader to one visible success before explaining every option.
+
+Copy the environment file:
+
+```bash
+cp .env.example .env
+```
+
+Set the public URL and support address:
+
+```env
+APP_URL=http://localhost:8090
+SUPPORT_EMAIL=support@example.com
+```
+
+## Run the application
+
+```bash
+task dev
+```
+
+Open the local URL printed by the task. The application and asset watchers reload as files change.
+
+## Verify the first request
+
+```bash
+curl --include http://localhost:8090/healthz
+```
+
+The health endpoint returns an empty `204 No Content` response:
+
+```text
+HTTP/1.1 204 No Content
+```
+
+Replace this sample with the shortest path to your product's first meaningful result.

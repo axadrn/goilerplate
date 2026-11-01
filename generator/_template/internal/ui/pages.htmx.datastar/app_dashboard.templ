@@ -1,0 +1,169 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/ui/components/badge"
+	"{{.ModulePath}}/internal/ui/components/card"
+	"{{.ModulePath}}/internal/ui/components/chart"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/layouts"
+)
+
+var dashboardStats = []struct {
+	Label  string
+	Value  string
+	Detail string
+	Icon   string
+}{
+	{Label: "Monthly revenue", Value: "$48,240", Detail: "+12.5% from last month", Icon: "revenue"},
+	{Label: "Active accounts", Value: "2,420", Detail: "+180 this month", Icon: "accounts"},
+	{Label: "Trial conversion", Value: "18.2%", Detail: "+2.4 points this quarter", Icon: "conversion"},
+	{Label: "Support response", Value: "1h 18m", Detail: "Within the 2 hour target", Icon: "support"},
+}
+
+var dashboardRevenueData = []chart.Datum{
+	{"month": "Jan", "revenue": 24800},
+	{"month": "Feb", "revenue": 27100},
+	{"month": "Mar", "revenue": 29600},
+	{"month": "Apr", "revenue": 31400},
+	{"month": "May", "revenue": 33800},
+	{"month": "Jun", "revenue": 35700},
+	{"month": "Jul", "revenue": 38200},
+	{"month": "Aug", "revenue": 40100},
+	{"month": "Sep", "revenue": 42300},
+	{"month": "Oct", "revenue": 44700},
+	{"month": "Nov", "revenue": 46100},
+	{"month": "Dec", "revenue": 48240},
+}
+
+var dashboardAccountsData = []chart.Datum{
+	{"month": "Jul", "trials": 210, "upgrades": 52},
+	{"month": "Aug", "trials": 248, "upgrades": 61},
+	{"month": "Sep", "trials": 232, "upgrades": 58},
+	{"month": "Oct", "trials": 276, "upgrades": 72},
+	{"month": "Nov", "trials": 301, "upgrades": 79},
+	{"month": "Dec", "trials": 324, "upgrades": 88},
+}
+
+var dashboardRevenueConfig = chart.Config{
+	{Key: "revenue", Label: "Revenue", Color: "var(--chart-1)"},
+}
+
+var dashboardAccountsConfig = chart.Config{
+	{Key: "trials", Label: "Trials", Color: "var(--chart-2)"},
+	{Key: "upgrades", Label: "Upgrades", Color: "var(--chart-1)"},
+}
+
+templ Dashboard() {
+	@layouts.App("Dashboard") {
+		@DashboardContent()
+	}
+}
+
+templ DashboardContent() {
+	<div class="space-y-6 p-4 sm:p-6">
+		<div class="flex items-end justify-between gap-4">
+			<div>
+				<h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
+				<p class="mt-2 text-sm text-muted-foreground">A clear starting point for your product's most important signals.</p>
+			</div>
+			@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "hidden font-normal text-muted-foreground sm:inline-flex"}) {
+				<span class="size-2 rounded-full bg-chart-2"></span>
+				Example data
+			}
+		</div>
+		<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+			for _, stat := range dashboardStats {
+				@dashboardStatCard(stat.Label, stat.Value, stat.Detail, stat.Icon)
+			}
+		</div>
+		<div class="grid gap-4 xl:grid-cols-2">
+			@card.Card(card.Props{Class: "gap-0"}) {
+				@card.Header(card.HeaderProps{Class: "border-b pb-4"}) {
+					@card.Title() {
+						Revenue trend
+					}
+					@card.Description() {
+						Monthly recurring revenue over twelve months.
+					}
+					@card.Action() {
+						@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "font-normal text-muted-foreground"}) {
+							@icon.TrendingUp(icon.Props{Class: "size-3"})
+							12.5%
+						}
+					}
+				}
+				@card.Content(card.ContentProps{Class: "pt-4"}) {
+					@chart.Container(chart.ContainerProps{Config: dashboardRevenueConfig, Class: "h-[320px] min-h-[320px] w-full aspect-auto"}) {
+						@chart.AreaChart(chart.AreaChartProps{Data: dashboardRevenueData, AccessibilityLayer: true, Margin: &chart.Margin{Left: 8, Right: 8}}) {
+							@chart.CartesianGrid(chart.CartesianGridProps{Vertical: chart.Bool(false)})
+							@chart.XAxis(chart.XAxisProps{DataKey: "month", TickLine: false, AxisLine: false, TickMargin: 8})
+							@chart.Tooltip(chart.TooltipProps{Cursor: chart.Bool(false), Content: chart.TooltipContentProps{Indicator: "line"}})
+							@chart.Area(chart.AreaProps{DataKey: "revenue", Type: chart.CurveNatural, Fill: "var(--color-revenue)", FillOpacity: 0.2, Stroke: "var(--color-revenue)"})
+						}
+					}
+				}
+			}
+			@card.Card(card.Props{Class: "gap-0"}) {
+				@card.Header(card.HeaderProps{Class: "border-b pb-4"}) {
+					@card.Title() {
+						Account growth
+					}
+					@card.Description() {
+						Trials and paid upgrades for the last six months.
+					}
+					@card.Action() {
+						@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "font-normal text-muted-foreground"}) {
+							@icon.UsersRound(icon.Props{Class: "size-3"})
+							+38 upgrades
+						}
+					}
+				}
+				@card.Content(card.ContentProps{Class: "pt-4"}) {
+					@chart.Container(chart.ContainerProps{Config: dashboardAccountsConfig, Class: "h-[320px] min-h-[320px] w-full aspect-auto"}) {
+						@chart.BarChart(chart.BarChartProps{Data: dashboardAccountsData, AccessibilityLayer: true, Margin: &chart.Margin{Left: 8, Right: 8}}) {
+							@chart.CartesianGrid(chart.CartesianGridProps{Vertical: chart.Bool(false)})
+							@chart.XAxis(chart.XAxisProps{DataKey: "month", TickLine: false, AxisLine: false, TickMargin: 8})
+							@chart.Tooltip(chart.TooltipProps{Cursor: chart.Bool(false), Content: chart.TooltipContentProps{Indicator: "dot"}})
+							@chart.Legend()
+							@chart.Bar(chart.BarProps{DataKey: "trials", Fill: "var(--color-trials)", Radius: []float64{4, 4, 0, 0}})
+							@chart.Bar(chart.BarProps{DataKey: "upgrades", Fill: "var(--color-upgrades)", Radius: []float64{4, 4, 0, 0}})
+						}
+					}
+				}
+			}
+		</div>
+	</div>
+}
+
+templ dashboardStatCard(label, value, detail, statIcon string) {
+	@card.Card(card.Props{Class: "gap-0"}) {
+		@card.Header() {
+			@card.Description() {
+				{ label }
+			}
+			@card.Title(card.TitleProps{Class: "text-2xl font-semibold tabular-nums sm:text-3xl"}) {
+				{ value }
+			}
+			@card.Action() {
+				<div class="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+					switch statIcon {
+						case "revenue":
+							@icon.DollarSign(icon.Props{Class: "size-4"})
+						case "accounts":
+							@icon.UsersRound(icon.Props{Class: "size-4"})
+						case "conversion":
+							@icon.Target(icon.Props{Class: "size-4"})
+						default:
+							@icon.Clock3(icon.Props{Class: "size-4"})
+					}
+				</div>
+			}
+		}
+		@card.Content(card.ContentProps{Class: "mt-4"}) {
+			<p class="flex items-center gap-1.5 text-xs text-muted-foreground">
+				<span class="size-1 rounded-full bg-chart-2"></span>
+				{ detail }
+			</p>
+		}
+	}
+}

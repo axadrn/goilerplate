@@ -1,0 +1,47 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/dialog"
+	"{{.ModulePath}}/internal/ui/csrf"
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+templ SettingsAvatarForm() {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@templ.Fragment("settings-avatar-form") {
+		<form
+			id="avatar-upload-form"
+			enctype="multipart/form-data"
+			class="space-y-4"
+			hx-swap-oob="true"
+			hx-post={ basePath + "/account/avatar" }
+			hx-encoding="multipart/form-data"
+			hx-swap="none"
+			hx-disable="find button[type='submit']"
+		>
+			@csrf.Token()
+			@SettingsAvatarFields()
+			<div class="flex flex-col sm:flex-row sm:justify-end gap-2">
+				@SettingsAvatarUploadButton()
+				@dialog.Dialog(dialog.Props{ID: "delete-avatar-dialog"}) {
+					@SettingsAvatarDeleteTrigger()
+					@dialog.Content() {
+						@SettingsAvatarDeleteDialog()
+						@dialog.Footer() {
+							@SettingsAvatarDeleteCancel()
+							@button.Button(button.Props{Attributes: utils.MergeAttributes(dialog.Close(ctx), templ.Attributes{
+								"hx-delete":  basePath + "/account/avatar",
+								"hx-swap":    "none",
+								"hx-disable": "this",
+							})}) {
+								Remove
+							}
+						}
+					}
+				}
+			</div>
+		</form>
+	}
+}

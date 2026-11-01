@@ -1,0 +1,264 @@
+package service
+
+import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/repository"
+	"{{.ModulePath}}/internal/testutil"
+)
+
+func TestAdminServiceAccessMetricsAndImpersonation(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "operator", Email: "operator@example.com", Name: "Operator", Verified: true})
+	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "target", Email: "target@example.com", Name: "Target"})
+	target.Subscription.PlanID = model.SubscriptionPlanPro
+	if err := repository.NewSubscriptionRepository(database).Update(target.Subscription); err != nil {
+		t.Fatalf("upgrade target subscription: %v", err)
+	}
+	sessions := repository.NewSessionRepository(database)
+	auth := NewAuthService(
+		nil, nil, sessions, nil, nil,
+		false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+	)
+{{- if .API }}
+	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokenRepository(database), now: time.Now})
+{{- end }}
+	adminRepository := repository.NewAdminRepository(database)
+	admin := NewAdminService(adminRepository, repository.NewUserRepository(database), auth, []string{"operator@example.com"})
+
+	operatorRecorder := httptest.NewRecorder()
+	operatorRequest := httptest.NewRequest(http.MethodGet, "/auth", nil)
+	operatorSession, err := auth.StartSession(operatorRecorder, operatorRequest, operator.User.ID)
+	if err != nil {
+		t.Fatalf("StartSession(operator) error = %v", err)
+	}
+	operatorCookie := operatorRecorder.Result().Cookies()[0]
+	targetRecorder := httptest.NewRecorder()
+	targetRequest := httptest.NewRequest(http.MethodGet, "/auth", nil)
+	_, err = auth.StartSession(targetRecorder, targetRequest, target.User.ID)
+	if err != nil {
+		t.Fatalf("StartSession(target) error = %v", err)
+	}
+	targetCookie := targetRecorder.Result().Cookies()[0]
+
+	if !admin.IsAdmin(operator.User, operatorSession) {
+		t.Fatal("configured operator was not recognized")
+	}
+	unverifiedOperator := *operator.User
+	unverifiedOperator.EmailVerifiedAt = nil
+	if admin.IsAdmin(&unverifiedOperator, operatorSession) {
+		t.Fatal("unverified operator was recognized")
+	}
+	if admin.IsAdmin(target.User, operatorSession) {
+		t.Fatal("ordinary user was recognized as an operator")
+	}
+	dashboard, err := admin.Dashboard(operator.User, operatorSession, "target@", 1)
+	if err != nil {
+		t.Fatalf("Dashboard() error = %v", err)
+	}
+	if dashboard.Metrics.Users != 2 || dashboard.Metrics.VerifiedUsers != 1 || dashboard.Metrics.Workspaces != 2 || dashboard.Metrics.PaidWorkspaces != 1 || dashboard.Metrics.ActiveSessions != 2 {
+		t.Fatalf("metrics = %#v", dashboard.Metrics)
+	}
+	if len(dashboard.Users.Users) != 1 || dashboard.Users.Users[0].ID != target.User.ID {
+		t.Fatalf("searched users = %#v", dashboard.Users)
+	}
+	if _, err := admin.Dashboard(target.User, operatorSession, "", 1); !errors.Is(err, ErrAdminPermission) {
+		t.Fatalf("ordinary Dashboard() error = %v, want ErrAdminPermission", err)
+	}
+
+	impersonationRequest := httptest.NewRequest(http.MethodPost, "/admin/users/target/impersonate", nil)
+	impersonationRequest.AddCookie(operatorCookie)
+	impersonationRecorder := httptest.NewRecorder()
+	if err := admin.StartImpersonation(impersonationRecorder, impersonationRequest, operator.User, operatorSession, target.User.ID); err != nil {
+		t.Fatalf("StartImpersonation() error = %v", err)
+	}
+	impersonationCookies := impersonationRecorder.Result().Cookies()
+	if len(impersonationCookies) != 1 || impersonationCookies[0].Name != "impersonation_token" {
+		t.Fatalf("impersonation cookies = %#v", impersonationCookies)
+	}
+	impersonationCookie := impersonationCookies[0]
+	impersonationSession, err := auth.AuthenticateSession(impersonationCookie.Value)
+	if err != nil {
+		t.Fatalf("AuthenticateSession(impersonation) error = %v", err)
+	}
+	if impersonationSession.UserID != target.User.ID || !impersonationSession.IsImpersonating() || *impersonationSession.ImpersonatorUserID != operator.User.ID {
+		t.Fatalf("impersonation session = %#v", impersonationSession)
+	}
+	if impersonationSession.ExpiresAt.After(time.Now().Add(time.Hour + time.Minute)) {
+		t.Fatalf("impersonation expiry = %v, want at most one hour", impersonationSession.ExpiresAt)
+	}
+	if admin.IsAdmin(target.User, impersonationSession) {
+		t.Fatal("impersonated request retained operator access")
+	}
+	if _, err := auth.AuthenticateSession(operatorCookie.Value); err != nil {
+		t.Fatalf("operator session was replaced: %v", err)
+	}
+
+	stopRecorder := httptest.NewRecorder()
+	if err := admin.StopImpersonation(stopRecorder, target.User, impersonationSession); err != nil {
+		t.Fatalf("StopImpersonation() error = %v", err)
+	}
+	if cookies := stopRecorder.Result().Cookies(); len(cookies) != 1 || cookies[0].Name != "impersonation_token" || cookies[0].MaxAge != -1 {
+		t.Fatalf("cleared impersonation cookies = %#v", cookies)
+	}
+	if _, err := auth.AuthenticateSession(impersonationCookie.Value); !errors.Is(err, repository.ErrSessionNotFound) {
+		t.Fatalf("stopped impersonation error = %v, want ErrSessionNotFound", err)
+	}
+	if _, err := auth.AuthenticateSession(operatorCookie.Value); err != nil {
+		t.Fatalf("operator session after stop error = %v", err)
+	}
+
+	if err := admin.RevokeUserSessions(operator.User, operatorSession, operator.User.ID); !errors.Is(err, ErrAdminSelfAction) {
+		t.Fatalf("self RevokeUserSessions() error = %v, want ErrAdminSelfAction", err)
+	}
+	if err := admin.RevokeUserSessions(operator.User, operatorSession, target.User.ID); err != nil {
+		t.Fatalf("RevokeUserSessions() error = %v", err)
+	}
+	if _, err := auth.AuthenticateSession(targetCookie.Value); !errors.Is(err, repository.ErrSessionNotFound) {
+		t.Fatalf("revoked target session error = %v, want ErrSessionNotFound", err)
+	}
+	events, err := adminRepository.ListAuditEvents(10)
+	if err != nil {
+		t.Fatalf("ListAuditEvents() error = %v", err)
+	}
+	for _, action := range []string{"admin.impersonation_started", "admin.impersonation_stopped", "admin.sessions_revoked"} {
+		if !hasAdminAuditAction(events, action) {
+			t.Fatalf("admin events missing %q: %#v", action, events)
+		}
+	}
+}
+
+func TestAdminSessionRevocationIncludesIssuedImpersonationSessions(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "revoked-operator", Email: "revoked@example.com", Verified: true})
+	securityOperator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "security-operator", Email: "security@example.com", Verified: true})
+	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "impersonated-target"})
+	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+{{- if .API }}
+	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokenRepository(database), now: time.Now})
+{{- end }}
+	admin := NewAdminService(
+		repository.NewAdminRepository(database),
+		repository.NewUserRepository(database),
+		auth,
+		[]string{operator.User.Email, securityOperator.User.Email},
+	)
+
+	operatorRecorder := httptest.NewRecorder()
+	operatorSession, err := auth.StartSession(operatorRecorder, httptest.NewRequest(http.MethodGet, "/auth", nil), operator.User.ID)
+	if err != nil {
+		t.Fatalf("StartSession(operator) error = %v", err)
+	}
+	operatorCookie := operatorRecorder.Result().Cookies()[0]
+	securityRecorder := httptest.NewRecorder()
+	securitySession, err := auth.StartSession(securityRecorder, httptest.NewRequest(http.MethodGet, "/auth", nil), securityOperator.User.ID)
+	if err != nil {
+		t.Fatalf("StartSession(security operator) error = %v", err)
+	}
+	impersonationRecorder := httptest.NewRecorder()
+	impersonationRequest := httptest.NewRequest(http.MethodPost, "/admin/users/impersonated-target/impersonate", nil)
+	impersonationRequest.AddCookie(operatorCookie)
+	if err := admin.StartImpersonation(impersonationRecorder, impersonationRequest, operator.User, operatorSession, target.User.ID); err != nil {
+		t.Fatalf("StartImpersonation() error = %v", err)
+	}
+	impersonationCookie := impersonationRecorder.Result().Cookies()[0]
+
+	if err := admin.RevokeUserSessions(securityOperator.User, securitySession, operator.User.ID); err != nil {
+		t.Fatalf("RevokeUserSessions(operator) error = %v", err)
+	}
+	if _, err := auth.AuthenticateSession(operatorCookie.Value); !errors.Is(err, repository.ErrSessionNotFound) {
+		t.Fatalf("operator session error = %v, want ErrSessionNotFound", err)
+	}
+	if _, err := auth.AuthenticateSession(impersonationCookie.Value); !errors.Is(err, repository.ErrSessionNotFound) {
+		t.Fatalf("issued impersonation session error = %v, want ErrSessionNotFound", err)
+	}
+}
+
+func TestStopImpersonationSessionRollsBackWhenAuditCannotCommit(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "atomic-operator", Email: "atomic@example.com", Verified: true})
+	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "atomic-target"})
+	auth := NewAuthService(nil, nil, repository.NewSessionRepository(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	adminRepository := repository.NewAdminRepository(database)
+	admin := NewAdminService(adminRepository, repository.NewUserRepository(database), auth, []string{operator.User.Email})
+
+	operatorRecorder := httptest.NewRecorder()
+	operatorSession, err := auth.StartSession(operatorRecorder, httptest.NewRequest(http.MethodGet, "/auth", nil), operator.User.ID)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/admin/users/atomic-target/impersonate", nil)
+	request.AddCookie(operatorRecorder.Result().Cookies()[0])
+	impersonationRecorder := httptest.NewRecorder()
+	if err := admin.StartImpersonation(impersonationRecorder, request, operator.User, operatorSession, target.User.ID); err != nil {
+		t.Fatalf("StartImpersonation() error = %v", err)
+	}
+	impersonationCookie := impersonationRecorder.Result().Cookies()[0]
+	impersonationSession, err := auth.AuthenticateSession(impersonationCookie.Value)
+	if err != nil {
+		t.Fatalf("AuthenticateSession() error = %v", err)
+	}
+	existingEvent := &model.AdminAuditEvent{
+		ID: "duplicate-audit", Action: "existing", TargetType: "user", TargetID: target.User.ID,
+		Metadata: "{}", CreatedAt: time.Now(),
+	}
+	if err := adminRepository.CreateAuditEvent(existingEvent); err != nil {
+		t.Fatalf("create existing audit event: %v", err)
+	}
+	failedEvent := &model.AdminAuditEvent{
+		ID: existingEvent.ID, Action: "admin.impersonation_stopped", TargetType: "user", TargetID: target.User.ID,
+		Metadata: "{}", CreatedAt: time.Now(),
+	}
+	if err := adminRepository.StopImpersonationSession(
+		impersonationSession.ID,
+		target.User.ID,
+		operator.User.ID,
+		failedEvent,
+	); err == nil {
+		t.Fatal("StopImpersonationSession() error = nil, want duplicate audit error")
+	}
+	if _, err := auth.AuthenticateSession(impersonationCookie.Value); err != nil {
+		t.Fatalf("impersonation session was deleted after audit failure: %v", err)
+	}
+
+	successRecorder := httptest.NewRecorder()
+	if err := admin.StopImpersonation(successRecorder, target.User, impersonationSession); err != nil {
+		t.Fatalf("StopImpersonation(retry) error = %v", err)
+	}
+	if _, err := auth.AuthenticateSession(impersonationCookie.Value); !errors.Is(err, repository.ErrSessionNotFound) {
+		t.Fatalf("stopped session error = %v, want ErrSessionNotFound", err)
+	}
+}
+
+func TestAdminAuditRetention(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	repo := repository.NewAdminRepository(database)
+	old := time.Now().Add(-181 * 24 * time.Hour)
+	if err := repo.CreateAuditEvent(&model.AdminAuditEvent{ID: "old", Action: "old", TargetType: "user", TargetID: "1", Metadata: "{}", CreatedAt: old}); err != nil {
+		t.Fatalf("CreateAuditEvent() error = %v", err)
+	}
+	if err := repo.CreateAuditEvent(&model.AdminAuditEvent{ID: "new", Action: "new", TargetType: "user", TargetID: "2", Metadata: "{}", CreatedAt: time.Now()}); err != nil {
+		t.Fatalf("CreateAuditEvent(new) error = %v", err)
+	}
+	events, err := repo.ListAuditEvents(10)
+	if err != nil {
+		t.Fatalf("ListAuditEvents() error = %v", err)
+	}
+	if len(events) != 1 || events[0].ID != "new" {
+		t.Fatalf("retained events = %#v", events)
+	}
+}
+
+func hasAdminAuditAction(events []model.AdminAuditEvent, action string) bool {
+	for _, event := range events {
+		if event.Action == action {
+			return true
+		}
+	}
+	return false
+}

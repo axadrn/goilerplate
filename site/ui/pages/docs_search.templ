@@ -1,0 +1,98 @@
+package pages
+
+import (
+	"github.com/axadrn/goilerplate/v4/site/docs"
+	commandmenu "github.com/axadrn/goilerplate/v4/site/ui/components/command"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/dialog"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
+)
+
+// docsSearch is the ⌘K search of the docs, the same as shadcn's: the
+// library's command dialog with its fuzzy filter over every page and every
+// section of a page. ⌘K, ctrl+K or "/" opens it; enter goes there.
+templ docsSearch(tree *docs.DocPage) {
+	<button
+		type="button"
+		class="inline-flex h-8 w-9 cursor-pointer items-center justify-center gap-2 rounded-lg bg-muted text-[13px] text-muted-foreground transition-colors hover:text-foreground sm:w-56 sm:justify-start sm:px-3"
+		aria-label="Search the docs"
+		data-docs-search-open
+		{ dialog.TriggerFor("docs-search")... }
+	>
+		@icon.Search(icon.Props{Class: "size-4 shrink-0"})
+		<span class="hidden sm:inline">Search the docs…</span>
+		<kbd class="ml-auto hidden rounded border bg-background px-1.5 font-sans text-[11px] font-medium sm:inline">⌘K</kbd>
+	</button>
+	@commandmenu.Dialog(commandmenu.DialogProps{
+		ID:          "docs-search",
+		Title:       "Search the docs",
+		Description: "Find a page or a section of the docs",
+		Class:       "top-[15%] sm:max-w-lg",
+	}) {
+		@commandmenu.Command(commandmenu.Props{ID: "docs-search-command", Label: "Search the docs"}) {
+			@commandmenu.Input(commandmenu.InputProps{Placeholder: "Search the docs…"})
+			@commandmenu.List(commandmenu.ListProps{Class: "min-h-80"}) {
+				@commandmenu.Empty() {
+					Nothing found.
+				}
+				@commandmenu.Group(commandmenu.GroupProps{Heading: "Overview"}) {
+					for _, page := range tree.Children {
+						if len(page.Children) == 0 {
+							@docsSearchPage(page)
+						}
+					}
+				}
+				for _, section := range tree.Children {
+					if len(section.Children) > 0 {
+						@commandmenu.Group(commandmenu.GroupProps{Heading: section.Title}) {
+							for _, page := range section.Children {
+								@docsSearchPage(page)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			// ⌘K, ctrl+K or "/" opens the search, unless typing somewhere.
+			document.addEventListener("keydown", (event) => {
+				const shortcut = (event.key === "k" && (event.metaKey || event.ctrlKey)) || event.key === "/";
+				const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || event.target.closest("input, textarea, select"));
+				if (!shortcut || typing) return;
+				event.preventDefault();
+				window.templ.dialog.toggle("docs-search");
+			});
+			// Enter or a click goes to the page or section.
+			document.addEventListener("command-select", (event) => {
+				const item = event.target instanceof Element && event.target.closest("#docs-search-command [data-href]");
+				if (!item) return;
+				window.templ.dialog.close("docs-search");
+				window.location.href = item.dataset.href;
+			});
+		})();
+	</script>
+}
+
+// docsSearchPage is a page and its sections. The value the fuzzy filter
+// reads holds the title, the description and, for a section, its page.
+templ docsSearchPage(page *docs.DocPage) {
+	@commandmenu.Item(commandmenu.ItemProps{
+		Value:      page.Title + " " + page.Description,
+		Attributes: templ.Attributes{"data-href": docsPageURL(page)},
+	}) {
+		@icon.FileText()
+		<span class="truncate">{ page.Title }</span>
+	}
+	for _, heading := range page.Headings {
+		if heading.Level == 2 {
+			@commandmenu.Item(commandmenu.ItemProps{
+				Value:      page.Title + " " + heading.Text,
+				Attributes: templ.Attributes{"data-href": docsPageURL(page) + "#" + heading.ID},
+			}) {
+				@icon.Hash()
+				<span class="truncate"><span class="text-muted-foreground">{ page.Title } › </span>{ heading.Text }</span>
+			}
+		}
+	}
+}

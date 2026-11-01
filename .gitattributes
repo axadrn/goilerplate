@@ -1,2 +1,4 @@
 go.mod text eol=lf
 go.sum text eol=lf
+# templ preserves inline text spacing with trailing spaces.
+*.templ -whitespace

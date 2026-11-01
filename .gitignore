@@ -1,1 +1,30 @@
-/dist/
+# Everything stays out unless it is listed here, so nothing private lands in
+# the repo by accident: no .env, no database, no notes. Add a path here when
+# it belongs in the repo.
+/*
+!/.gitignore
+!/.gitattributes
+!/.github/
+!/.goreleaser.yaml
+!/AGENTS.md
+!/CHANGELOG.md
+!/LICENSE
+!/LICENSE-0BSD
+!/README.md
+!/Taskfile.yml
+!/cmd/
+!/content/
+!/generator/
+!/go.mod
+!/go.sum
+!/internal/
+!/site/
+
+# Projects rendered by generator/scripts/render-dev.sh.
+/generator/.dev/
+/generator/_template/web.svelte/node_modules/
+/generator/_template/web.svelte/.svelte-kit/
+
+# Built by the site build: the CSS and the rendered pages.
+/site/assets/css/output.css
+/site/dist/

@@ -1,0 +1,35 @@
+package csrf
+
+import "{{.ModulePath}}/internal/ctxkeys"
+
+// Token renders a hidden CSRF token input for form submissions.
+//
+// Usage in forms:
+//
+//	<form action="/auth/password" method="POST">
+//	    @csrf.Token()
+//	    <input name="email" type="email">
+//	    <button>Login</button>
+//	</form>
+//
+// Security: This token protects against Cross-Site Request Forgery (CSRF) attacks.
+// The token is validated server-side via middleware.CSRFProtection middleware.
+//
+// How it works:
+// 1. Server generates random token and stores in HttpOnly cookie
+// 2. Server renders token in this hidden input
+// 3. On form submit, both cookie and form field are sent
+// 4. Server compares: cookie token == form token (constant-time comparison)
+// 5. If match → request allowed, if mismatch → 403 Forbidden
+//
+// Why this protects against CSRF:
+// - Attacker can trigger cookie to be sent (automatic browser behavior)
+// - But attacker CANNOT read cookie value (HttpOnly + SameSite)
+// - Therefore attacker CANNOT set correct form field value
+// - Server rejects request because tokens don't match
+//
+// This is called "Double Submit Cookie" pattern. Industry standard used by
+// Stripe, GitHub, Shopify, and recommended by OWASP.
+templ Token() {
+	<input type="hidden" name="csrf_token" value={ ctxkeys.CSRFToken(ctx) }/>
+}

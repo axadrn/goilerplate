@@ -1,0 +1,67 @@
+package api_test
+
+import (
+	"net/http"
+	"testing"
+)
+
+func TestPaidAccountShape(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	user := seedVerifiedUser(t, environment, "paid", "Paid User")
+	token := environment.signIn(t, user.ID)
+
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token})
+	expectStatus(t, recorder, http.StatusOK)
+	body := decodeBody[map[string]any](t, recorder)
+	account := body["user"].(map[string]any)
+	if account["id"] != "paid" || account["password_set"] != true || len(account) != 5 {
+		t.Fatalf("user = %#v", account)
+	}
+	if body["onboarding_required"] != false {
+		t.Fatalf("onboarding_required = %#v", body["onboarding_required"])
+	}
+	if body["is_admin"] != false {
+		t.Fatalf("is_admin = %#v, want false", body["is_admin"])
+	}
+{{- if .Workspaces }}
+	_, hasSubscription := body["subscription"]
+	if hasSubscription {
+		t.Fatalf("workspace account carries a subscription: %#v", body)
+	}
+	workspaces := body["workspaces"].([]any)
+	if len(workspaces) != 1 {
+		t.Fatalf("workspaces = %#v", workspaces)
+	}
+	membership := workspaces[0].(map[string]any)
+	workspace := membership["workspace"].(map[string]any)
+	if membership["role"] != "owner" || workspace["slug"] != "paid-workspace" || workspace["id"] != "workspace-paid" {
+		t.Fatalf("membership = %#v", membership)
+	}
+{{- else }}
+	subscription := body["subscription"].(map[string]any)
+	if subscription["plan_id"] != "free" || subscription["status"] != "active" {
+		t.Fatalf("subscription = %#v", subscription)
+	}
+	for _, hidden := range []string{"provider_customer_id", "provider_subscription_id", "user_id"} {
+		_, exposed := subscription[hidden]
+		if exposed {
+			t.Fatalf("subscription exposes %s: %#v", hidden, subscription)
+		}
+	}
+	access := body["access"].(map[string]any)
+	if access["plan_id"] != "free" || access["state"] == "" {
+		t.Fatalf("access = %#v", access)
+	}
+{{- end }}
+{{- if .Storage }}
+	value, hasAvatar := body["avatar_url"]
+	if !hasAvatar || value != nil {
+		t.Fatalf("avatar_url = %#v, want null", value)
+	}
+{{- else }}
+	_, hasAvatar := body["avatar_url"]
+	if hasAvatar {
+		t.Fatalf("account without storage carries avatar_url: %#v", body)
+	}
+{{- end }}
+}

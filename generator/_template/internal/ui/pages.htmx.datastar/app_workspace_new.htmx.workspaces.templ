@@ -1,0 +1,54 @@
+package pages
+
+import (
+	"strconv"
+
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/blocks"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/field"
+	"{{.ModulePath}}/internal/ui/components/input"
+	"{{.ModulePath}}/internal/ui/csrf"
+	"{{.ModulePath}}/internal/ui/layouts"
+)
+
+templ NewWorkspace(errorMsg string) {
+	@layouts.Auth(layouts.SEOProps{Title: "New workspace", Description: "Create a workspace", Path: ctxkeys.URLPath(ctx)}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("New workspace", "Create a separate space for your team") {
+				@NewWorkspaceForm(errorMsg)
+			}
+		}
+	}
+}
+
+templ NewWorkspaceForm(errorMsg string) {
+	<form
+		id="new-workspace-form"
+		action="/workspaces/new"
+		method="POST"
+		hx-post="/workspaces/new"
+		hx-target="#new-workspace-form"
+		hx-swap="outerHTML"
+		hx-disable="find button[type='submit']"
+	>
+		@csrf.Token()
+		@field.Group() {
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "workspace-name"}) {
+					Workspace name
+				}
+				@input.Input(input.Props{ID: "workspace-name", Name: "name", Type: "text", Placeholder: "Acme", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(errorMsg != ""), "autofocus": ""}})
+				if errorMsg != "" {
+					@field.Error() {
+						{ errorMsg }
+					}
+				}
+			}
+			@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full"}) {
+				Create workspace
+			}
+		}
+	</form>
+}

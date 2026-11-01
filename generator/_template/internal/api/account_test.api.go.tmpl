@@ -1,0 +1,232 @@
+package api_test
+
+import (
+	"net/http"
+	"testing"
+{{- if .Workspaces }}
+	"time"
+{{- end }}
+
+	"{{.ModulePath}}/internal/api"
+	"{{.ModulePath}}/internal/testutil"
+)
+
+func TestUpdateName(t *testing.T) {
+	tests := []struct {
+		name   string
+		body   string
+		status int
+		code   string
+		want   string
+	}{
+		{name: "valid", body: `{"name":" Grace Hopper "}`, status: http.StatusOK, want: "Grace Hopper"},
+		{name: "empty", body: `{"name":""}`, status: http.StatusUnprocessableEntity, code: "validation_failed"},
+		{name: "control characters", body: `{"name":"Grace\u0007"}`, status: http.StatusUnprocessableEntity, code: "validation_failed"},
+		{name: "unknown field", body: `{"display_name":"Grace"}`, status: http.StatusBadRequest, code: "invalid_body"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			environment := newAPIEnvironment(t)
+			user := seedVerifiedUser(t, environment, "namer", "Namer")
+			token := environment.signIn(t, user.ID)
+
+			recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/name", body: test.body, bearer: token})
+			if test.code != "" {
+				detail := expectError(t, recorder, test.status, test.code)
+				if test.code == "validation_failed" && detail.Fields["name"] == "" {
+					t.Fatalf("fields = %#v", detail.Fields)
+				}
+				return
+			}
+			expectStatus(t, recorder, test.status)
+			response := decodeBody[api.UserResponse](t, recorder)
+			if response.User.Name != test.want {
+				t.Fatalf("name = %q, want %q", response.User.Name, test.want)
+			}
+		})
+	}
+}
+
+func TestChangeEmail(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	user := seedVerifiedUser(t, environment, "changer", "Changer")
+	seedVerifiedUser(t, environment, "taken", "Taken")
+	token := environment.signIn(t, user.ID)
+
+	same := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"CHANGER@example.com"}`, bearer: token})
+	expectError(t, same, http.StatusUnprocessableEntity, "validation_failed")
+	invalid := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"nope"}`, bearer: token})
+	expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")
+	taken := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"taken@example.com"}`, bearer: token})
+	expectError(t, taken, http.StatusConflict, "email_taken")
+
+	recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"changed@example.com"}`, bearer: token})
+	expectStatus(t, recorder, http.StatusAccepted)
+	verification := environment.mailedToken(t, "/auth/verify-email-change/")
+	verified := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/email-change/verify", body: `{"token":"` + verification + `"}`})
+	expectStatus(t, verified, http.StatusOK)
+	if decodeBody[api.SessionToken](t, verified).User.Email != "changed@example.com" {
+		t.Fatalf("email change was not applied: %s", verified.Body.String())
+	}
+}
+
+func TestChangeEmailIsRateLimitedPerRecipient(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	for index, id := range []string{"first", "second", "third", "fourth"} {
+		user := seedVerifiedUser(t, environment, id, "Limit")
+		token := environment.signIn(t, user.ID)
+		recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"wanted@example.com"}`, bearer: token})
+		if index < 3 {
+			expectStatus(t, recorder, http.StatusAccepted)
+			continue
+		}
+		expectError(t, recorder, http.StatusTooManyRequests, "rate_limited")
+	}
+}
+
+func TestChangePasswordSignsOutOtherSessions(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	user := seedVerifiedUser(t, environment, "rotator", "Rotator")
+	token := environment.signIn(t, user.ID)
+	other := environment.signIn(t, user.ID)
+
+	wrong := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"wrong password here","new_password":"another long passphrase"}`, bearer: token})
+	detail := expectError(t, wrong, http.StatusUnprocessableEntity, "validation_failed")
+	if detail.Fields["current_password"] == "" {
+		t.Fatalf("fields = %#v", detail.Fields)
+	}
+	weak := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"` + testPassword + `","new_password":"short"}`, bearer: token})
+	detail = expectError(t, weak, http.StatusUnprocessableEntity, "validation_failed")
+	if detail.Fields["new_password"] != "Password must be at least 12 characters." {
+		t.Fatalf("fields = %#v", detail.Fields)
+	}
+
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"` + testPassword + `","new_password":"another long passphrase"}`, bearer: token})
+	expectStatus(t, recorder, http.StatusNoContent)
+
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}), http.StatusOK)
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: other}), http.StatusUnauthorized, "unauthenticated")
+	login := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/password", body: `{"email":"rotator@example.com","password":"another long passphrase"}`})
+	expectStatus(t, login, http.StatusOK)
+}
+
+func TestSetAndRemovePassword(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	user := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "passwordless", Email: "passwordless@example.com", Name: "Passwordless", Verified: true}).User
+	token := environment.signIn(t, user.ID)
+	other := environment.signIn(t, user.ID)
+
+	change := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"anything","new_password":"another long passphrase"}`, bearer: token})
+	expectError(t, change, http.StatusConflict, "password_not_set")
+	remove := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/password", bearer: token})
+	expectError(t, remove, http.StatusConflict, "password_not_set")
+	weak := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"short"}`, bearer: token})
+	expectError(t, weak, http.StatusUnprocessableEntity, "validation_failed")
+
+	set := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"` + testPassword + `"}`, bearer: token})
+	expectStatus(t, set, http.StatusNoContent)
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: other}), http.StatusUnauthorized, "unauthenticated")
+	account := decodeBody[api.UserResponse](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}))
+	if !account.User.PasswordSet {
+		t.Fatalf("password_set = false after set: %#v", account.User)
+	}
+	again := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"` + testPassword + `"}`, bearer: token})
+	expectError(t, again, http.StatusConflict, "password_already_set")
+
+	removed := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/password", bearer: token})
+	expectStatus(t, removed, http.StatusNoContent)
+	account = decodeBody[api.UserResponse](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}))
+	if account.User.PasswordSet {
+		t.Fatalf("password_set = true after removal: %#v", account.User)
+	}
+}
+
+func TestDeleteAccount(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	user := seedVerifiedUser(t, environment, "leaving", "Leaving")
+{{- if .Workspaces }}
+	coOwner := seedVerifiedUser(t, environment, "coowner", "Co Owner")
+	_, err := environment.database.Exec(
+		`INSERT INTO workspace_members (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, $5)`,
+		"shared-coowner", "workspace-leaving", coOwner.ID, "owner", time.Now(),
+	)
+	if err != nil {
+		t.Fatalf("add co-owner: %v", err)
+	}
+{{- end }}
+	token := environment.signIn(t, user.ID)
+
+	wrong := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"other@example.com"}`, bearer: token})
+	detail := expectError(t, wrong, http.StatusUnprocessableEntity, "validation_failed")
+	if detail.Fields["confirm_email"] == "" {
+		t.Fatalf("fields = %#v", detail.Fields)
+	}
+
+	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"LEAVING@example.com"}`, bearer: token})
+	expectStatus(t, recorder, http.StatusNoContent)
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}), http.StatusUnauthorized, "unauthenticated")
+{{- if .Workspaces }}
+	_, err = environment.users.ByID(user.ID)
+{{- else }}
+	_, err := environment.users.ByID(user.ID)
+{{- end }}
+	if err == nil {
+		t.Fatal("account still exists")
+	}
+}
+{{- if .Workspaces }}
+
+func TestDeleteAccountRefusesSoleWorkspaceOwner(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedVerifiedUser(t, environment, "owner", "Owner")
+	token := environment.signIn(t, owner.ID)
+
+	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"owner@example.com"}`, bearer: token})
+	expectError(t, recorder, http.StatusConflict, "sole_workspace_owner")
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}), http.StatusOK)
+}
+{{- else }}
+
+func TestDeleteAccountRefusesActiveSubscription(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	fixture := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "subscriber", Email: "subscriber@example.com", Name: "Subscriber", Verified: true})
+	_, err := environment.database.Exec(`UPDATE subscriptions SET plan_id = $1, status = $2 WHERE user_id = $3`, "pro", "active", fixture.User.ID)
+	if err != nil {
+		t.Fatalf("mark subscription paid: %v", err)
+	}
+	token := environment.signIn(t, fixture.User.ID)
+
+	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"subscriber@example.com"}`, bearer: token})
+	expectError(t, recorder, http.StatusConflict, "active_subscription")
+}
+{{- end }}
+
+func TestAccountRoutesRequireOnboarding(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	user := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "unnamed", Email: "unnamed@example.com", Verified: true}).User
+	token := environment.signIn(t, user.ID)
+
+	routes := []apiRequest{
+		{method: http.MethodPatch, path: "/api/v1/account/name", body: `{"name":"Named"}`},
+		{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"named@example.com"}`},
+		{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"x","new_password":"y"}`},
+		{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"x"}`},
+		{method: http.MethodDelete, path: "/api/v1/account/password"},
+		{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"unnamed@example.com"}`},
+		{method: http.MethodGet, path: "/api/v1/account/sessions"},
+		{method: http.MethodDelete, path: "/api/v1/account/sessions/any"},
+		{method: http.MethodDelete, path: "/api/v1/account/sessions"},
+{{- if .Storage }}
+		{method: http.MethodPost, path: "/api/v1/account/avatar"},
+		{method: http.MethodDelete, path: "/api/v1/account/avatar"},
+{{- end }}
+	}
+	for _, route := range routes {
+		t.Run(route.method+" "+route.path, func(t *testing.T) {
+			anonymous := route
+			expectError(t, environment.send(t, anonymous), http.StatusUnauthorized, "unauthenticated")
+			route.bearer = token
+			expectError(t, environment.send(t, route), http.StatusForbidden, "onboarding_required")
+		})
+	}
+}

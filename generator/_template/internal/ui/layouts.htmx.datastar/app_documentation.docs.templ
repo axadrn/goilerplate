@@ -1,0 +1,22 @@
+package layouts
+
+import (
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/sidebar"
+)
+
+templ AppSidebarDocumentation() {
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{
+			Href: "/docs",
+			Size: sidebar.MenuButtonSizeSm,
+			Attributes: templ.Attributes{
+				"target": "_blank",
+				"rel":    "noopener",
+			},
+		}) {
+			@icon.BookOpen(icon.Props{Class: "size-4"})
+			<span>Documentation</span>
+		}
+	}
+}

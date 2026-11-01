@@ -1,0 +1,15 @@
+package blocks
+
+import "{{.ModulePath}}/internal/ui/components/button"
+
+templ NavbarBlogDesktop() {
+	@button.Button(button.Props{Href: "/blog", Variant: button.VariantGhost, Size: button.SizeSm}) {
+		Blog
+	}
+}
+
+templ NavbarBlogMobile() {
+	<a href="/blog" class="flex items-center px-3 py-2 rounded-md hover:bg-accent text-foreground">
+		Blog
+	</a>
+}

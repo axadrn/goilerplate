@@ -1,0 +1,9 @@
+// The brand and the modules this project was generated with. The Go server
+// has the same values in internal/brand and its configuration.
+export const config = {
+	name: {{.ProjectNameGo}},
+	workspaces: {{.Workspaces}},
+	storage: {{.Storage}},
+	google: {{.HasGoogleOAuth}},
+	github: {{.HasGitHubOAuth}}
+} as const;

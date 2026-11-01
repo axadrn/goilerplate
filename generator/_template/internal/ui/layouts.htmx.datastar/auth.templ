@@ -1,0 +1,14 @@
+package layouts
+
+import "{{.ModulePath}}/internal/ui/blocks"
+
+templ Auth(seo SEOProps) {
+	@Base(seo) {
+		<div class="relative">
+			<div class="absolute top-4 right-4 z-10">
+				@blocks.ThemeSwitcher()
+			</div>
+			{ children... }
+		</div>
+	}
+}

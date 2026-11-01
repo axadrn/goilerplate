@@ -1,0 +1,257 @@
+package api
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"{{.ModulePath}}/internal/repository"
+	"{{.ModulePath}}/internal/service"
+)
+
+func decodeErrorBody(t *testing.T, recorder *httptest.ResponseRecorder) ErrorDetail {
+	t.Helper()
+	contentType := recorder.Header().Get("Content-Type")
+	if contentType != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", contentType)
+	}
+	var body ErrorBody
+	err := json.Unmarshal(recorder.Body.Bytes(), &body)
+	if err != nil {
+		t.Fatalf("decode error body %q: %v", recorder.Body.String(), err)
+	}
+	return body.Error
+}
+
+func TestJSONWritesStatusAndBody(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	JSON(recorder, http.StatusCreated, map[string]string{"name": "Ada"})
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201", recorder.Code)
+	}
+	if recorder.Header().Get("Content-Type") != "application/json" {
+		t.Fatalf("Content-Type = %q", recorder.Header().Get("Content-Type"))
+	}
+	if recorder.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("Cache-Control = %q", recorder.Header().Get("Cache-Control"))
+	}
+	if strings.TrimSpace(recorder.Body.String()) != `{"name":"Ada"}` {
+		t.Fatalf("body = %q", recorder.Body.String())
+	}
+}
+
+func TestJSONEncodingFailureIsInternal(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	JSON(recorder, http.StatusOK, map[string]any{"bad": make(chan int)})
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", recorder.Code)
+	}
+	detail := decodeErrorBody(t, recorder)
+	if detail.Code != "internal" {
+		t.Fatalf("code = %q, want internal", detail.Code)
+	}
+}
+
+func TestNoContent(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	NoContent(recorder)
+
+	if recorder.Code != http.StatusNoContent || recorder.Body.Len() != 0 {
+		t.Fatalf("status = %d, body = %q", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestErrorWritesEnvelope(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	Error(recorder, http.StatusConflict, "seat_limit", "No free seats.")
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409", recorder.Code)
+	}
+	if strings.TrimSpace(recorder.Body.String()) != `{"error":{"code":"seat_limit","message":"No free seats."}}` {
+		t.Fatalf("body = %q", recorder.Body.String())
+	}
+}
+
+func TestValidationErrorWritesFields(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ValidationError(recorder, map[string]string{"email": "Enter a valid email address."})
+
+	if recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422", recorder.Code)
+	}
+	detail := decodeErrorBody(t, recorder)
+	if detail.Code != "validation_failed" || detail.Fields["email"] != "Enter a valid email address." {
+		t.Fatalf("detail = %#v", detail)
+	}
+}
+
+func TestServiceErrorMapsKnownErrors(t *testing.T) {
+	tests := []struct {
+		err        error
+		wantStatus int
+		wantCode   string
+		wantField  string
+	}{
+		{service.ErrInvalidCredentials, http.StatusUnauthorized, "invalid_credentials", ""},
+		{fmt.Errorf("login: %w", service.ErrInvalidCredentials), http.StatusUnauthorized, "invalid_credentials", ""},
+		{service.ErrEmailNotVerified, http.StatusForbidden, "email_not_verified", ""},
+		{repository.ErrTokenExpired, http.StatusBadRequest, "invalid_token", ""},
+		{repository.ErrSessionNotFound, http.StatusNotFound, "not_found", ""},
+		{service.ErrWeakPassword, http.StatusUnprocessableEntity, "validation_failed", "password"},
+		{service.ErrInvalidCurrentPassword, http.StatusUnprocessableEntity, "validation_failed", "current_password"},
+		{service.ErrAdminPermission, http.StatusForbidden, "forbidden", ""},
+		{service.ErrActiveSubscription, http.StatusConflict, "active_subscription", ""},
+{{- if .Workspaces }}
+		{repository.ErrLastOwner, http.StatusConflict, "last_owner", ""},
+		{repository.ErrSeatLimit, http.StatusConflict, "seat_limit", ""},
+		{repository.ErrAlreadyMember, http.StatusConflict, "already_member", ""},
+		{service.ErrWorkspacePermission, http.StatusForbidden, "forbidden", ""},
+		{repository.ErrWorkspaceInvitationExpired, http.StatusGone, "invitation_unavailable", ""},
+{{- end }}
+{{- if .Storage }}
+		{repository.ErrFileNotFound, http.StatusNotFound, "not_found", ""},
+{{- end }}
+	}
+	for _, test := range tests {
+		t.Run(test.err.Error(), func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			ServiceError(recorder, test.err)
+
+			if recorder.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d", recorder.Code, test.wantStatus)
+			}
+			detail := decodeErrorBody(t, recorder)
+			if detail.Code != test.wantCode {
+				t.Fatalf("code = %q, want %q", detail.Code, test.wantCode)
+			}
+			if test.wantField != "" && detail.Fields[test.wantField] == "" {
+				t.Fatalf("fields = %#v, want %q", detail.Fields, test.wantField)
+			}
+		})
+	}
+}
+
+func TestServiceErrorHidesUnknownErrors(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ServiceError(recorder, errors.New("database password is hunter2"))
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", recorder.Code)
+	}
+	detail := decodeErrorBody(t, recorder)
+	if detail.Code != "internal" || strings.Contains(detail.Message, "hunter2") {
+		t.Fatalf("detail = %#v", detail)
+	}
+}
+
+func TestCodeForStatus(t *testing.T) {
+	tests := map[int]string{
+		http.StatusUnauthorized:        "unauthenticated",
+		http.StatusForbidden:           "forbidden",
+		http.StatusNotFound:            "not_found",
+		http.StatusTooManyRequests:     "rate_limited",
+		http.StatusInternalServerError: "internal",
+		http.StatusBadGateway:          "internal",
+	}
+	for status, want := range tests {
+		got := CodeForStatus(status)
+		if got != want {
+			t.Fatalf("CodeForStatus(%d) = %q, want %q", status, got, want)
+		}
+	}
+}
+
+func TestDecodeRequiresJSONContentType(t *testing.T) {
+	tests := []struct {
+		contentType string
+		wantOK      bool
+	}{
+		{contentType: "application/json", wantOK: true},
+		{contentType: "application/json; charset=utf-8", wantOK: true},
+		{contentType: "Application/JSON", wantOK: true},
+		{contentType: ""},
+		{contentType: "text/plain"},
+		{contentType: "application/x-www-form-urlencoded"},
+		{contentType: "multipart/form-data; boundary=x"},
+		{contentType: "application/json-patch+json"},
+	}
+	for _, test := range tests {
+		t.Run(test.contentType, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/magic-link", strings.NewReader(`{"email":"ada@example.com"}`))
+			if test.contentType != "" {
+				request.Header.Set("Content-Type", test.contentType)
+			}
+			recorder := httptest.NewRecorder()
+			var value struct {
+				Email string `json:"email"`
+			}
+
+			ok := Decode(recorder, request, &value)
+			if ok != test.wantOK {
+				t.Fatalf("Decode() = %t, want %t, body %s", ok, test.wantOK, recorder.Body.String())
+			}
+			if test.wantOK {
+				return
+			}
+			if recorder.Code != http.StatusUnsupportedMediaType {
+				t.Fatalf("status = %d, want 415", recorder.Code)
+			}
+			detail := decodeErrorBody(t, recorder)
+			if detail.Code != "unsupported_media_type" || value.Email != "" {
+				t.Fatalf("detail = %#v, value = %#v", detail, value)
+			}
+		})
+	}
+}
+
+func TestDecode(t *testing.T) {
+	type payload struct {
+		Email string `json:"email"`
+	}
+	tests := []struct {
+		name    string
+		body    string
+		wantOK  bool
+		wantMsg string
+	}{
+		{name: "valid", body: `{"email":"ada@example.com"}`, wantOK: true},
+		{name: "empty", body: ``, wantMsg: "The request body is empty."},
+		{name: "malformed", body: `{"email":`, wantMsg: "The request body is not valid JSON for this endpoint."},
+		{name: "unknown field", body: `{"email":"ada@example.com","admin":true}`, wantMsg: "The request body is not valid JSON for this endpoint."},
+		{name: "trailing data", body: `{"email":"ada@example.com"}{}`, wantMsg: "The request body must contain a single JSON object."},
+		{name: "too large", body: `{"email":"` + strings.Repeat("a", MaxBodyBytes) + `"}`, wantMsg: "The request body is too large."},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/magic-link", strings.NewReader(test.body))
+			request.Header.Set("Content-Type", "application/json")
+			recorder := httptest.NewRecorder()
+			var value payload
+
+			ok := Decode(recorder, request, &value)
+			if ok != test.wantOK {
+				t.Fatalf("Decode() = %t, want %t", ok, test.wantOK)
+			}
+			if test.wantOK {
+				if value.Email != "ada@example.com" {
+					t.Fatalf("value = %#v", value)
+				}
+				return
+			}
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400", recorder.Code)
+			}
+			detail := decodeErrorBody(t, recorder)
+			if detail.Code != "invalid_body" || detail.Message != test.wantMsg {
+				t.Fatalf("detail = %#v, want message %q", detail, test.wantMsg)
+			}
+		})
+	}
+}

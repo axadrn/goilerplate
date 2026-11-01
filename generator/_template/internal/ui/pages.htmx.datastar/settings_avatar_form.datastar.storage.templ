@@ -1,0 +1,48 @@
+package pages
+
+import (
+	"fmt"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/dialog"
+	"{{.ModulePath}}/internal/ui/csrf"
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+templ SettingsAvatarForm() {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@templ.Fragment("settings-avatar-form") {
+		<form
+			id="avatar-upload-form"
+			enctype="multipart/form-data"
+			class="space-y-4"
+			data-on:submit={ fmt.Sprintf("@post(%q, {contentType: 'form'})", basePath+"/account/avatar") }
+			data-indicator:_avatar-upload
+			data-attr:inert="$_avatarUpload"
+			data-attr:aria-busy="$_avatarUpload"
+		>
+			@csrf.Token()
+			@SettingsAvatarFields()
+			<div class="flex flex-col sm:flex-row sm:justify-end gap-2">
+				@SettingsAvatarUploadButton()
+				@dialog.Dialog(dialog.Props{ID: "delete-avatar-dialog"}) {
+					@SettingsAvatarDeleteTrigger()
+					@dialog.Content() {
+						@SettingsAvatarDeleteDialog()
+						@dialog.Footer() {
+							@SettingsAvatarDeleteCancel()
+							@button.Button(button.Props{Attributes: utils.MergeAttributes(dialog.Close(ctx), templ.Attributes{
+								"data-on:click":      fmt.Sprintf("@delete(%q, {headers: {'X-CSRF-Token': %q}})", basePath+"/account/avatar", ctxkeys.CSRFToken(ctx)),
+								"data-indicator:_remove-avatar": true,
+								"data-attr:disabled": "$_removeAvatar",
+								"data-attr:aria-busy": "$_removeAvatar",
+							})}) {
+								Remove
+							}
+						}
+					}
+				}
+			</div>
+		</form>
+	}
+}

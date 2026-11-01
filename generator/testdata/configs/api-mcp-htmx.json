@@ -1,0 +1,14 @@
+{
+  "project_name": "API Ship",
+  "module_path": "example.com/api-ship",
+  "framework": "htmx",
+  "database": "sqlite",
+  "payment": "stripe",
+  "mail": "smtp",
+  "workspaces": false,
+  "oauth": [],
+  "storage": false,
+  "content": [],
+  "api": true,
+  "mcp": true
+}

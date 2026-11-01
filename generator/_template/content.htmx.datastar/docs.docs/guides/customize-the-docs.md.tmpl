@@ -1,0 +1,29 @@
+---
+title: "Customize the Docs"
+description: "Turn the included pages into documentation for your product"
+order: 2
+---
+
+## Start with the first successful outcome
+
+Rewrite Getting Started around the shortest path to a visible result. Show the exact command, expected response, and one recovery step for the most common failure.
+
+## Replace examples with product language
+
+Search the example copy before launch:
+
+```bash
+rg -n "example|replace" content/docs
+```
+
+Remove pages that do not help a reader make a decision or complete a task.
+
+## Verify the public surface
+
+Check the rendered page, raw Markdown, and discovery index:
+
+```bash
+curl --fail http://localhost:8090/docs
+curl --fail http://localhost:8090/docs.md
+curl --fail http://localhost:8090/llms.txt
+```

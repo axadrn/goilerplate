@@ -9,17 +9,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/goilerplate/v3/api"
+	"github.com/axadrn/goilerplate/v4/generator"
 )
 
 func TestInspectChecksProjectAndSelectedTools(t *testing.T) {
 	root := t.TempDir()
-	writeProject(t, root, api.ProjectLock{
-		SchemaVersion:   api.LockSchemaVersion,
+	writeProject(t, root, generator.LockFile{
+		SchemaVersion:   generator.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Config: api.GenerationAnswers{
+		Config: generator.Config{
 			ModulePath: "example.com/acme",
-			Edition:    "free",
 			Database:   "postgres",
 			Mail:       "resend",
 		},
@@ -46,10 +45,10 @@ func TestInspectChecksProjectAndSelectedTools(t *testing.T) {
 
 func TestInspectReportsModuleVersionsAndMissingTools(t *testing.T) {
 	root := t.TempDir()
-	writeProject(t, root, api.ProjectLock{
-		SchemaVersion:   api.LockSchemaVersion,
+	writeProject(t, root, generator.LockFile{
+		SchemaVersion:   generator.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Config:          api.GenerationAnswers{ModulePath: "example.com/wanted", Database: "sqlite", Mail: "resend"},
+		Config:          generator.Config{ModulePath: "example.com/wanted", Database: "sqlite", Mail: "resend"},
 	})
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/wrong\n\ngo 1.25.0\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -109,10 +108,10 @@ func TestInspectChecksTheFrontendToolsOfTheSelection(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
-			writeProject(t, root, api.ProjectLock{
-				SchemaVersion:   api.LockSchemaVersion,
+			writeProject(t, root, generator.LockFile{
+				SchemaVersion:   generator.LockSchemaVersion,
 				TemplateVersion: "v3.1.0",
-				Config:          api.GenerationAnswers{ModulePath: "example.com/acme", Framework: test.framework, API: test.framework != "htmx", Database: "sqlite", Mail: "resend"},
+				Config:          generator.Config{ModulePath: "example.com/acme", Framework: generator.Framework(test.framework), API: test.framework != "htmx", Database: "sqlite", Mail: "resend"},
 			})
 			report := fakeInspector(test.outputs).Inspect(context.Background(), root)
 			if report.Errors != len(test.errors) {
@@ -137,10 +136,10 @@ func TestInspectChecksTheFrontendToolsOfTheSelection(t *testing.T) {
 
 func TestInspectAllowsCommentsAndNoGoVersionGate(t *testing.T) {
 	root := t.TempDir()
-	writeProject(t, root, api.ProjectLock{
-		SchemaVersion:   api.LockSchemaVersion,
+	writeProject(t, root, generator.LockFile{
+		SchemaVersion:   generator.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Config:          api.GenerationAnswers{ModulePath: "example.com/acme", Database: "sqlite", Mail: "resend"},
+		Config:          generator.Config{ModulePath: "example.com/acme", Database: "sqlite", Mail: "resend"},
 	})
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/acme // generated project\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -153,15 +152,15 @@ func TestInspectAllowsCommentsAndNoGoVersionGate(t *testing.T) {
 
 func TestInspectValidatesSelectedEnvironment(t *testing.T) {
 	root := t.TempDir()
-	writeProject(t, root, api.ProjectLock{
-		SchemaVersion:   api.LockSchemaVersion,
+	writeProject(t, root, generator.LockFile{
+		SchemaVersion:   generator.LockSchemaVersion,
 		TemplateVersion: "v3.0.0",
-		Config: api.GenerationAnswers{
+		Config: generator.Config{
 			ModulePath: "example.com/acme",
 			Database:   "sqlite",
 			Mail:       "resend",
 			Payment:    "stripe",
-			OAuth:      []string{"github"},
+			OAuth:      []generator.OAuth{generator.OAuthGitHub},
 			Storage:    true,
 		},
 	})
@@ -249,7 +248,7 @@ func fakeInspector(outputs map[string]string) Inspector {
 	}
 }
 
-func writeProject(t *testing.T, root string, lock api.ProjectLock) {
+func writeProject(t *testing.T, root string, lock generator.LockFile) {
 	t.Helper()
 	encoded, err := json.Marshal(lock)
 	if err != nil {

@@ -1,0 +1,16 @@
+{
+  "project_name": "Headless Stripe",
+  "module_path": "example.com/headless-stripe",
+  "framework": "headless",
+  "database": "sqlite",
+  "payment": "stripe",
+  "mail": "smtp",
+  "workspaces": false,
+  "oauth": [
+    "github"
+  ],
+  "storage": true,
+  "content": [],
+  "api": true,
+  "mcp": true
+}

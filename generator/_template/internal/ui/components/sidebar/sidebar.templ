@@ -1,0 +1,973 @@
+package sidebar
+
+import (
+	"context"
+	"math/rand"
+	"strconv"
+
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/input"
+	"{{.ModulePath}}/internal/ui/components/sheet"
+	"{{.ModulePath}}/internal/ui/components/skeleton"
+	"{{.ModulePath}}/internal/ui/components/tooltip"
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+// The pendant of shadcn's sidebar.tsx width constants; the cookie and the
+// toggle key constants live in sidebar.js, where they are used.
+const (
+	sidebarWidth       = "16rem"
+	sidebarWidthMobile = "18rem"
+	sidebarWidthIcon   = "3rem"
+)
+
+type contextKey string
+
+const (
+	sidebarIDKey    contextKey = "sidebar-id"
+	sidebarStateKey contextKey = "sidebar-state"
+)
+
+type ctxState struct {
+	collapsed   bool
+	collapsible Collapsible
+}
+
+func sidebarID(ctx context.Context) string {
+	if id, ok := ctx.Value(sidebarIDKey).(string); ok {
+		return id
+	}
+	return ""
+}
+
+func sidebarState(ctx context.Context) ctxState {
+	if s, ok := ctx.Value(sidebarStateKey).(ctxState); ok {
+		return s
+	}
+	return ctxState{}
+}
+
+type Side string
+
+const (
+	SideLeft  Side = "left" // default
+	SideRight Side = "right"
+)
+
+type Variant string
+
+const (
+	VariantSidebar  Variant = "sidebar" // default
+	VariantFloating Variant = "floating"
+	VariantInset    Variant = "inset"
+)
+
+type Collapsible string
+
+const (
+	CollapsibleOffcanvas Collapsible = "offcanvas" // default
+	CollapsibleIcon      Collapsible = "icon"
+	CollapsibleNone      Collapsible = "none"
+)
+
+type MenuButtonVariant string
+
+const (
+	MenuButtonVariantDefault MenuButtonVariant = "default"
+	MenuButtonVariantOutline MenuButtonVariant = "outline"
+)
+
+type MenuButtonSize string
+
+const (
+	MenuButtonSizeDefault MenuButtonSize = "default" // default
+	MenuButtonSizeSm      MenuButtonSize = "sm"
+	MenuButtonSizeLg      MenuButtonSize = "lg"
+)
+
+type MenuSubButtonSize string
+
+const (
+	MenuSubButtonSizeMd MenuSubButtonSize = "md" // default
+	MenuSubButtonSizeSm MenuSubButtonSize = "sm"
+)
+
+type Props struct {
+	ID          string
+	Class       string
+	Attributes  templ.Attributes
+	Side        Side        // default: "left"
+	Variant     Variant     // default: "sidebar"
+	Collapsible Collapsible // default: "offcanvas"
+}
+
+type ProviderProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	// DisableDefaultOpen renders the sidebar collapsed on page load, the zero-value
+	// inversion of SidebarProvider's defaultOpen (true).
+	DisableDefaultOpen bool
+}
+
+type TriggerProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	Target     string // Target sidebar ID to toggle
+}
+
+type RailProps struct {
+	Class      string
+	Attributes templ.Attributes
+}
+
+type InsetProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type InputProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	Name       string
+	Value      string
+	Placeholder string
+}
+
+type HeaderProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type FooterProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type SeparatorProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type ContentProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type GroupProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type GroupLabelProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type GroupActionProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type GroupContentProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type MenuProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type MenuItemProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type MenuButtonProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	Href       string
+	IsActive   bool
+	Variant    MenuButtonVariant // default: "default"
+	Size       MenuButtonSize    // default: "default"
+	Tooltip    string            // Tooltip text to show when sidebar is collapsed to icons
+	// TooltipHidden is the tooltip prop's hidden (tooltip={{ hidden }}):
+	// nil hides the tooltip unless the sidebar is collapsed, a value pins it.
+	TooltipHidden *bool
+}
+
+type MenuActionProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	// ShowOnHover reveals the action only while its menu item is hovered.
+	ShowOnHover bool
+}
+
+type MenuBadgeProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type MenuSkeletonProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	ShowIcon   bool
+}
+
+type MenuSubProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type MenuSubItemProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type MenuSubButtonProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	Href       string
+	IsActive   bool
+	Size       MenuSubButtonSize // default: "md"
+}
+
+// Provider is the SidebarProvider pendant: it hosts the width variables and
+// the has-data-[variant=inset] background.
+templ Provider(props ...ProviderProps) {
+	{{ var p ProviderProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	{{ var layoutID string = p.ID }}
+	if layoutID == "" {
+		{{ layoutID = utils.RandomID() }}
+	}
+	{{ ctx = context.WithValue(ctx, sidebarIDKey, layoutID) }}
+	{{ ctx = context.WithValue(ctx, sidebarStateKey, ctxState{collapsed: p.DisableDefaultOpen}) }}
+	<div
+		data-slot="sidebar-wrapper"
+		class={ utils.CN(
+			"group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+			p.Class,
+		) }
+		{ utils.MergeAttributes(
+			templ.Attributes{"style": "--sidebar-width: " + sidebarWidth + "; --sidebar-width-icon: " + sidebarWidthIcon + ";"},
+			p.Attributes,
+		)... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Sidebar(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.ID == "" {
+		if ctxId := ctx.Value(sidebarIDKey); ctxId != nil {
+			{{ p.ID = ctxId.(string) }}
+		} else {
+			{{ p.ID = utils.RandomID() }}
+		}
+	}
+	if p.Side == "" {
+		{{ p.Side = SideLeft }}
+	}
+	if p.Variant == "" {
+		{{ p.Variant = VariantSidebar }}
+	}
+	if p.Collapsible == "" {
+		{{ p.Collapsible = CollapsibleOffcanvas }}
+	}
+	{{ s := sidebarState(ctx) }}
+	{{ ctx = context.WithValue(ctx, sidebarIDKey, p.ID) }}
+	{{ ctx = context.WithValue(ctx, sidebarStateKey, ctxState{collapsed: s.collapsed, collapsible: p.Collapsible}) }}
+	if p.Collapsible == CollapsibleNone {
+		<div
+			id={ p.ID }
+			data-slot="sidebar"
+			class={ utils.CN(
+				"flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
+				p.Class,
+			) }
+			{ p.Attributes... }
+		>
+			{ children... }
+		</div>
+	} else {
+		{{ var sheetSide = sheet.SideLeft }}
+		if p.Side == SideRight {
+			{{ sheetSide = sheet.SideRight }}
+		}
+		<!-- Mobile: the sidebar content moves into this sheet below md -->
+		@sheet.Sheet(sheet.Props{
+			ID: p.ID + "-mobile",
+		}) {
+			@sheet.Content(sheet.ContentProps{
+				Side:            sheetSide,
+				Class: "w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden md:hidden",
+				Attributes: templ.Attributes{
+					"data-sidebar": "sidebar",
+					"data-mobile":  "true",
+					"style":        "--sidebar-width: " + sidebarWidthMobile + ";",
+				},
+			}) {
+				@sheet.Header(sheet.HeaderProps{Class: "sr-only"}) {
+					@sheet.Title() {
+						Sidebar
+					}
+					@sheet.Description() {
+						Displays the mobile sidebar.
+					}
+				}
+				<div class="flex h-full w-full flex-col" data-templ-sidebar-mobile-portal={ p.ID }></div>
+			}
+		}
+		<!-- Desktop -->
+		<div
+			class="group peer hidden text-sidebar-foreground md:block"
+			data-state={ utils.IfElse(s.collapsed, "collapsed", "expanded") }
+			data-collapsible={ utils.IfElse(s.collapsed, string(p.Collapsible), "") }
+			data-variant={ string(p.Variant) }
+			data-side={ string(p.Side) }
+			data-slot="sidebar"
+			data-templ-sidebar-id={ p.ID }
+			data-templ-collapsible={ string(p.Collapsible) }
+		>
+			<!-- Gap element that keeps the sidebar width in the document flow -->
+			<div
+				data-slot="sidebar-gap"
+				class={ utils.CN(
+					"transition-[width] duration-200 ease-linear relative w-(--sidebar-width) bg-transparent",
+					"group-data-[collapsible=offcanvas]:w-0",
+					"group-data-[side=right]:rotate-180",
+					utils.IfElse(
+						p.Variant == VariantFloating || p.Variant == VariantInset,
+						"group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]",
+						"group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
+					),
+				) }
+			></div>
+			<div
+				id={ p.ID }
+				data-slot="sidebar-container"
+				data-side={ string(p.Side) }
+				class={ utils.CN(
+					"fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+					utils.IfElse(
+						p.Variant == VariantFloating || p.Variant == VariantInset,
+						"p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]",
+						"group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+					),
+					p.Class,
+				) }
+				{ p.Attributes... }
+			>
+				<div
+					data-sidebar="sidebar"
+					data-slot="sidebar-inner"
+					class="bg-sidebar group-data-[variant=floating]:ring-sidebar-border group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 flex size-full flex-col"
+				>
+					{ children... }
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// Trigger toggles the sidebar: below md it opens the mobile sheet, on
+// desktop it collapses/expands (the script decides).
+templ Trigger(props ...TriggerProps) {
+	{{ var p TriggerProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	{{ var targetID = p.Target }}
+	if targetID == "" {
+		{{ targetID = sidebarID(ctx) }}
+	}
+	@button.Button(button.Props{
+		ID:      p.ID,
+		Size:    button.SizeIconSm,
+		Variant: button.VariantGhost,
+		Class:   utils.CN("", p.Class),
+		Attributes: utils.MergeAttributes(
+			templ.Attributes{
+				"data-sidebar":               "trigger",
+				"data-slot":                  "sidebar-trigger",
+				"data-templ-sidebar-trigger": targetID,
+			},
+			p.Attributes,
+		),
+	}) {
+		@icon.PanelLeft(icon.Props{Class: ""})
+		<span class="sr-only">Toggle Sidebar</span>
+	}
+}
+
+// Rail is the invisible strip on the sidebar edge that toggles it on click.
+templ Rail(props ...RailProps) {
+	{{ var p RailProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<button
+		data-sidebar="rail"
+		data-slot="sidebar-rail"
+		data-templ-sidebar-trigger={ sidebarID(ctx) }
+		aria-label="Toggle Sidebar"
+		tabindex="-1"
+		title="Toggle Sidebar"
+		class={ utils.CN(
+			"hover:after:bg-sidebar-border absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
+			"in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
+			"[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
+			"group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full hover:group-data-[collapsible=offcanvas]:bg-sidebar",
+			"[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
+			"[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
+			p.Class,
+		) }
+		{ p.Attributes... }
+	></button>
+}
+
+templ Inset(props ...InsetProps) {
+	{{ var p InsetProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<main
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-inset"
+		class={ utils.CN(
+			"bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2 relative flex w-full flex-1 flex-col",
+			p.Class,
+		) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</main>
+}
+
+templ Input(props ...InputProps) {
+	{{ var p InputProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	@input.Input(input.Props{
+		ID:          p.ID,
+		Name:        p.Name,
+		Value:       p.Value,
+		Placeholder: p.Placeholder,
+		Class:       utils.CN("bg-background h-8 w-full shadow-none", p.Class),
+		Attributes: utils.MergeAttributes(
+			templ.Attributes{"data-slot": "sidebar-input", "data-sidebar": "input"},
+			p.Attributes,
+		),
+	})
+}
+
+templ Header(props ...HeaderProps) {
+	{{ var p HeaderProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-header"
+		data-sidebar="header"
+		class={ utils.CN("gap-2 p-2 flex flex-col", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Footer(props ...FooterProps) {
+	{{ var p FooterProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-footer"
+		data-sidebar="footer"
+		class={ utils.CN("gap-2 p-2 flex flex-col", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Separator(props ...SeparatorProps) {
+	{{ var p SeparatorProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		role="separator"
+		data-slot="sidebar-separator"
+		data-sidebar="separator"
+		data-orientation="horizontal"
+		class={ utils.CN(
+			// The base separator classes the tsx inherits from ui/separator,
+			// plus the sidebar override from sidebar.tsx.
+			"shrink-0 bg-border data-horizontal:h-px data-horizontal:w-full data-vertical:w-px data-vertical:self-stretch",
+			"bg-sidebar-border mx-2 w-auto",
+			p.Class,
+		) }
+		{ p.Attributes... }
+	></div>
+}
+
+templ Content(props ...ContentProps) {
+	{{ var p ContentProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-content"
+		data-sidebar="content"
+		class={ utils.CN(
+			"no-scrollbar gap-0 flex min-h-0 flex-1 flex-col overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+			p.Class,
+		) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Group(props ...GroupProps) {
+	{{ var p GroupProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-group"
+		data-sidebar="group"
+		class={ utils.CN("p-2 relative flex w-full min-w-0 flex-col", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ GroupLabel(props ...GroupLabelProps) {
+	{{ var p GroupLabelProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-group-label"
+		data-sidebar="group-label"
+		class={ utils.CN(
+			"text-sidebar-foreground/70 ring-sidebar-ring h-8 rounded-md px-2 text-xs font-medium transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 focus-visible:ring-2 [&>svg]:size-4 flex shrink-0 items-center outline-hidden [&>svg]:shrink-0",
+			p.Class,
+		) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ GroupAction(props ...GroupActionProps) {
+	{{ var p GroupActionProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<button
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		type="button"
+		data-slot="sidebar-group-action"
+		data-sidebar="group-action"
+		class={ utils.CN(
+			"text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute top-3.5 right-3 w-5 rounded-md p-0 focus-visible:ring-2 [&>svg]:size-4 flex aspect-square items-center justify-center outline-hidden transition-transform group-data-[collapsible=icon]:hidden after:absolute after:-inset-2 md:after:hidden [&>svg]:shrink-0",
+			p.Class,
+		) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</button>
+}
+
+templ GroupContent(props ...GroupContentProps) {
+	{{ var p GroupContentProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-group-content"
+		data-sidebar="group-content"
+		class={ utils.CN("text-sm w-full", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Menu(props ...MenuProps) {
+	{{ var p MenuProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<ul
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-menu"
+		data-sidebar="menu"
+		class={ utils.CN("gap-0 flex w-full min-w-0 flex-col", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</ul>
+}
+
+templ MenuItem(props ...MenuItemProps) {
+	{{ var p MenuItemProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<li
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-menu-item"
+		data-sidebar="menu-item"
+		class={ utils.CN("group/menu-item relative", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</li>
+}
+
+// 1:1 the sidebarMenuButtonVariants cva base: structure lives here, the look
+// comes from the active style-*.css via the classes.
+const menuButtonBaseClasses = "ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground gap-2 rounded-md p-2 text-left text-sm transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! focus-visible:ring-2 data-active:font-medium peer/menu-button group/menu-button flex w-full items-center overflow-hidden outline-hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate"
+
+func menuButtonClasses(p MenuButtonProps) string {
+	return utils.CN(
+		menuButtonBaseClasses,
+		menuButtonVariantClasses(p.Variant),
+		menuButtonSizeClasses(p.Size),
+		p.Class,
+	)
+}
+
+func menuButtonVariantClasses(v MenuButtonVariant) string {
+	switch v {
+	case MenuButtonVariantOutline:
+		return "bg-background hover:bg-sidebar-accent hover:text-sidebar-accent-foreground shadow-[0_0_0_1px_var(--sidebar-border)] hover:shadow-[0_0_0_1px_var(--sidebar-accent)]"
+	default:
+		return "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+	}
+}
+
+func menuButtonSizeClasses(s MenuButtonSize) string {
+	switch s {
+	case MenuButtonSizeSm:
+		return "h-7 text-xs"
+	case MenuButtonSizeLg:
+		return "h-12 text-sm group-data-[collapsible=icon]:p-0!"
+	default:
+		return "h-8 text-sm"
+	}
+}
+
+templ MenuButton(props ...MenuButtonProps) {
+	{{ var p MenuButtonProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.Variant == "" {
+		{{ p.Variant = MenuButtonVariantDefault }}
+	}
+	if p.Size == "" {
+		{{ p.Size = MenuButtonSizeDefault }}
+	}
+	if p.Tooltip != "" {
+		@tooltip.Tooltip() {
+			{{ s := sidebarState(ctx) }}
+			{{ tp := p }}
+			{{ trigger := tooltip.Trigger(ctx) }}
+			// shadcn renders the trigger through the menu button element,
+			// whose own data-slot stays.
+			{{ delete(trigger, "data-slot") }}
+			{{ tp.Attributes = utils.MergeAttributes(trigger, p.Attributes) }}
+			@menuButtonEl(tp) {
+				{ children... }
+			}
+			// hidden={state !== "collapsed" || isMobile}: the script keeps it in
+			// sync on toggle and below md. An explicit TooltipHidden pins it.
+			{{ content := templ.Attributes{} }}
+			if p.TooltipHidden != nil {
+				{{ content["data-templ-tooltip-hidden"] = strconv.FormatBool(*p.TooltipHidden) }}
+				{{ content["hidden"] = *p.TooltipHidden }}
+			} else {
+				{{ content["hidden"] = !s.collapsed }}
+			}
+			@tooltip.Content(tooltip.ContentProps{Side: tooltip.SideRight, Attributes: content}) {
+				{ p.Tooltip }
+			}
+		}
+	} else {
+		@menuButtonEl(p) {
+			{ children... }
+		}
+	}
+}
+
+templ menuButtonEl(p MenuButtonProps) {
+	if p.Href != "" {
+		<a
+			if p.ID != "" {
+				id={ p.ID }
+			}
+			href={ templ.SafeURL(p.Href) }
+			if _, ok := p.Attributes["data-slot"]; !ok {
+				data-slot="sidebar-menu-button"
+			}
+			data-sidebar="menu-button"
+			data-size={ string(p.Size) }
+			data-active?={ p.IsActive }
+			class={ menuButtonClasses(p) }
+			{ p.Attributes... }
+		>
+			{ children... }
+		</a>
+	} else {
+		<button
+			if p.ID != "" {
+				id={ p.ID }
+			}
+			if _, ok := p.Attributes["type"]; !ok {
+				type="button"
+			}
+			if _, ok := p.Attributes["data-slot"]; !ok {
+				data-slot="sidebar-menu-button"
+			}
+			data-sidebar="menu-button"
+			data-size={ string(p.Size) }
+			data-active?={ p.IsActive }
+			class={ menuButtonClasses(p) }
+			{ p.Attributes... }
+		>
+			{ children... }
+		</button>
+	}
+}
+
+templ MenuAction(props ...MenuActionProps) {
+	{{ var p MenuActionProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<button
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		if _, ok := p.Attributes["type"]; !ok {
+			type="button"
+		}
+		if _, ok := p.Attributes["data-slot"]; !ok {
+			data-slot="sidebar-menu-action"
+		}
+		data-sidebar="menu-action"
+		class={ utils.CN(
+			"text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground peer-hover/menu-button:text-sidebar-accent-foreground absolute top-1.5 right-1 aspect-square w-5 rounded-md p-0 peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 focus-visible:ring-2 [&>svg]:size-4 flex items-center justify-center outline-hidden transition-transform group-data-[collapsible=icon]:hidden after:absolute after:-inset-2 md:after:hidden [&>svg]:shrink-0",
+			map[string]bool{"group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-active/menu-button:text-sidebar-accent-foreground aria-expanded:opacity-100 md:opacity-0": p.ShowOnHover},
+			p.Class,
+		) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</button>
+}
+
+templ MenuBadge(props ...MenuBadgeProps) {
+	{{ var p MenuBadgeProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-menu-badge"
+		data-sidebar="menu-badge"
+		class={ utils.CN(
+			"text-sidebar-foreground peer-hover/menu-button:text-sidebar-accent-foreground peer-data-active/menu-button:text-sidebar-accent-foreground pointer-events-none absolute right-1 h-5 min-w-5 rounded-md px-1 text-xs font-medium peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 flex items-center justify-center tabular-nums select-none group-data-[collapsible=icon]:hidden",
+			p.Class,
+		) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ MenuSkeleton(props ...MenuSkeletonProps) {
+	{{ var p MenuSkeletonProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	// Random width between 50 and 90%, like shadcn.
+	{{ width := strconv.Itoa(rand.Intn(40)+50) + "%" }}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-menu-skeleton"
+		data-sidebar="menu-skeleton"
+		class={ utils.CN("h-8 gap-2 rounded-md px-2 flex items-center", p.Class) }
+		{ p.Attributes... }
+	>
+		if p.ShowIcon {
+			@skeleton.Skeleton(skeleton.Props{
+				Class:      "size-4 rounded-md",
+				Attributes: templ.Attributes{"data-sidebar": "menu-skeleton-icon"},
+			})
+		}
+		@skeleton.Skeleton(skeleton.Props{
+			Class: "h-4 max-w-(--skeleton-width) flex-1",
+			Attributes: templ.Attributes{
+				"data-sidebar": "menu-skeleton-text",
+				"style":        "--skeleton-width: " + width + ";",
+			},
+		})
+	</div>
+}
+
+templ MenuSub(props ...MenuSubProps) {
+	{{ var p MenuSubProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<ul
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-menu-sub"
+		data-sidebar="menu-sub"
+		class={ utils.CN(
+			"border-sidebar-border mx-3.5 translate-x-px gap-1 border-l px-2.5 py-0.5 group-data-[collapsible=icon]:hidden flex min-w-0 flex-col",
+			p.Class,
+		) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</ul>
+}
+
+templ MenuSubItem(props ...MenuSubItemProps) {
+	{{ var p MenuSubItemProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<li
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sidebar-menu-sub-item"
+		data-sidebar="menu-sub-item"
+		class={ utils.CN("group/menu-sub-item relative", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</li>
+}
+
+func menuSubButtonClasses(p MenuSubButtonProps) string {
+	return utils.CN(
+		"text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground [&>svg]:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground h-7 gap-2 rounded-md px-2 focus-visible:ring-2 data-[size=md]:text-sm data-[size=sm]:text-xs [&>svg]:size-4 flex min-w-0 -translate-x-px items-center overflow-hidden outline-hidden group-data-[collapsible=icon]:hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:shrink-0",
+		p.Class,
+	)
+}
+
+templ MenuSubButton(props ...MenuSubButtonProps) {
+	{{ var p MenuSubButtonProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.Size == "" {
+		{{ p.Size = MenuSubButtonSizeMd }}
+	}
+	if p.Href != "" {
+		<a
+			if p.ID != "" {
+				id={ p.ID }
+			}
+			href={ templ.SafeURL(p.Href) }
+			data-slot="sidebar-menu-sub-button"
+			data-sidebar="menu-sub-button"
+			data-size={ string(p.Size) }
+			data-active?={ p.IsActive }
+			class={ menuSubButtonClasses(p) }
+			{ p.Attributes... }
+		>
+			{ children... }
+		</a>
+	} else {
+		<button
+			if p.ID != "" {
+				id={ p.ID }
+			}
+			type="button"
+			data-slot="sidebar-menu-sub-button"
+			data-sidebar="menu-sub-button"
+			data-size={ string(p.Size) }
+			data-active?={ p.IsActive }
+			class={ utils.CN(menuSubButtonClasses(p), "w-full text-left") }
+			{ p.Attributes... }
+		>
+			{ children... }
+		</button>
+	}
+}

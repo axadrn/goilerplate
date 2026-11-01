@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/axadrn/goilerplate/v3/internal/github"
+	"github.com/axadrn/goilerplate/v4/internal/github"
 )
 
 func (a *App) changelog(ctx context.Context, arguments []string) error {

@@ -1,0 +1,31 @@
+package blocks
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/axadrn/goilerplate/v4/site/brand"
+)
+
+templ Footer() {
+	<footer class="border-t border-border">
+		<div class="mx-auto flex max-w-[1240px] flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+			<a href="/" class="text-[22px] leading-none" aria-label={ brand.Name + " home" }>
+				@Wordmark()
+			</a>
+			<nav class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground" aria-label="Footer">
+				@footerLink("/docs", "Docs")
+				@footerLink("/changelog", "Changelog")
+				@footerLink(GitHubURL, "GitHub")
+				@footerLink("https://github.com/axadrn/shadcn-templ", "shadcn-templ")
+				@footerLink("https://ops.goilerplate.com", "ops")
+				@footerLink("/legal/privacy", "Privacy")
+				<span>© { strconv.Itoa(time.Now().Year()) } { brand.Name }</span>
+			</nav>
+		</div>
+	</footer>
+}
+
+templ footerLink(href, label string) {
+	<a href={ templ.SafeURL(href) } class="transition-colors hover:text-foreground">{ label }</a>
+}

@@ -1,0 +1,64 @@
+package layouts
+
+import "{{.ModulePath}}/internal/ctxkeys"
+
+// Analytics renders all enabled analytics providers
+// Multiple providers can be used simultaneously
+templ Analytics() {
+	{{ cfg := ctxkeys.RenderConfig(ctx) }}
+	// Umami Analytics (recommended)
+	if cfg.UmamiWebsiteID != "" {
+		@Umami()
+	}
+	// Plausible Analytics
+	if cfg.PlausibleDomain != "" {
+		@Plausible()
+	}
+	// Google Analytics 4
+	if cfg.GoogleAnalyticsID != "" {
+		@GoogleAnalytics()
+	}
+}
+
+// Umami renders Umami Analytics script (recommended)
+// Requires: UMAMI_WEBSITE_ID
+// Optional: UMAMI_HOST (defaults to cloud.umami.is, set for self-hosted)
+templ Umami() {
+	{{ cfg := ctxkeys.RenderConfig(ctx) }}
+	{{ host := cfg.UmamiHost }}
+	if host == "" {
+		{{ host = "cloud.umami.is" }}
+	}
+	<!-- Umami Analytics -->
+	<script nonce={ templ.GetNonce(ctx) } defer src={ "https://" + host + "/script.js" } data-website-id={ cfg.UmamiWebsiteID }></script>
+	<!-- End Umami Analytics -->
+}
+
+// GoogleAnalytics renders Google Analytics 4 (direct integration)
+// Requires: GOOGLE_ANALYTICS_ID
+templ GoogleAnalytics() {
+	{{ cfg := ctxkeys.RenderConfig(ctx) }}
+	<!-- Google Analytics -->
+	<script nonce={ templ.GetNonce(ctx) } async src={ "https://www.googletagmanager.com/gtag/js?id=" + cfg.GoogleAnalyticsID }></script>
+	<script nonce={ templ.GetNonce(ctx) }>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', {{ cfg.GoogleAnalyticsID }});
+	</script>
+	<!-- End Google Analytics -->
+}
+
+// Plausible renders Plausible Analytics script
+// Requires: PLAUSIBLE_DOMAIN
+// Optional: PLAUSIBLE_HOST (defaults to plausible.io, set for self-hosted)
+templ Plausible() {
+	{{ cfg := ctxkeys.RenderConfig(ctx) }}
+	{{ host := cfg.PlausibleHost }}
+	if host == "" {
+		{{ host = "plausible.io" }}
+	}
+	<!-- Plausible Analytics -->
+	<script nonce={ templ.GetNonce(ctx) } defer data-domain={ cfg.PlausibleDomain } src={ "https://" + host + "/js/script.js" }></script>
+	<!-- End Plausible Analytics -->
+}

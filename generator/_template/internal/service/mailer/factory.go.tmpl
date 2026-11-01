@@ -1,0 +1,14 @@
+package mailer
+
+import "{{.ModulePath}}/internal/config"
+
+func NewProvider(cfg *config.Config) (Mailer, error) {
+{{- if eq .Mail "resend" }}
+	return NewResendMailer(cfg.ResendAPIKey, cfg.EmailFrom), nil
+{{- else }}
+	return NewSMTPMailer(SMTPConfig{
+		Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword, TLS: cfg.SMTPTLS, From: cfg.EmailFrom,
+	})
+{{- end }}
+}

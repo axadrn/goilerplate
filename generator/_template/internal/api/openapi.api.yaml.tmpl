@@ -1,0 +1,2483 @@
+openapi: 3.1.0
+info:
+  title: {{ printf "%s API" .ProjectName | printf "%q" }}
+  version: v1
+  description: |
+{{- if .IsHeadless }}
+    JSON API of {{ .ProjectName }}. The project has no web pages: `GET /` names the
+    project and the API base path, `GET /healthz` reports health, and every other
+    unknown path answers the `Error` envelope with `not_found`.
+{{- else if .IsSvelte }}
+    JSON API of {{ .ProjectName }}. The SvelteKit app served on the same origin uses it
+    with the session cookie. `GET /healthz` reports health, and every unknown path under
+    `/api/` answers the `Error` envelope with `not_found`.
+{{- else }}
+    JSON API of {{ .ProjectName }}. Every endpoint under `/api/v1` uses the same
+    services and rules as the web app.
+{{- end }}
+
+    Authentication: sign in with one of the `/api/v1/auth` endpoints and send the returned
+    token as `Authorization: Bearer <token>`. A browser frontend on the same site may use
+    the `session_token` cookie instead. Cookie requests that change state need the
+    `X-CSRF-Token` header with the token from `GET /api/v1/csrf`. Requests with an
+    `Authorization: Bearer` header never use cookies and need no CSRF token. Other
+    schemes, such as Basic auth added by a proxy, keep the cookie and its CSRF check.
+
+    Cookie sign-in: a browser app on the same origin adds `?session=cookie` to a sign-in
+    endpoint. The answer then sets the HttpOnly `session_token` cookie and carries no token,
+    so scripts never see it. These sign-ins always need the `X-CSRF-Token` header.
+
+    Personal API tokens: a signed-in user creates them with `POST /api/v1/account/tokens`
+    and sends one as `Authorization: Bearer pat_...` from scripts, integrations and AI agents.
+    A token acts for its user on the operations that list `apiTokenAuth`, with the scope the
+    operation names: `read` for reads, `write` for changes. A token without that scope gets
+    403 `insufficient_scope`, and a token on any other operation gets 403 `forbidden`.
+    Tokens never manage sessions, tokens, email, password, billing, admin or deletions.
+{{- if .Workspaces }}
+    Tokens never change member roles or remove members.
+    Each token is bound to one workspace: other workspaces answer 404 and are left out of
+    lists.
+{{- end }}
+
+    Errors: every non-2xx JSON answer is the `Error` envelope with a stable lowercase
+    snake case `code`. `fields` is present only for `validation_failed`.
+
+    Times are RFC 3339 in UTC. Lists answer `{"items": [...]}`. Request bodies are
+    `application/json` unless an endpoint says otherwise, at most 1 MiB, and unknown
+    fields are rejected.
+
+    CORS: browsers on the origins in `CORS_ALLOWED_ORIGINS` may call `/api/` with
+    credentials and read the `Retry-After` header of a 429 answer.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+  - cookieAuth: []
+tags:
+  - name: Meta
+    description: The API description, the project name and support address, and the CSRF token for cookie sessions.
+  - name: Auth
+    description: Sign-in, onboarding and logout. Sign-in answers carry a bearer token and set no cookie, unless they ask for a cookie session with `session=cookie`.
+  - name: Account
+    description: The signed-in account.
+  - name: Sessions
+    description: Active sessions of the signed-in account.
+  - name: API tokens
+    description: Personal API tokens of the signed-in account. Only a signed-in session manages them. Recovering the account with a forgot password link, changing, setting or removing the password, and an admin signing the user out everywhere revoke every token. Signing out other sessions keeps them.
+{{- if .Workspaces }}
+  - name: Workspaces
+    description: Workspaces, members, invitations and activity.
+  - name: Invitations
+    description: Workspace invitations opened with the token from the invitation email.
+{{- end }}
+  - name: Billing
+    description: {{ if .Workspaces }}Workspace subscriptions, checkout and billing management.{{ else }}The subscription, checkout and the customer portal.{{ end }}
+  - name: Admin
+    description: Operator dashboard data and session revocation. Admins only.
+{{- if or .HasGoogleOAuth .HasGitHubOAuth }}
+  - name: OAuth
+    description: Browser redirect flows. They end in a cookie session and are not JSON endpoints.
+{{- end }}
+
+paths:
+  /api/v1/openapi.yaml:
+    get:
+      tags: [Meta]
+      operationId: getOpenAPI
+      summary: Get this OpenAPI document
+      security: []
+      responses:
+        '200':
+          description: The OpenAPI 3.1 document.
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /api/v1/csrf:
+    get:
+      tags: [Meta]
+      operationId: getCSRFToken
+      summary: Get the CSRF token
+      description: |
+        Returns the CSRF token for cookie requests and sets the `csrf_token` cookie when it is
+        missing. Send the token as `X-CSRF-Token` on every cookie request that changes state.
+        Bearer clients do not need it.
+      security: []
+      responses:
+        '200':
+          description: The CSRF token of this browser.
+          headers:
+            Set-Cookie:
+              description: The HttpOnly `csrf_token` cookie, when the request had none.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CSRFToken'
+
+  /api/v1/meta:
+    get:
+      tags: [Meta]
+      operationId: getMeta
+      summary: Get the project name and support address
+      security: []
+      responses:
+        '200':
+          description: Public facts about the project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meta'
+
+  /api/v1/auth/password:
+    post:
+      tags: [Auth]
+      operationId: signInWithPassword
+      summary: Sign in with email and password
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SessionMode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordSignInRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Session'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          description: '`invalid_credentials`. Wrong email or password, an unverified address, or an account without a password.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.email` or `fields.password`.'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/auth/magic-link:
+    post:
+      tags: [Auth]
+      operationId: sendMagicLink
+      summary: Email a sign-in link
+      description: |
+        Emails a link to `APP_URL/auth/magic-link/{token}` and creates the account when the
+        address is new. The answer is the same whether or not an account exists. The page at
+        that link calls `POST /api/v1/auth/magic-link/verify` with the token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '202':
+          description: The link is on its way when the address can receive one.
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.email`.'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+          description: '`rate_limited`. Too many links for this client IP or this address.'
+
+  /api/v1/auth/magic-link/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyMagicLink
+      summary: Sign in with a magic link token
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SessionMode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Session'
+        '400':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/auth/forgot-password:
+    post:
+      tags: [Auth]
+      operationId: sendForgotPasswordLink
+      summary: Email a password reset link
+      description: |
+        Emails a link to `APP_URL/auth/forgot-password/{token}`. The answer is the same whether
+        or not an account exists. The page at that link calls
+        `POST /api/v1/auth/forgot-password/verify` with the token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '202':
+          description: The link is on its way when an account exists.
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.email`.'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+          description: '`rate_limited`. Too many links for this client IP or this address.'
+
+  /api/v1/auth/forgot-password/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyForgotPassword
+      summary: Sign in with a password reset token
+      description: Removes the password, signs out every other session, revokes every personal API token, and returns a new session. Set a new password with `POST /api/v1/account/password/set`.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SessionMode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Session'
+        '400':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/auth/email-change/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyEmailChange
+      summary: Confirm an email change
+      description: |
+        Moves the pending address to the account, signs out every session of the account, and
+        returns a new session. A cookie caller also gets the new session cookie. The link in the
+        email points to `APP_URL/auth/verify-email-change/{token}`.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SessionMode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Session'
+        '400':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/auth/onboarding:
+    post:
+      tags: [Auth]
+      operationId: completeOnboarding
+      summary: Complete onboarding
+      description: {{ if .Workspaces }}Sets the name of a new account and creates its first workspace when it has none. With `invitation_token` of an available invitation for the account's email address no workspace is created, because the account joins the invited workspace next through `POST /api/v1/invitations/{token}/accept`.{{ if .IsSvelte }} Without `invitation_token` the `pending_invitation` cookie of the invitation preview counts the same way.{{ end }}{{ else }}Sets the name of a new account.{{ end }} Every other endpoint answers `onboarding_required` until this is done.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/{{ if .Workspaces }}OnboardingRequest{{ else }}NameRequest{{ end }}'
+      responses:
+        '200':
+          description: The onboarded account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/{{ if .Workspaces }}OnboardingResponse{{ else }}UserResponse{{ end }}'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: signOut
+      summary: Sign out
+      description: Revokes the session of the bearer token, or the cookie session and its cookie.
+      responses:
+        '204':
+          description: The session is revoked.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+          description: '`forbidden` for a cookie request without a valid `X-CSRF-Token` header. Logout stays available during impersonation.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account:
+    get:
+      tags: [Account]
+      operationId: getAccount
+      summary: Get the signed-in account
+      description: Works before onboarding and reports `onboarding_required`.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags: [Account]
+      operationId: deleteAccount
+      summary: Delete the account
+      description: Deletes the account after the caller types its email address. Every session ends with it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '204':
+          description: The account is deleted.
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+{{- if .Workspaces }}
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`sole_workspace_owner`. Transfer or delete the workspaces the account owns alone first.'
+{{- else }}
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`active_subscription`. End paid access first.'
+{{- end }}
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.confirm_email` when it does not match the account email.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/name:
+    patch:
+      tags: [Account]
+      operationId: updateAccountName
+      summary: Change the display name
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NameRequest'
+      responses:
+        '200':
+          description: The updated account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/email:
+    patch:
+      tags: [Account]
+      operationId: requestEmailChange
+      summary: Change the email address
+      description: |
+        Emails a verification link to the new address. The address changes once the link is
+        confirmed with `POST /api/v1/auth/email-change/verify`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '202':
+          description: The verification link is on its way.
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`email_taken`. Another account uses this address.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.email`, also when the address is the current one.'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+          description: '`rate_limited`. Too many email changes for this account or this address.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/password:
+    post:
+      tags: [Account]
+      operationId: changePassword
+      summary: Change the password
+      description: Replaces the password, signs out every other session, and revokes every personal API token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: The password is changed.
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`password_not_set`. The account has no password, set one first.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.current_password` or `fields.new_password`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags: [Account]
+      operationId: removePassword
+      summary: Remove the password
+      description: Makes the account passwordless, signs out every other session, and revokes every personal API token.
+      responses:
+        '204':
+          description: The password is removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`password_not_set`. The account has no password.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/password/set:
+    post:
+      tags: [Account]
+      operationId: setPassword
+      summary: Add a password
+      description: Adds a password to a passwordless account, signs out every other session, and revokes every personal API token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetPasswordRequest'
+      responses:
+        '204':
+          description: The password is set.
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`password_already_set`. Change the password instead.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.password`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/sessions:
+    get:
+      tags: [Sessions]
+      operationId: listSessions
+      summary: List active sessions
+      responses:
+        '200':
+          description: Every active session. The session of this request has `current` set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags: [Sessions]
+      operationId: revokeOtherSessions
+      summary: Sign out every other session
+      description: Personal API tokens stay valid. Revoke them one by one with `DELETE /api/v1/account/tokens/{id}`.
+      responses:
+        '204':
+          description: Only the current session is left.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/sessions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/SessionID'
+    delete:
+      tags: [Sessions]
+      operationId: revokeSession
+      summary: Sign out one session
+      description: Revoking the current session signs the caller out, and a cookie caller also loses the cookie.
+      responses:
+        '204':
+          description: The session is revoked.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No active session with this ID belongs to the account.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/tokens:
+    get:
+      tags: [API tokens]
+      operationId: listAPITokens
+      summary: List personal API tokens
+      description: Newest first. Expired tokens stay listed with `expired` set until they are revoked. The token itself is never shown again.
+      responses:
+        '200':
+          description: Every token of the account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`onboarding_required`, `forbidden` for a personal API token.'
+        '500':
+          $ref: '#/components/responses/Internal'
+    post:
+      tags: [API tokens]
+      operationId: createAPIToken
+      summary: Create a personal API token
+      description: Answers the token once. Store it right away; only its hash is kept. An account holds at most 50 tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAPITokenRequest'
+      responses:
+        '201':
+          description: The new token and its raw value.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedAPIToken'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`onboarding_required`, `forbidden` for a personal API token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`token_limit`. Revoke a token first.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`, `fields.scopes`, `fields.expires_in_days`{{ if .Workspaces }} or `fields.workspace_id`{{ end }}.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/tokens/{id}:
+    parameters:
+      - $ref: '#/components/parameters/APITokenID'
+    delete:
+      tags: [API tokens]
+      operationId: revokeAPIToken
+      summary: Revoke a personal API token
+      description: Requests with the token answer 401 from now on.
+      responses:
+        '204':
+          description: The token is revoked.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`onboarding_required`, `forbidden` for a personal API token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No token with this ID belongs to the account.'
+        '500':
+          $ref: '#/components/responses/Internal'
+{{- if .Storage }}
+
+  /api/v1/account/avatar:
+    post:
+      tags: [Account]
+      operationId: uploadAvatar
+      summary: Upload an avatar
+      description: Replaces the avatar. The request is `multipart/form-data` with the image in the field `file`, at most 10 MB.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  contentMediaType: application/octet-stream
+                  description: A JPEG, PNG or WebP image.
+      responses:
+        '200':
+          description: The new avatar.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarResponse'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+          description: '`invalid_body`. The body is not multipart or larger than 10 MB.'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.file` when the field is missing or the file is not an accepted image.'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags: [Account]
+      operationId: deleteAvatar
+      summary: Remove the avatar
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '204':
+          description: The avatar is removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+{{- end }}
+{{- if .Workspaces }}
+
+  /api/v1/workspaces:
+    get:
+      tags: [Workspaces]
+      operationId: listWorkspaces
+      summary: List workspaces
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The workspaces of the account with its role in each.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+    post:
+      tags: [Workspaces]
+      operationId: createWorkspace
+      summary: Create a workspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NameRequest'
+      responses:
+        '201':
+          description: The new workspace, owned by the account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Membership'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+    get:
+      tags: [Workspaces]
+      operationId: getWorkspace
+      summary: Get a workspace
+      description: The workspace, the role and permissions of the caller, members, pending invitations for members who may manage them, and seats.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The workspace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceDetail'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags: [Workspaces]
+      operationId: deleteWorkspace
+      summary: Delete a workspace
+      responses:
+        '204':
+          description: The workspace is deleted.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`active_subscription`. End paid access first.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/name:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+    patch:
+      tags: [Workspaces]
+      operationId: renameWorkspace
+      summary: Rename a workspace
+      description: The slug stays the same.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NameRequest'
+      responses:
+        '200':
+          description: The renamed workspace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceResponse'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+    post:
+      tags: [Workspaces]
+      operationId: inviteMember
+      summary: Invite a member
+      description: Emails an invitation link to `APP_URL/workspaces/invitations/{token}`. The invitation appears in `GET /api/v1/workspaces/{workspaceSlug}`.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+      responses:
+        '202':
+          description: The invitation is created and on its way.
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`seat_limit` when the plan has no free seat, `already_member` when the address belongs to a member.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.email` or `fields.role`.'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/invitations/{invitationID}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+      - $ref: '#/components/parameters/InvitationID'
+    delete:
+      tags: [Workspaces]
+      operationId: revokeInvitation
+      summary: Revoke an invitation
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '204':
+          description: The invitation is revoked.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. Unknown workspace or invitation.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/invitations/{invitationID}/resend:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+      - $ref: '#/components/parameters/InvitationID'
+    post:
+      tags: [Workspaces]
+      operationId: resendInvitation
+      summary: Resend an invitation
+      description: Revokes the invitation and sends a new one, so the invitation ID changes.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '202':
+          description: The new invitation is on its way.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. Unknown workspace or invitation.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`seat_limit` or `already_member`.'
+        '410':
+          $ref: '#/components/responses/InvitationUnavailable'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/members/{memberID}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+      - $ref: '#/components/parameters/MemberID'
+    delete:
+      tags: [Workspaces]
+      operationId: removeMember
+      summary: Remove a member
+      responses:
+        '204':
+          description: The member is removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. Unknown workspace or member.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`last_owner`. A workspace keeps at least one owner.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/members/{memberID}/role:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+      - $ref: '#/components/parameters/MemberID'
+    patch:
+      tags: [Workspaces]
+      operationId: changeMemberRole
+      summary: Change the role of a member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+      responses:
+        '200':
+          description: The member with the new role.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. Unknown workspace or member.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`last_owner`. A workspace keeps at least one owner.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.role`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/leave:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+    post:
+      tags: [Workspaces]
+      operationId: leaveWorkspace
+      summary: Leave a workspace
+      responses:
+        '204':
+          description: The account is no longer a member.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`last_owner`. Hand over ownership first.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/activity:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+    get:
+      tags: [Workspaces]
+      operationId: listWorkspaceActivity
+      summary: List workspace activity
+      description: Audit events, newest first. Pass `next_cursor` as `cursor` to read the next page.
+      parameters:
+        - name: limit
+          in: query
+          description: Events per page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: cursor
+          in: query
+          description: The `next_cursor` of the previous page.
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: One page of events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityPage'
+        '400':
+          description: '`invalid_cursor`. Start again without a cursor.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.limit`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/billing:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+    get:
+      tags: [Billing]
+      operationId: getWorkspaceBilling
+      summary: Get the workspace subscription and plans
+      description: Only members who may manage billing.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          $ref: '#/components/responses/Billing'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/billing/checkout:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+    post:
+      tags: [Billing]
+      operationId: createWorkspaceCheckout
+      summary: Start a checkout for the workspace
+      description: Only members who may manage billing. Open the returned URL in a browser.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ProviderURL'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`checkout_pending` while a checkout is being created, `checkout_conflict` when a checkout for another plan is open, `already_paid`.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/InvalidCheckout'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/workspaces/{workspaceSlug}/billing/manage:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceSlug'
+    get:
+      tags: [Billing]
+      operationId: getWorkspaceBillingManagement
+      summary: Open billing management for the workspace
+      description: Only members who may manage billing. Open the returned URL in a browser.
+      responses:
+        '200':
+          $ref: '#/components/responses/ProviderURL'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/WorkspaceForbidden'
+          description: '`forbidden` when the role may not manage billing, `onboarding_required`, or `impersonation_read_only` during impersonation because billing management is a provider session.'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '409':
+          $ref: '#/components/responses/NoBillingAccount'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/invitations/{token}:
+    parameters:
+      - $ref: '#/components/parameters/InvitationToken'
+    get:
+      tags: [Invitations]
+      operationId: getInvitation
+      summary: Preview an invitation
+      description: Needs no session. The token comes from the invitation link `APP_URL/workspaces/invitations/{token}`.{{ if .IsSvelte }} For a guest or an account that still needs onboarding the answer sets the HttpOnly `pending_invitation` cookie, so sign-in and onboarding in another tab return to the invitation. A signed-in account clears it.{{ end }}
+      security: []
+      responses:
+        '200':
+          description: The open invitation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationPreview'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. Unknown token.'
+        '410':
+          $ref: '#/components/responses/InvitationUnavailable'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/invitations/{token}/accept:
+    parameters:
+      - $ref: '#/components/parameters/InvitationToken'
+    post:
+      tags: [Invitations]
+      operationId: acceptInvitation
+      summary: Accept an invitation
+      description: Adds the signed-in account to the workspace. The account email must match the invited address.
+      responses:
+        '200':
+          description: The new membership.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Membership'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`invitation_email_mismatch` when the invitation belongs to another address, `onboarding_required`, `forbidden` for a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. Unknown token.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`already_member` or `seat_limit`.'
+        '410':
+          $ref: '#/components/responses/InvitationUnavailable'
+        '500':
+          $ref: '#/components/responses/Internal'
+{{- else }}
+
+  /api/v1/billing:
+    get:
+      tags: [Billing]
+      operationId: getBilling
+      summary: Get the subscription and plans
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          $ref: '#/components/responses/Billing'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/billing/checkout:
+    post:
+      tags: [Billing]
+      operationId: createCheckout
+      summary: Start a checkout
+      description: Open the returned URL in a browser.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ProviderURL'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/InvalidCheckout'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/billing/portal:
+    get:
+      tags: [Billing]
+      operationId: getCustomerPortal
+      summary: Open the customer portal
+      description: Open the returned URL in a browser.
+      responses:
+        '200':
+          $ref: '#/components/responses/ProviderURL'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`onboarding_required`, or `impersonation_read_only` during impersonation because the portal is a provider session.'
+        '409':
+          $ref: '#/components/responses/NoBillingAccount'
+        '500':
+          $ref: '#/components/responses/Internal'
+{{- end }}
+
+  /api/v1/admin/users:
+    get:
+      tags: [Admin]
+      operationId: getAdminDashboard
+      summary: Get the admin dashboard
+      description: Metrics, one page of users, and the latest audit events.
+      parameters:
+        - name: query
+          in: query
+          description: Filters users by email or name, without case.
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: The page of users, starting at 1.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: The dashboard.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboard'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/admin/users/{userID}/sessions/revoke:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    post:
+      tags: [Admin]
+      operationId: revokeUserSessions
+      summary: Sign a user out everywhere
+      description: Revokes every session and every personal API token of the user.
+      responses:
+        '204':
+          description: Every session and personal API token of the user is revoked.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. Unknown user.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`admin_self_action`. Use the sessions endpoints for your own account.'
+        '500':
+          $ref: '#/components/responses/Internal'
+{{- if .HasGoogleOAuth }}
+
+  /auth/google:
+    get:
+      tags: [OAuth]
+      operationId: startGoogleSignIn
+      summary: Start Google sign-in
+      description: Open in a browser, not with fetch. Redirects to Google, which returns to `API_URL/auth/google/callback`. `API_URL` defaults to `APP_URL`.
+      security: []
+      responses:
+        '307':
+          description: Redirect to Google.
+        '303':
+          description: The browser is already signed in and goes to {{ if not .HasHTMLFrontend }}`APP_URL/app`{{ else }}the app{{ end }}.
+        '429':
+          description: Too many attempts from this client IP.
+
+  /auth/google/callback:
+    get:
+      tags: [OAuth]
+      operationId: finishGoogleSignIn
+      summary: Finish Google sign-in
+{{- if not .HasHTMLFrontend }}
+      description: Google redirects the browser here. On success the browser gets the `session_token` cookie and goes to `APP_URL/app`, where the frontend reads `GET /api/v1/account` for `onboarding_required`. A failed sign-in goes to `APP_URL/auth?error=oauth_failed`.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/OAuthCode'
+        - $ref: '#/components/parameters/OAuthState'
+      responses:
+        '303':
+          description: Signed in, redirect to `APP_URL/app` with the `session_token` cookie. Or sign-in failed, redirect to `APP_URL/auth?error=oauth_failed` without a cookie.
+          headers:
+            Set-Cookie:
+              description: The `session_token` cookie after a successful sign-in.
+              schema:
+                type: string
+{{- else }}
+      description: Google redirects the browser here. On success the browser gets the `session_token` cookie and goes to the app or to onboarding.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/OAuthCode'
+        - $ref: '#/components/parameters/OAuthState'
+      responses:
+        '303':
+          description: Signed in. Redirect to the app or to onboarding.
+          headers:
+            Set-Cookie:
+              description: The `session_token` cookie.
+              schema:
+                type: string
+        '200':
+          description: Sign-in failed. The sign-in page with the error.
+          content:
+            text/html:
+              schema:
+                type: string
+{{- end }}
+        '429':
+          description: Too many attempts from this client IP.
+{{- end }}
+{{- if .HasGitHubOAuth }}
+
+  /auth/github:
+    get:
+      tags: [OAuth]
+      operationId: startGitHubSignIn
+      summary: Start GitHub sign-in
+      description: Open in a browser, not with fetch. Redirects to GitHub, which returns to `API_URL/auth/github/callback`. `API_URL` defaults to `APP_URL`.
+      security: []
+      responses:
+        '307':
+          description: Redirect to GitHub.
+        '303':
+          description: The browser is already signed in and goes to {{ if not .HasHTMLFrontend }}`APP_URL/app`{{ else }}the app{{ end }}.
+        '429':
+          description: Too many attempts from this client IP.
+
+  /auth/github/callback:
+    get:
+      tags: [OAuth]
+      operationId: finishGitHubSignIn
+      summary: Finish GitHub sign-in
+{{- if not .HasHTMLFrontend }}
+      description: GitHub redirects the browser here. On success the browser gets the `session_token` cookie and goes to `APP_URL/app`, where the frontend reads `GET /api/v1/account` for `onboarding_required`. A failed sign-in goes to `APP_URL/auth?error=oauth_failed`.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/OAuthCode'
+        - $ref: '#/components/parameters/OAuthState'
+      responses:
+        '303':
+          description: Signed in, redirect to `APP_URL/app` with the `session_token` cookie. Or sign-in failed, redirect to `APP_URL/auth?error=oauth_failed` without a cookie.
+          headers:
+            Set-Cookie:
+              description: The `session_token` cookie after a successful sign-in.
+              schema:
+                type: string
+{{- else }}
+      description: GitHub redirects the browser here. On success the browser gets the `session_token` cookie and goes to the app or to onboarding.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/OAuthCode'
+        - $ref: '#/components/parameters/OAuthState'
+      responses:
+        '303':
+          description: Signed in. Redirect to the app or to onboarding.
+          headers:
+            Set-Cookie:
+              description: The `session_token` cookie.
+              schema:
+                type: string
+        '200':
+          description: Sign-in failed. The sign-in page with the error.
+          content:
+            text/html:
+              schema:
+                type: string
+{{- end }}
+        '429':
+          description: Too many attempts from this client IP.
+{{- end }}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: The `token` from a sign-in endpoint. It is the session and expires with it.
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_token
+      description: The session cookie of a same-site browser frontend. Requests that change state also need the `X-CSRF-Token` header.
+    apiTokenAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: pat_
+      description: 'A personal API token from `POST /api/v1/account/tokens`, sent as `Authorization: Bearer pat_...`. The role in the security entry of an operation is the scope it needs.'
+
+  parameters:
+    SessionMode:
+      name: session
+      in: query
+      required: false
+      description: '`cookie` sets the HttpOnly `session_token` cookie and answers without the token. A session the browser already had in that cookie is revoked. Such a request always needs the `X-CSRF-Token` header. Leave it out for a bearer token.'
+      schema:
+        type: string
+        enum: [cookie]
+    SessionID:
+      name: id
+      in: path
+      required: true
+      description: The session ID from `GET /api/v1/account/sessions`.
+      schema:
+        type: string
+    APITokenID:
+      name: id
+      in: path
+      required: true
+      description: The token ID from `GET /api/v1/account/tokens`.
+      schema:
+        type: string
+{{- if .Workspaces }}
+    WorkspaceSlug:
+      name: workspaceSlug
+      in: path
+      required: true
+      description: The workspace slug. Unknown workspaces and workspaces the account does not belong to answer 404.
+      schema:
+        type: string
+    InvitationID:
+      name: invitationID
+      in: path
+      required: true
+      description: The invitation ID from `GET /api/v1/workspaces/{workspaceSlug}`.
+      schema:
+        type: string
+    MemberID:
+      name: memberID
+      in: path
+      required: true
+      description: The member ID from `GET /api/v1/workspaces/{workspaceSlug}`.
+      schema:
+        type: string
+    InvitationToken:
+      name: token
+      in: path
+      required: true
+      description: The token from the invitation email.
+      schema:
+        type: string
+{{- end }}
+    UserID:
+      name: userID
+      in: path
+      required: true
+      description: The user ID from the admin dashboard.
+      schema:
+        type: string
+{{- if or .HasGoogleOAuth .HasGitHubOAuth }}
+    OAuthCode:
+      name: code
+      in: query
+      required: true
+      description: The authorization code from the provider.
+      schema:
+        type: string
+    OAuthState:
+      name: state
+      in: query
+      required: true
+      description: The state value, checked against the `oauth_state` cookie.
+      schema:
+        type: string
+{{- end }}
+
+  responses:
+    Session:
+      description: 'A new session. Send `token` as `Authorization: Bearer <token>`. With `session=cookie` the answer is a `CookieSession` and the token is only in the cookie.'
+      headers:
+        Set-Cookie:
+          description: The HttpOnly `session_token` cookie, only with `session=cookie`.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/SessionToken'
+              - $ref: '#/components/schemas/CookieSession'
+    InvalidBody:
+      description: '`invalid_body`. The body is empty, not valid JSON, has unknown fields, or is larger than 1 MiB.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InvalidToken:
+      description: '`invalid_token` when the token is unknown, expired or used, or `invalid_body`.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthenticated:
+      description: '`unauthenticated`. No valid session.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: '`forbidden` for a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    OnboardedForbidden:
+      description: '`onboarding_required` until `POST /api/v1/auth/onboarding`, `forbidden` for a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` for writes during impersonation.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+{{- if .Workspaces }}
+    WorkspaceForbidden:
+      description: '`forbidden` when the workspace role does not allow the action or a cookie request has no valid `X-CSRF-Token` header, `onboarding_required`, `impersonation_read_only` for writes during impersonation.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    WorkspaceNotFound:
+      description: '`not_found`. Unknown workspace, or the account is not a member.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InvitationUnavailable:
+      description: '`invitation_unavailable`. The invitation expired, was revoked or was used.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+{{- end }}
+    AdminForbidden:
+      description: '`forbidden` for accounts that are not admins or a cookie request without a valid `X-CSRF-Token` header, `onboarding_required`, `impersonation_read_only` for writes during impersonation.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Billing:
+      description: The subscription, its access, and the plans a checkout can start.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Billing'
+    ProviderURL:
+      description: A URL hosted by the payment provider.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/URLResponse'
+    InvalidCheckout:
+      description: '`invalid_plan` for an unknown or unpurchasable plan, `invalid_interval` for an interval other than monthly or yearly.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NoBillingAccount:
+      description: '`no_billing_account`. Start a paid plan first.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: '`not_found`.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: The request conflicts with the current state.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnsupportedMediaType:
+      description: '`unsupported_media_type`. Send the body as `application/json`.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationFailed:
+      description: '`validation_failed` with one message per invalid field in `fields`.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: '`rate_limited`. Wait for `Retry-After` seconds.'
+      headers:
+        Retry-After:
+          description: Seconds until the limit resets.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Internal:
+      description: '`internal`. The error is logged on the server.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable lowercase snake case code.
+              examples: [validation_failed]
+            message:
+              type: string
+              description: A sentence for humans.
+            fields:
+              type: object
+              description: One message per invalid field. Present only for `validation_failed`.
+              additionalProperties:
+                type: string
+    CSRFToken:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    Meta:
+      type: object
+      required: [name, support_email]
+      properties:
+        name:
+          type: string
+          description: The project name.
+        support_email:
+          type: string
+          format: email
+          description: The `SUPPORT_EMAIL` address.
+    EmailRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    TokenRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: The token from the emailed link.
+    NameRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+{{- if .Workspaces }}
+    OnboardingRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+        invitation_token:
+          type: string
+          description: The token of the workspace invitation the person arrived with. An unknown, used, revoked, expired or foreign invitation is ignored and the default workspace is created.
+{{- end }}
+    PasswordSignInRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    ChangePasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [current_password, new_password]
+      properties:
+        current_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          format: password
+          minLength: 12
+          description: 12 to 72 bytes, not a common password.
+    SetPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [password]
+      properties:
+        password:
+          type: string
+          format: password
+          minLength: 12
+          description: 12 to 72 bytes, not a common password.
+    DeleteAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [confirm_email]
+      properties:
+        confirm_email:
+          type: string
+          description: The account email address, compared without case.
+    User:
+      type: object
+      required: [id, email, name, password_set, created_at]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          description: Empty until onboarding.
+        password_set:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    UserResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+    CookieSession:
+      type: object
+      additionalProperties: false
+      required: [expires_at, user]
+      description: A sign-in with `session=cookie`. The token is only in the HttpOnly `session_token` cookie.
+      properties:
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+    SessionToken:
+      type: object
+      required: [token, expires_at, user]
+      properties:
+        token:
+          type: string
+          description: The bearer token. It is shown once.
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+    Account:
+      type: object
+      required: [user, onboarding_required{{ if .Workspaces }}, workspaces{{ else }}, subscription, access{{ end }}, is_admin{{ if and .Workspaces .IsSvelte }}, pending_invitation{{ end }}{{ if .Storage }}, avatar_url{{ end }}]
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        onboarding_required:
+          type: boolean
+{{- if .Workspaces }}
+        workspaces:
+          type: array
+          description: The workspaces of the account. Subscriptions belong to workspaces, see the workspace billing endpoint.
+          items:
+            $ref: '#/components/schemas/Membership'
+{{- else }}
+        subscription:
+          oneOf:
+            - $ref: '#/components/schemas/Subscription'
+            - type: 'null'
+        access:
+          oneOf:
+            - $ref: '#/components/schemas/Access'
+            - type: 'null'
+{{- end }}
+        is_admin:
+          type: boolean
+          description: True when the signed-in session belongs to an operator listed in `ADMIN_EMAILS` with a verified email. False for API tokens and during impersonation. The admin endpoints answer 403 when it is false.
+{{- if and .Workspaces .IsSvelte }}
+        pending_invitation:
+          type: [string, 'null']
+          description: The token of the available invitation for this account that the browser opened before signing in, from the `pending_invitation` cookie. The app returns to it after sign-in.
+{{- end }}
+{{- if .Storage }}
+        avatar_url:
+          type: [string, 'null']
+          format: uri
+{{- end }}
+    Session:
+      type: object
+      required: [id, display_name, current, last_seen_at, created_at]
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+          description: Browser and system, for example "Chrome on macOS".
+        current:
+          type: boolean
+        last_seen_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    SessionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+    APIToken:
+      type: object
+      required: [id, name, prefix, scopes, {{ if .Workspaces }}workspace_id, {{ end }}last_used_at, expires_at, expired, created_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        prefix:
+          type: string
+          description: The first 8 characters after `pat_`, to tell tokens apart.
+        scopes:
+          type: array
+          items:
+            type: string
+            enum: [read, write]
+          description: '`["read"]` or `["read", "write"]`.'
+{{- if .Workspaces }}
+        workspace_id:
+          type: string
+          description: The only workspace the token can reach.
+{{- end }}
+        last_used_at:
+          type: [string, 'null']
+          format: date-time
+          description: Updated at most once a minute.
+        expires_at:
+          type: [string, 'null']
+          format: date-time
+          description: '`null` for a token that never expires.'
+        expired:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    APITokenList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIToken'
+    CreateAPITokenRequest:
+      type: object
+      required: [name{{ if .Workspaces }}, workspace_id{{ end }}]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: A label such as "Claude Desktop" or "Nightly export".
+        scopes:
+          type: array
+          items:
+            type: string
+            enum: [read, write]
+          description: '`write` includes `read`. Defaults to `["read"]`.'
+        expires_in_days:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 365
+          description: '`null` or missing for a token that never expires.'
+{{- if .Workspaces }}
+        workspace_id:
+          type: string
+          description: The workspace the token is bound to, one of `GET /api/v1/workspaces`.
+{{- end }}
+    CreatedAPIToken:
+      type: object
+      required: [token, api_token]
+      properties:
+        token:
+          type: string
+          description: 'The raw token, `pat_` and 52 characters. It is shown only in this answer.'
+        api_token:
+          $ref: '#/components/schemas/APIToken'
+{{- if .Storage }}
+    AvatarResponse:
+      type: object
+      required: [avatar_url]
+      properties:
+        avatar_url:
+          type: [string, 'null']
+          format: uri
+{{- end }}
+{{- if .Workspaces }}
+    Workspace:
+      type: object
+      required: [id, name, slug]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+    WorkspaceRole:
+      type: string
+      enum: [owner, admin, member]
+    Membership:
+      type: object
+      required: [workspace, role]
+      properties:
+        workspace:
+          $ref: '#/components/schemas/Workspace'
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+    MembershipList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Membership'
+    OnboardingResponse:
+      type: object
+      required: [user, workspace]
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        workspace:
+          description: The workspace created by onboarding, or null when the account already had one or onboarding came with an available invitation.
+          oneOf:
+            - $ref: '#/components/schemas/Workspace'
+            - type: 'null'
+    WorkspaceResponse:
+      type: object
+      required: [workspace]
+      properties:
+        workspace:
+          $ref: '#/components/schemas/Workspace'
+    WorkspaceMember:
+      type: object
+      required: [id, user_id, name, role, created_at]
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+          description: Present only for members who may manage members.
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        created_at:
+          type: string
+          format: date-time
+    MemberResponse:
+      type: object
+      required: [member]
+      properties:
+        member:
+          $ref: '#/components/schemas/WorkspaceMember'
+    PendingInvitation:
+      type: object
+      required: [id, email, role, expires_at, created_at]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    WorkspacePermissions:
+      type: object
+      required: [manage_workspace, manage_members, manage_owners, manage_billing, delete_workspace, view_audit_log]
+      properties:
+        manage_workspace:
+          type: boolean
+        manage_members:
+          type: boolean
+        manage_owners:
+          type: boolean
+        manage_billing:
+          type: boolean
+        delete_workspace:
+          type: boolean
+        view_audit_log:
+          type: boolean
+    WorkspaceDetail:
+      type: object
+      required: [workspace, role, permissions, members, invitations, seats]
+      properties:
+        workspace:
+          $ref: '#/components/schemas/Workspace'
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        permissions:
+          $ref: '#/components/schemas/WorkspacePermissions'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceMember'
+        invitations:
+          type: array
+          description: Pending invitations. Empty for members who may not manage members.
+          items:
+            $ref: '#/components/schemas/PendingInvitation'
+        seats:
+          type: object
+          required: [used, limit]
+          properties:
+            used:
+              type: integer
+            limit:
+              type: [integer, 'null']
+              description: Null when the plan has no member limit.
+    InvitationRequest:
+      type: object
+      additionalProperties: false
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, member]
+    RoleRequest:
+      type: object
+      additionalProperties: false
+      required: [role]
+      properties:
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+    WorkspaceEvent:
+      type: object
+      required: [id, actor_user_id, actor_email, action, target_type, target_id, metadata, created_at]
+      properties:
+        id:
+          type: string
+        actor_user_id:
+          type: [string, 'null']
+        actor_email:
+          type: string
+        action:
+          type: string
+          examples: [member.invited]
+        target_type:
+          type: string
+        target_id:
+          type: string
+        metadata:
+          type: string
+          description: JSON text with details of the event.
+        created_at:
+          type: string
+          format: date-time
+    ActivityPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceEvent'
+        next_cursor:
+          type: [string, 'null']
+          description: Null on the last page.
+    InvitationPreview:
+      type: object
+      required: [workspace_name, inviter_name, role, expires_at]
+      properties:
+        workspace_name:
+          type: string
+        inviter_name:
+          type: string
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        expires_at:
+          type: string
+          format: date-time
+{{- end }}
+    Subscription:
+      type: object
+      required: [id, plan_id, status, provider, current_period_end, amount, currency, interval, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        plan_id:
+          type: string
+        status:
+          type: string
+          enum: [active, trialing, past_due, incomplete, inactive, cancelled, blocked]
+        provider:
+          type: string
+        current_period_end:
+          type: [string, 'null']
+          format: date-time
+        amount:
+          type: [integer, 'null']
+          description: In the smallest currency unit.
+        currency:
+          type: string
+        interval:
+          type: [string, 'null']
+          enum: [monthly, yearly, null]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Access:
+      type: object
+      required: [plan_id, state, trial_ends_at, access_ends_at]
+      properties:
+        plan_id:
+          type: string
+        state:
+          type: string
+          enum: [free, trial, paid, grace, blocked]
+        trial_ends_at:
+          type: [string, 'null']
+          format: date-time
+        access_ends_at:
+          type: [string, 'null']
+          format: date-time
+    Plan:
+      type: object
+      required: [id, name, description, benefits, current, prices]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        benefits:
+          type: array
+          items:
+            type: string
+        current:
+          type: boolean
+          description: True for the plan of the current access.
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanPrice'
+    PlanPrice:
+      type: object
+      required: [interval, amount, display_price]
+      properties:
+        interval:
+          type: string
+          enum: [monthly, yearly]
+        amount:
+          type: integer
+          description: In the smallest currency unit.
+        display_price:
+          type: string
+    Billing:
+      type: object
+      required: [subscription, access, plans]
+      properties:
+        subscription:
+          oneOf:
+            - $ref: '#/components/schemas/Subscription'
+            - type: 'null'
+        access:
+          oneOf:
+            - $ref: '#/components/schemas/Access'
+            - type: 'null'
+        plans:
+          type: array
+          description: Plans a checkout can start.
+          items:
+            $ref: '#/components/schemas/Plan'
+    CheckoutRequest:
+      type: object
+      additionalProperties: false
+      required: [plan_id]
+      properties:
+        plan_id:
+          type: string
+        interval:
+          type: string
+          enum: [monthly, yearly]
+          default: monthly
+    URLResponse:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+    AdminMetrics:
+      type: object
+      required: [users, verified_users, {{ if .Workspaces }}workspaces, paid_workspaces{{ else }}paid_users{{ end }}, active_sessions]
+      properties:
+        users:
+          type: integer
+        verified_users:
+          type: integer
+{{- if .Workspaces }}
+        workspaces:
+          type: integer
+        paid_workspaces:
+          type: integer
+{{- else }}
+        paid_users:
+          type: integer
+{{- end }}
+        active_sessions:
+          type: integer
+    AdminUser:
+      type: object
+      required: [id, email, name, email_verified_at, created_at{{ if .Workspaces }}, workspace_count{{ end }}, active_session_count, is_admin]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        email_verified_at:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+{{- if .Workspaces }}
+        workspace_count:
+          type: integer
+{{- end }}
+        active_session_count:
+          type: integer
+        is_admin:
+          type: boolean
+    AdminUserPage:
+      type: object
+      required: [items, query, page, total_pages, total_users]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+        query:
+          type: string
+        page:
+          type: integer
+        total_pages:
+          type: integer
+        total_users:
+          type: integer
+    AdminAuditEvent:
+      type: object
+      required: [id, actor_user_id, actor_email{{ if .Workspaces }}, workspace_id{{ end }}, action, target_type, target_id, metadata, created_at]
+      properties:
+        id:
+          type: string
+        actor_user_id:
+          type: [string, 'null']
+        actor_email:
+          type: string
+{{- if .Workspaces }}
+        workspace_id:
+          type: [string, 'null']
+{{- end }}
+        action:
+          type: string
+        target_type:
+          type: string
+        target_id:
+          type: string
+        metadata:
+          type: string
+          description: JSON text with details of the event.
+        created_at:
+          type: string
+          format: date-time
+    AdminDashboard:
+      type: object
+      required: [metrics, users, events]
+      properties:
+        metrics:
+          $ref: '#/components/schemas/AdminMetrics'
+        users:
+          $ref: '#/components/schemas/AdminUserPage'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminAuditEvent'

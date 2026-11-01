@@ -1,0 +1,91 @@
+package access
+
+var Product = Catalog{
+	Signup: SignupPolicy{
+		Mode:          SignupFreemium,
+		TrialPlanID:   PlanPro,
+		TrialDays:     7,
+		TrialFallback: FallbackFree,
+	},
+	Lifecycle: LifecyclePolicy{
+		PastDueGraceDays: 7,
+		PaidFallback:     FallbackFree,
+	},
+	Plans: []Plan{
+		{
+			ID:          PlanFree,
+			Name:        "Free",
+			Description: "For exploring the core product",
+			Limits: map[Limit]int{
+{{- if .Workspaces }}
+				LimitMembers: 1,
+{{- end }}
+			},
+			Benefits: []string{
+{{- if .Workspaces }}
+				"1 workspace seat",
+{{- end }}
+				"Secure user accounts",
+				"Community support",
+			},
+		},
+		{
+			ID:           PlanPro,
+			Name:         "Pro",
+			Description:  "For growing businesses",
+			MonthlyPrice: 2900,
+			YearlyPrice:  27900,
+			Limits: map[Limit]int{
+{{- if .Workspaces }}
+				LimitMembers: 5,
+{{- end }}
+			},
+			Benefits: []string{
+{{- if .Workspaces }}
+				"5 workspace seats",
+{{- end }}
+				"Monthly or yearly billing",
+				"Email support",
+			},
+			Purchasable: true,
+		},
+		{
+			ID:           PlanEnterprise,
+			Name:         "Enterprise",
+			Description:  "For larger workspaces",
+			MonthlyPrice: 9900,
+			YearlyPrice:  95000,
+			Features: []Feature{
+				FeaturePrioritySupport,
+			},
+			Limits: map[Limit]int{
+{{- if .Workspaces }}
+				LimitMembers: 25,
+{{- end }}
+			},
+			Benefits: []string{
+{{- if .Workspaces }}
+				"25 workspace seats",
+{{- end }}
+				"Monthly or yearly billing",
+				"Priority support",
+			},
+			Purchasable: true,
+		},
+	},
+}
+
+type Catalog struct {
+	Signup    SignupPolicy
+	Lifecycle LifecyclePolicy
+	Plans     []Plan
+}
+
+func PlanByID(planID string) (Plan, bool) {
+	for _, plan := range Product.Plans {
+		if plan.ID == planID {
+			return plan, true
+		}
+	}
+	return Plan{}, false
+}

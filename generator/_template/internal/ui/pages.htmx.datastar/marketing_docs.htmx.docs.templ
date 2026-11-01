@@ -1,0 +1,513 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/blocks"
+	"{{.ModulePath}}/internal/ui/components/breadcrumb"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/collapsible"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/sidebar"
+	"{{.ModulePath}}/internal/ui/layouts"
+	"fmt"
+)
+
+templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.DocPage, nextPage *model.DocPage) {
+	{{ cfg := ctxkeys.RenderConfig(ctx) }}
+	@layouts.Base(layouts.SEOProps{
+		Title:        fmt.Sprintf("%s - Documentation", currentPage.Title),
+		Description:  currentPage.Description,
+		Path:         ctxkeys.URLPath(ctx),
+		MarkdownPath: docsMarkdownURL(currentPage),
+	}) {
+		@sidebar.Provider() {
+			@sidebar.Sidebar() {
+				@sidebar.Header() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Size: sidebar.MenuButtonSizeLg,
+								Href: "/docs",
+							}) {
+								@icon.BookOpen()
+								<div class="flex flex-col">
+									<span class="text-sm font-bold">{ brand.Name }</span>
+									<span class="text-xs text-muted-foreground">Documentation</span>
+								</div>
+							}
+						}
+					}
+				}
+				@sidebar.Content() {
+					@renderDocsNav(docsTree, currentPage)
+				}
+				@sidebar.Footer() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Href: "/",
+							}) {
+								@icon.House(icon.Props{Class: "size-4"})
+								<span>Home</span>
+							}
+						}
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Href: "mailto:" + cfg.SupportEmail,
+							}) {
+								@icon.MessageCircleQuestionMark(icon.Props{Class: "size-4"})
+								<span>Support</span>
+							}
+						}
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/llms.txt", Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
+								@icon.FileText(icon.Props{Class: "size-4"})
+								<span>llms.txt</span>
+							}
+						}
+					}
+				}
+				@sidebar.Rail()
+			}
+			@sidebar.Inset(sidebar.InsetProps{Class: "min-w-0"}) {
+				// Top Navigation Bar
+				<header class="sticky top-0 z-10 border-b bg-background">
+					<div class="flex h-14 items-center px-6">
+						<div class="flex items-center gap-4">
+							@sidebar.Trigger()
+							@templ.Fragment("docs-breadcrumb") {
+								<div id="docs-breadcrumb" hx-swap-oob="true">
+									@breadcrumb.Breadcrumb() {
+										@breadcrumb.List() {
+											@breadcrumb.Item() {
+												@breadcrumb.Link(breadcrumb.LinkProps{Href: "/"}) {
+													Home
+												}
+											}
+											@breadcrumb.Item() {
+												@breadcrumb.Separator()
+												if docsPageURL(currentPage) != "/docs" {
+													@breadcrumb.Link(breadcrumb.LinkProps{Href: "/docs"}) {
+														Docs
+													}
+												} else {
+													@breadcrumb.Page() {
+														Docs
+													}
+												}
+											}
+											if docsPageURL(currentPage) != "/docs" {
+												@breadcrumb.Item() {
+													@breadcrumb.Separator()
+													@breadcrumb.Page() {
+														{ currentPage.Title }
+													}
+												}
+											}
+										}
+									}
+								</div>
+							}
+						</div>
+						<div class="ml-auto flex items-center gap-4">
+							@blocks.ThemeSwitcher()
+						</div>
+					</div>
+				</header>
+				<div class="xl:grid xl:grid-cols-[minmax(0,1fr)_16rem]">
+					<div class="min-w-0">
+						<main class="min-h-[calc(100svh-3.5rem)]">
+							// Documentation content with the partial-navigation target wrapper
+							<div class="max-w-5xl px-6 pt-12 pb-16" id="docs-content-wrapper">
+								@templ.Fragment("docs-content") {
+									// Documentation Content
+									<article id="docs-content" style="--docs-heading-offset: 80px;">
+										// Page Title
+										<div class="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+											<div class="min-w-0">
+												<h1 class="mb-2 text-4xl font-bold">{ currentPage.Title }</h1>
+												if currentPage.Description != "" {
+													<p class="text-xl text-muted-foreground">{ currentPage.Description }</p>
+												}
+											</div>
+											@docsPageActions(currentPage)
+										</div>
+										// Content
+										<div class="[&_h2]:scroll-mt-[var(--docs-heading-offset)] [&_h3]:scroll-mt-[var(--docs-heading-offset)]">
+											@blocks.Typeset(currentPage.HTMLContent)
+										</div>
+										// Navigation Footer
+										<div class="mt-12 pt-8">
+											<div class="flex justify-between">
+												if prevPage != nil {
+													@button.Button(button.Props{
+														Href:    docsPageURL(prevPage),
+														Variant: button.VariantOutline,
+														Attributes: templ.Attributes{
+															"hx-get":        docsPageURL(prevPage),
+															"hx-target":     "#docs-content-wrapper",
+															"hx-push-url":   "true",
+															"hx-swap":       "innerHTML",
+															"hx-sync":       "#docs-content-wrapper:replace",
+															"hx-status:4xx": "swap:none push:false",
+															"hx-status:5xx": "swap:none push:false",
+														},
+													}) {
+														← { prevPage.Title }
+													}
+												}
+												if nextPage != nil {
+													@button.Button(button.Props{
+														Href:    docsPageURL(nextPage),
+														Variant: button.VariantOutline,
+														Attributes: templ.Attributes{
+															"hx-get":        docsPageURL(nextPage),
+															"hx-target":     "#docs-content-wrapper",
+															"hx-push-url":   "true",
+															"hx-swap":       "innerHTML",
+															"hx-sync":       "#docs-content-wrapper:replace",
+															"hx-status:4xx": "swap:none push:false",
+															"hx-status:5xx": "swap:none push:false",
+														},
+													}) {
+														{ nextPage.Title } →
+													}
+												}
+											</div>
+										</div>
+									</article>
+								}
+							</div>
+						</main>
+						@blocks.Footer()
+					</div>
+					@renderPageTOC(currentPage.Headings)
+				</div>
+			}
+			// Partial-navigation active state updater
+			<script nonce={ templ.GetNonce(ctx) }>
+				let docsTOCScrollHandler = null;
+				// A clicked TOC entry stays active until the reader scrolls
+				// themselves, even when the page cannot scroll it to the top.
+				let pinnedDocsTOCId = null;
+				document.addEventListener('click', event => {
+					const link = event.target.closest('[data-docs-toc-link]');
+					if (!link) return;
+					pinnedDocsTOCId = link.dataset.docsTocLink;
+					setActiveDocsTOCLink(pinnedDocsTOCId);
+				});
+				['wheel', 'touchmove', 'keydown'].forEach(type => {
+					window.addEventListener(type, () => { pinnedDocsTOCId = null; }, { passive: true });
+				});
+
+				document.addEventListener('click', async event => {
+					const button = event.target.closest('[data-docs-copy]');
+					if (!button) return;
+					const response = await fetch(button.dataset.docsCopy, { headers: { Accept: 'text/markdown' } });
+					if (!response.ok) return;
+					await navigator.clipboard.writeText(await response.text());
+					button.querySelector('[data-copy-default]')?.classList.add('hidden');
+					button.querySelector('[data-copy-success]')?.classList.remove('hidden');
+					window.setTimeout(() => {
+						button.querySelector('[data-copy-default]')?.classList.remove('hidden');
+						button.querySelector('[data-copy-success]')?.classList.add('hidden');
+					}, 1600);
+				});
+
+				document.addEventListener('htmx:after:settle', event => {
+					if (event.target?.id === 'docs-content-wrapper') {
+						document.dispatchEvent(new CustomEvent('goilerplate:docs:navigated'));
+					}
+				});
+
+				function setActiveDocsTOCLink(activeId) {
+					document.querySelectorAll('[data-docs-toc-link]').forEach(link => {
+						const isActive = link.dataset.docsTocLink === activeId;
+
+						link.classList.toggle('text-foreground', isActive);
+						link.classList.toggle('font-medium', isActive);
+						link.classList.toggle('text-muted-foreground', !isActive);
+
+						if (isActive) {
+							link.setAttribute('aria-current', 'location');
+						} else {
+							link.removeAttribute('aria-current');
+						}
+					});
+				}
+
+				function initDocsTOC() {
+					const tocLinks = Array.from(document.querySelectorAll('[data-docs-toc-link]'));
+					if (docsTOCScrollHandler) {
+						window.removeEventListener('scroll', docsTOCScrollHandler);
+						docsTOCScrollHandler = null;
+					}
+
+					if (!tocLinks.length) {
+						return;
+					}
+
+					const headings = tocLinks
+						.map(link => document.getElementById(link.dataset.docsTocLink || ''))
+						.filter(Boolean);
+
+					if (!headings.length) {
+						return;
+					}
+
+					const activationOffset = parseInt(
+						getComputedStyle(document.getElementById('docs-content'))
+							.getPropertyValue('--docs-heading-offset'),
+						10,
+					) || 96;
+
+					const updateActiveDocsTOC = () => {
+						if (pinnedDocsTOCId) {
+							setActiveDocsTOCLink(pinnedDocsTOCId);
+							return;
+						}
+						// Near the end of a page the last headings never reach the
+						// top, so the line that activates them slides down to the
+						// bottom of the window over the last half screen of scrolling.
+						const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+						const tail = Math.min(maxScroll, window.innerHeight / 2);
+						const progress = tail > 0 ? Math.max(0, 1 - (maxScroll - window.scrollY) / tail) : 0;
+						const line = activationOffset + (window.innerHeight - activationOffset) * progress;
+						let activeId = headings[0]?.id ?? '';
+						for (const heading of headings) {
+							if (heading.getBoundingClientRect().top <= line) {
+								activeId = heading.id;
+							} else {
+								break;
+							}
+						}
+
+						setActiveDocsTOCLink(activeId);
+					};
+
+					pinnedDocsTOCId = null;
+					docsTOCScrollHandler = updateActiveDocsTOC;
+					window.addEventListener('scroll', docsTOCScrollHandler, { passive: true });
+					updateActiveDocsTOC();
+				}
+
+				// Update active states after partial navigation.
+				document.addEventListener('goilerplate:docs:navigated', () => {
+					const currentPath = window.location.pathname;
+					
+					// Update all sidebar menu buttons
+					document.querySelectorAll('[data-sidebar="menu-button"]').forEach(button => {
+						const href = button.getAttribute('href');
+						if (href) {
+							if (href === currentPath) {
+								button.setAttribute('data-active', '');
+							} else {
+								button.removeAttribute('data-active');
+							}
+						}
+					});
+					
+					// Update all sidebar menu sub-buttons
+					document.querySelectorAll('[data-sidebar="menu-sub-button"]').forEach(button => {
+						const href = button.getAttribute('href');
+						if (href) {
+							if (href === currentPath) {
+								button.setAttribute('data-active', '');
+							} else {
+								button.removeAttribute('data-active');
+							}
+						}
+					});
+
+					initDocsTOC();
+					window.scrollTo(0, 0);
+
+					window.templ?.sidebar?.setOpenMobile(false);
+				});
+
+				initDocsTOC();
+			</script>
+		}
+		@blocks.HighlightScripts()
+	}
+}
+
+// Helper function to check if a node or any of its descendants contains the current page
+func nodeContainsCurrentPage(node *model.DocPage, currentPage *model.DocPage) bool {
+	if node.Slug == currentPage.Slug {
+		return true
+	}
+	for _, child := range node.Children {
+		if nodeContainsCurrentPage(child, currentPage) {
+			return true
+		}
+	}
+	return false
+}
+
+func docsPageURL(node *model.DocPage) string {
+	if node == nil || node.Slug == "" || node.Slug == "introduction" {
+		return "/docs"
+	}
+	return "/docs/" + node.Slug
+}
+
+func docsMarkdownURL(node *model.DocPage) string {
+	return docsPageURL(node) + ".md"
+}
+
+templ docsPageActions(node *model.DocPage) {
+	<div class="flex shrink-0 items-center gap-2">
+		@button.Button(button.Props{Variant: button.VariantSecondary, Size: button.SizeSm, Class: "h-8 shadow-none", Attributes: templ.Attributes{"data-docs-copy": docsMarkdownURL(node)}}) {
+			<span data-copy-default>
+				@icon.Copy(icon.Props{Class: "size-3.5"})
+			</span>
+			<span data-copy-success class="hidden">
+				@icon.Check(icon.Props{Class: "size-3.5"})
+			</span>
+			Copy page
+		}
+		@button.Button(button.Props{Href: docsMarkdownURL(node), Target: "_blank", Variant: button.VariantSecondary, Size: button.SizeSm, Class: "h-8 shadow-none", Attributes: templ.Attributes{"rel": "noopener"}}) {
+			@icon.FileText(icon.Props{Class: "size-3.5"})
+			View Markdown
+		}
+	</div>
+}
+
+templ renderDocsNav(node *model.DocPage, currentPage *model.DocPage) {
+	@sidebar.Group() {
+		@sidebar.GroupLabel() {
+			Overview
+		}
+		@sidebar.GroupContent() {
+			@sidebar.Menu() {
+				for _, child := range node.Children {
+					if len(child.Children) == 0 {
+						@renderDocsMenuLeaf(child, currentPage)
+					}
+				}
+			}
+		}
+	}
+	for _, child := range node.Children {
+		if len(child.Children) > 0 {
+			@renderDocsSection(child, currentPage)
+		}
+	}
+}
+
+templ renderDocsSection(node *model.DocPage, currentPage *model.DocPage) {
+	@sidebar.Group() {
+		@sidebar.GroupLabel() {
+			{ node.Title }
+		}
+		@sidebar.GroupContent() {
+			@sidebar.Menu() {
+				for _, child := range node.Children {
+					if len(child.Children) > 0 {
+						@renderDocsCollapsibleMenu(child, currentPage)
+					} else {
+						@renderDocsMenuLeaf(child, currentPage)
+					}
+				}
+			}
+		}
+	}
+}
+
+templ renderDocsCollapsibleMenu(node *model.DocPage, currentPage *model.DocPage) {
+	@collapsible.Collapsible(collapsible.Props{
+		DefaultOpen: nodeContainsCurrentPage(node, currentPage),
+		Class:       "group/collapsible",
+	}) {
+		@sidebar.MenuItem() {
+			@sidebar.MenuButton(sidebar.MenuButtonProps{
+				IsActive:   nodeContainsCurrentPage(node, currentPage),
+				Attributes: collapsible.Trigger(ctx),
+			}) {
+				<span>{ node.Title }</span>
+				@icon.ChevronRight(icon.Props{Class: "ml-auto size-4 transition-transform duration-200 group-data-open/collapsible:rotate-90"})
+			}
+			@collapsible.Content() {
+				@sidebar.MenuSub() {
+					for _, child := range node.Children {
+						@sidebar.MenuSubItem() {
+							@sidebar.MenuSubButton(sidebar.MenuSubButtonProps{
+								Href:     docsPageURL(child),
+								IsActive: ctxkeys.URLPath(ctx) == docsPageURL(child),
+								Attributes: templ.Attributes{
+									"hx-get":        docsPageURL(child),
+									"hx-target":     "#docs-content-wrapper",
+									"hx-push-url":   "true",
+									"hx-swap":       "innerHTML",
+									"hx-sync":       "#docs-content-wrapper:replace",
+									"hx-status:4xx": "swap:none push:false",
+									"hx-status:5xx": "swap:none push:false",
+								},
+							}) {
+								{ child.Title }
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ renderDocsMenuLeaf(node *model.DocPage, currentPage *model.DocPage) {
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{
+			Href:     docsPageURL(node),
+			IsActive: ctxkeys.URLPath(ctx) == docsPageURL(node),
+			Attributes: templ.Attributes{
+				"hx-get":        docsPageURL(node),
+				"hx-target":     "#docs-content-wrapper",
+				"hx-push-url":   "true",
+				"hx-swap":       "innerHTML",
+				"hx-sync":       "#docs-content-wrapper:replace",
+				"hx-status:4xx": "swap:none push:false",
+				"hx-status:5xx": "swap:none push:false",
+			},
+		}) {
+			<span>{ node.Title }</span>
+		}
+	}
+}
+
+templ renderPageTOC(headings []model.DocHeading) {
+	@templ.Fragment("docs-toc") {
+		if len(headings) > 0 {
+			<aside id="docs-toc" class="hidden self-stretch border-l xl:block" hx-swap-oob="true">
+				<div class="sticky top-14 max-h-[calc(100svh-3.5rem)] overflow-y-auto pl-6 pt-12 pb-10">
+					<p class="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">On this page</p>
+					<nav class="flex flex-col gap-0.5">
+						for _, heading := range headings {
+							if heading.Level == 3 {
+								<a
+									href={ fmt.Sprintf("#%s", heading.ID) }
+									data-docs-toc-link={ heading.ID }
+									class="block py-1 pl-3 text-[13px] leading-5 text-muted-foreground transition-colors hover:text-foreground"
+								>
+									{ heading.Text }
+								</a>
+							} else {
+								<a
+									href={ fmt.Sprintf("#%s", heading.ID) }
+									data-docs-toc-link={ heading.ID }
+									class="block py-1 text-[13px] leading-5 text-muted-foreground transition-colors hover:text-foreground"
+								>
+									{ heading.Text }
+								</a>
+							}
+						}
+					</nav>
+				</div>
+			</aside>
+		} else {
+			<aside id="docs-toc" class="hidden" hx-swap-oob="true"></aside>
+		}
+	}
+}

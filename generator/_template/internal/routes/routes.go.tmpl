@@ -1,0 +1,406 @@
+package routes
+
+{{ if not .HasHTMLFrontend -}}
+import (
+{{- if .IsSvelte }}
+	"io/fs"
+{{- end }}
+	"net/http"
+
+	"{{.ModulePath}}/internal/api"
+	"{{.ModulePath}}/internal/app"
+{{- if .MCP }}
+	"{{.ModulePath}}/internal/mcp"
+{{- end }}
+	"{{.ModulePath}}/internal/middleware"
+{{- if .IsSvelte }}
+	"{{.ModulePath}}/web"
+{{- end }}
+)
+
+{{ if .IsSvelte -}}
+// SetupRoutes serves the JSON API and the embedded SvelteKit app on one
+// origin. Server paths stay explicit routes, unknown paths under /api/ answer
+// the JSON 404, and every other path is a file or a page of the app.
+{{- else -}}
+// SetupRoutes serves the JSON API of a headless project. There are no pages:
+// GET / names the project, and every unknown path answers the JSON 404.
+{{- end }}
+func SetupRoutes(app *app.App) http.Handler {
+	clientIPs := middleware.NewClientIPResolver(app.Cfg.TrustedProxyCIDRs)
+	securityHeaderConfig := middleware.SecurityHeadersConfig{
+		RobotsNoIndex: app.Cfg.RobotsNoIndex,
+	}
+	securityHeaders := func(next http.Handler) http.Handler {
+		return middleware.SecurityHeaders(securityHeaderConfig, next)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+{{- if .IsHeadless }}
+	mux.HandleFunc("GET /{$}", api.Root)
+{{- end }}
+
+	rateLimiter := middleware.RateLimitAuth(clientIPs)
+	authEmailRateLimiter := middleware.RateLimitAuthEmail(clientIPs)
+	emailChanges := middleware.RateLimitUserEmailChanges()
+{{- if .Workspaces }}
+	// API and MCP invitations share one budget.
+	invitationLimiter := middleware.NewWorkspaceInvitationLimiter()
+{{- end }}
+{{- if or .HasGoogleOAuth .HasGitHubOAuth }}
+	oauth := api.NewOAuthHandler(app.AuthService, app.Cfg)
+{{- end }}
+{{- if .HasGoogleOAuth }}
+	mux.HandleFunc("GET /auth/google", rateLimiter(oauth.GoogleAuth))
+	mux.HandleFunc("GET /auth/google/callback", rateLimiter(oauth.GoogleCallback))
+{{- end }}
+{{- if .HasGitHubOAuth }}
+	mux.HandleFunc("GET /auth/github", rateLimiter(oauth.GitHubAuth))
+	mux.HandleFunc("GET /auth/github/callback", rateLimiter(oauth.GitHubCallback))
+{{- end }}
+	mux.HandleFunc("POST /webhooks/payment", api.PaymentWebhook(app.PaymentService))
+{{ else -}}
+import (
+	"io/fs"
+	"net/http"
+	"regexp"
+
+	"{{.ModulePath}}/assets"
+{{- if .API }}
+	"{{.ModulePath}}/internal/api"
+{{- end }}
+	"{{.ModulePath}}/internal/app"
+	"{{.ModulePath}}/internal/content"
+	"{{.ModulePath}}/internal/handler"
+{{- if .MCP }}
+	"{{.ModulePath}}/internal/mcp"
+{{- end }}
+	"{{.ModulePath}}/internal/middleware"
+)
+
+var immutableAssetPathPattern = regexp.MustCompile(`^/?js/(?:.+\.[0-9a-f]{8}(?:\.min)?|shadcn-templ-[0-9a-f]{16})\.js$`)
+
+func SetupRoutes(app *app.App) http.Handler {
+	renderConfig := app.Cfg.Render()
+	clientIPs := middleware.NewClientIPResolver(app.Cfg.TrustedProxyCIDRs)
+	securityHeaderConfig := middleware.SecurityHeadersConfig{
+		RobotsNoIndex: app.Cfg.RobotsNoIndex,
+{{- if .Storage }}
+		S3Endpoint: app.Cfg.S3Endpoint,
+{{- end }}
+		UmamiHost:     app.Cfg.UmamiHost,
+		PlausibleHost: app.Cfg.PlausibleHost,
+	}
+	securityHeaders := func(next http.Handler) http.Handler {
+		return middleware.SecurityHeaders(securityHeaderConfig, next)
+	}
+	home := handler.NewHomeHandler()
+{{- if and .HasBlog .HasDocs }}
+	seo := handler.NewSEOHandler(app.BlogService, app.DocsService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex)
+{{- else if .HasBlog }}
+	seo := handler.NewSEOHandler(app.BlogService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex)
+{{- else if .HasDocs }}
+	seo := handler.NewSEOHandler(app.DocsService, app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex)
+{{- else }}
+	seo := handler.NewSEOHandler(app.Cfg.AppURL, content.Root, app.Cfg.RobotsNoIndex)
+{{- end }}
+	legal := handler.NewLegalHandler(app.LegalService)
+{{- if .HasBlog }}
+	blog := handler.NewBlogHandler(app.BlogService)
+	newsletter := handler.NewNewsletterHandler(app.NewsletterService)
+{{- end }}
+{{- if .HasDocs }}
+	docs := handler.NewDocsHandler(app.DocsService)
+{{- end }}
+{{- if .Workspaces }}
+	auth := handler.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService, app.Cfg)
+{{- if .Storage }}
+	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
+{{- else }}
+	account := handler.NewAccountHandler(app.AuthService, app.UserService)
+{{- end }}
+{{- else }}
+	auth := handler.NewAuthHandler(app.AuthService, app.UserService, app.SubscriptionService, app.Cfg)
+{{- if .Storage }}
+	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
+{{- else }}
+	account := handler.NewAccountHandler(app.AuthService, app.UserService)
+{{- end }}
+{{- end }}
+
+	profile := handler.NewProfileHandler(app.UserService)
+	dashboard := handler.NewDashboardHandler()
+{{- if .API }}
+	settings := handler.NewSettingsHandler(app.AuthService, app.APITokenService)
+	apiTokens := handler.NewAPITokensHandler(app.APITokenService)
+{{- else }}
+	settings := handler.NewSettingsHandler(app.AuthService)
+{{- end }}
+{{- if .Workspaces }}
+	billing := handler.NewBillingHandler(app.PaymentService, app.WorkspaceService)
+	admin := handler.NewAdminHandler(app.AdminService)
+{{- else }}
+	billing := handler.NewBillingHandler(app.SubscriptionService, app.PaymentService)
+	admin := handler.NewAdminHandler(app.AdminService)
+{{- end }}
+{{- if .Workspaces }}
+	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
+	workspaceInvitation := handler.NewWorkspaceInvitationHandler(app.WorkspaceService, app.Cfg)
+{{- end }}
+	mux := http.NewServeMux()
+	var assetHandler http.Handler
+	if app.Cfg.IsDevelopment() {
+		assetHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			http.FileServer(http.Dir("./assets")).ServeHTTP(w, r)
+		})
+	} else {
+		sub, _ := fs.Sub(assets.AssetsFS, ".")
+		fileServer := http.FileServer(http.FS(sub))
+		assetHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if immutableAssetPathPattern.MatchString(r.URL.Path) {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			fileServer.ServeHTTP(w, r)
+		})
+	}
+	mux.Handle("GET /assets/", http.StripPrefix("/assets/", middleware.Gzip(assetHandler)))
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	mux.HandleFunc("GET /robots.txt", seo.Robots)
+	mux.HandleFunc("GET /sitemap.xml", seo.Sitemap)
+	mux.HandleFunc("GET /llms.txt", seo.LLMs)
+	mux.HandleFunc("GET /{$}", home.HomePage)
+{{- if .HasBlog }}
+	mux.HandleFunc("GET /blog", blog.ListPosts)
+	mux.HandleFunc("GET /blog/{slug}", blog.ShowPost)
+	mux.HandleFunc("GET /blog/tag/{tag}", blog.ListByTag)
+	mux.HandleFunc("POST /newsletter/subscribe", newsletter.Subscribe)
+{{- end }}
+{{- if .HasDocs }}
+	mux.HandleFunc("GET /docs", docs.ShowDocs)
+	mux.HandleFunc("GET /docs.md", docs.ShowDocs)
+	mux.HandleFunc("GET /docs/", docs.ShowDocs)
+{{- end }}
+	mux.HandleFunc("GET /legal/{page}", legal.ShowPage)
+
+	rateLimiter := middleware.RateLimitAuth(clientIPs)
+	authEmailRateLimiter := middleware.RateLimitAuthEmail(clientIPs)
+{{- if .Workspaces }}
+	// Web, API and MCP invitations share one budget.
+	invitationLimiter := middleware.NewWorkspaceInvitationLimiter()
+{{- end }}
+	mux.HandleFunc("GET /auth", middleware.RequireGuest(auth.AuthPage))
+	mux.HandleFunc("GET /auth/password", middleware.RequireGuest(auth.PasswordPage))
+	mux.HandleFunc("GET /auth/forgot-password", middleware.RequireGuest(auth.ForgotPasswordPage))
+	mux.HandleFunc("GET /auth/forgot-password-sent", middleware.RequireGuest(auth.ForgotPasswordSentPage))
+	mux.HandleFunc("GET /auth/magic-link-sent", middleware.RequireGuest(auth.MagicLinkSentPage))
+	mux.HandleFunc("GET /auth/onboarding", middleware.RequireAuth(auth.OnboardingPage))
+{{- if .HasGoogleOAuth }}
+	mux.HandleFunc("GET /auth/google", rateLimiter(middleware.RequireGuest(auth.GoogleAuth)))
+	mux.HandleFunc("GET /auth/google/callback", rateLimiter(auth.GoogleCallback))
+{{- end }}
+{{- if .HasGitHubOAuth }}
+	mux.HandleFunc("GET /auth/github", rateLimiter(middleware.RequireGuest(auth.GitHubAuth)))
+	mux.HandleFunc("GET /auth/github/callback", rateLimiter(auth.GitHubCallback))
+{{- end }}
+	mux.HandleFunc("GET /auth/magic-link/{token}", auth.VerifyMagicLink)
+	mux.HandleFunc("GET /auth/forgot-password/{token}", auth.VerifyForgotPassword)
+	mux.HandleFunc("GET /auth/verify-email-change/{token}", auth.VerifyEmailChange)
+	mux.HandleFunc("POST /auth/magic-link", authEmailRateLimiter(middleware.RequireGuest(auth.SendMagicLink)))
+	mux.HandleFunc("POST /auth/password", rateLimiter(middleware.RequireGuest(auth.PasswordAuth)))
+	mux.HandleFunc("POST /auth/forgot-password", authEmailRateLimiter(middleware.RequireGuest(auth.ForgotPassword)))
+	mux.HandleFunc("POST /auth/onboarding", middleware.RequireAuth(auth.CompleteOnboarding))
+{{- if .Workspaces }}
+	mux.HandleFunc("GET /workspaces/new", middleware.RequireAuth(workspaceHandler.NewPage))
+	mux.HandleFunc("POST /workspaces/new", middleware.RequireAuth(workspaceHandler.Create))
+{{- end }}
+	mux.HandleFunc("POST /auth/logout", auth.Logout)
+	mux.HandleFunc("POST /admin/impersonation/stop", admin.StopImpersonation)
+{{- if .Workspaces }}
+	mux.HandleFunc("GET /workspaces/invitations/{token}", workspaceInvitation.Show)
+	mux.HandleFunc("POST /workspaces/invitations/{token}", middleware.RequireAuth(workspaceInvitation.Accept))
+{{- end }}
+{{- if .Workspaces }}
+	workspace := func(next http.HandlerFunc) http.HandlerFunc {
+		return middleware.RequireAuth(middleware.WithWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
+	}
+	mux.HandleFunc("GET /app", middleware.RequireAuth(workspaceHandler.Redirect))
+	mux.HandleFunc("GET /app/{workspaceSlug}/dashboard", workspace(dashboard.DashboardPage))
+	mux.HandleFunc("GET /app/{workspaceSlug}/settings", workspace(settings.SettingsPage))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions/{id}", workspace(settings.RevokeSession))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions", workspace(settings.RevokeAllSessions))
+{{- if .API }}
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/api-tokens", workspace(apiTokens.Create))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/api-tokens/{id}", workspace(apiTokens.Revoke))
+{{- end }}
+	mux.HandleFunc("PATCH /app/{workspaceSlug}/profile/name", workspace(profile.UpdateName))
+	emailChanges := middleware.RateLimitUserEmailChanges()
+	mux.HandleFunc("PATCH /app/{workspaceSlug}/account/email", workspace(emailChanges(account.ChangeEmail)))
+	mux.HandleFunc("POST /app/{workspaceSlug}/account/password", workspace(account.ChangePassword))
+{{- if .Storage }}
+	mux.HandleFunc("POST /app/{workspaceSlug}/account/avatar", workspace(account.UploadAvatar))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/account/avatar", workspace(account.DeleteAvatar))
+{{- end }}
+	mux.HandleFunc("POST /app/{workspaceSlug}/account/password/set", workspace(account.SetPassword))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/account/password", workspace(account.RemovePassword))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/account", workspace(account.DeleteAccount))
+	mux.HandleFunc("GET /app/{workspaceSlug}/billing", workspace(billing.BillingPage))
+	mux.HandleFunc("POST /app/{workspaceSlug}/billing/checkout", workspace(billing.CreateCheckout))
+	mux.HandleFunc("GET /app/{workspaceSlug}/billing/manage", workspace(billing.BillingManagement))
+	limitInvitations := middleware.RateLimitWorkspaceInvitations(invitationLimiter)
+	mux.HandleFunc("GET /app/{workspaceSlug}/workspace", workspace(workspaceHandler.Page))
+	mux.HandleFunc("GET /app/{workspaceSlug}/workspace/activity", workspace(workspaceHandler.ActivityPage))
+	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/name", workspace(workspaceHandler.UpdateName))
+	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/invitations", workspace(limitInvitations(workspaceHandler.Invite)))
+	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/invitations/{invitationID}/resend", workspace(limitInvitations(workspaceHandler.ResendInvitation)))
+	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/invitations/{invitationID}/revoke", workspace(workspaceHandler.RevokeInvitation))
+	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/members/{memberID}/role", workspace(workspaceHandler.ChangeRole))
+	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/members/{memberID}/remove", workspace(workspaceHandler.RemoveMember))
+	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/leave", workspace(workspaceHandler.Leave))
+	mux.HandleFunc("POST /app/{workspaceSlug}/workspace/delete", workspace(workspaceHandler.Delete))
+{{- else }}
+	mux.HandleFunc("GET /app", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/app/dashboard", http.StatusSeeOther)
+	}))
+	mux.HandleFunc("GET /app/dashboard", middleware.RequireAuth(dashboard.DashboardPage))
+	mux.HandleFunc("GET /app/settings", middleware.RequireAuth(settings.SettingsPage))
+	mux.HandleFunc("DELETE /app/settings/sessions/{id}", middleware.RequireAuth(settings.RevokeSession))
+	mux.HandleFunc("DELETE /app/settings/sessions", middleware.RequireAuth(settings.RevokeAllSessions))
+{{- if .API }}
+	mux.HandleFunc("POST /app/settings/api-tokens", middleware.RequireAuth(apiTokens.Create))
+	mux.HandleFunc("DELETE /app/settings/api-tokens/{id}", middleware.RequireAuth(apiTokens.Revoke))
+{{- end }}
+	mux.HandleFunc("PATCH /app/profile/name", middleware.RequireAuth(profile.UpdateName))
+	emailChanges := middleware.RateLimitUserEmailChanges()
+	mux.HandleFunc("PATCH /app/account/email", middleware.RequireAuth(emailChanges(account.ChangeEmail)))
+	mux.HandleFunc("POST /app/account/password", middleware.RequireAuth(account.ChangePassword))
+{{- if .Storage }}
+	mux.HandleFunc("POST /app/account/avatar", middleware.RequireAuth(account.UploadAvatar))
+	mux.HandleFunc("DELETE /app/account/avatar", middleware.RequireAuth(account.DeleteAvatar))
+{{- end }}
+	mux.HandleFunc("POST /app/account/password/set", middleware.RequireAuth(account.SetPassword))
+	mux.HandleFunc("DELETE /app/account/password", middleware.RequireAuth(account.RemovePassword))
+	mux.HandleFunc("DELETE /app/account", middleware.RequireAuth(account.DeleteAccount))
+	mux.HandleFunc("GET /app/billing", middleware.RequireAuth(billing.BillingPage))
+	mux.HandleFunc("POST /app/billing/checkout", middleware.RequireAuth(billing.CreateCheckout))
+	mux.HandleFunc("GET /app/billing/portal", middleware.RequireAuth(billing.CustomerPortal))
+{{- end }}
+	adminRoute := func(next http.HandlerFunc) http.HandlerFunc {
+		return middleware.RequireAuth(middleware.RequireAdmin(next))
+	}
+	mux.HandleFunc("GET /admin", adminRoute(admin.Dashboard))
+	mux.HandleFunc("POST /admin/users/{userID}/sessions/revoke", adminRoute(admin.RevokeUserSessions))
+	mux.HandleFunc("POST /admin/users/{userID}/impersonate", adminRoute(admin.StartImpersonation))
+	mux.HandleFunc("POST /webhooks/payment", billing.Webhook)
+{{- end }}
+{{- if .API }}
+{{- if and .Workspaces .IsSvelte }}
+	invitationCookie := api.NewInvitationCookie(app.Cfg.IsProduction())
+{{- end }}
+	apiHandlers := api.Handlers{
+		Meta: api.NewMetaHandler(app.Cfg.SupportEmail),
+{{- if and .Workspaces .IsSvelte }}
+		Auth: api.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService, invitationCookie),
+{{- else if .Workspaces }}
+		Auth: api.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService),
+{{- else }}
+		Auth: api.NewAuthHandler(app.AuthService, app.UserService),
+{{- end }}
+{{- if .Storage }}
+		Account: api.NewAccountHandler(app.AuthService, app.UserService, app.FileService),
+{{- else }}
+		Account: api.NewAccountHandler(app.AuthService, app.UserService),
+{{- end }}
+		Sessions: api.NewSessionsHandler(app.AuthService),
+		Tokens:   api.NewAPITokensHandler(app.APITokenService),
+{{- if .Workspaces }}
+		Billing:     api.NewBillingHandler(app.PaymentService, app.WorkspaceService),
+		Admin:       api.NewAdminHandler(app.AdminService),
+		Workspaces:  api.NewWorkspaceHandler(app.WorkspaceService),
+{{- if .IsSvelte }}
+		Invitations: api.NewWorkspaceInvitationHandler(app.WorkspaceService, invitationCookie),
+{{- else }}
+		Invitations: api.NewWorkspaceInvitationHandler(app.WorkspaceService),
+{{- end }}
+{{- else }}
+		Billing: api.NewBillingHandler(app.PaymentService),
+		Admin:   api.NewAdminHandler(app.AdminService),
+{{- end }}
+	}
+	apiMiddleware := api.Middleware{
+		RequireAuth:           middleware.RequireAuthAPI,
+		RequireOnboarded:      middleware.RequireOnboardedAPI,
+		RateLimitAuth:         rateLimiter,
+		RateLimitAuthEmail:    authEmailRateLimiter,
+		RateLimitEmailChanges: emailChanges,
+		RequireAdmin: middleware.RequireAdminAPI,
+{{- if .Workspaces }}
+		Workspace: func(next http.HandlerFunc) http.HandlerFunc {
+			return middleware.RequireOnboardedAPI(middleware.WithWorkspaceAPI(app.WorkspaceService, app.SubscriptionService)(next))
+		},
+		RateLimitInvitations: middleware.RateLimitWorkspaceInvitations(invitationLimiter),
+{{- end }}
+	}
+	for _, route := range api.Routes(apiHandlers, apiMiddleware) {
+		mux.HandleFunc(route.Pattern, route.Handler)
+	}
+{{- if .MCP }}
+	mcpServer := mcp.NewServer(mcp.Services{
+		Users: app.UserService,
+{{- if .Workspaces }}
+		Workspaces:    app.WorkspaceService,
+		Subscriptions: app.SubscriptionService,
+		Invitations:   invitationLimiter,
+{{- end }}
+	})
+	mux.Handle("/mcp", mcp.Handler(mcpServer))
+{{- end }}
+{{- if .IsHeadless }}
+	mux.HandleFunc("/", middleware.APINotFound)
+{{- else }}
+	mux.HandleFunc("/api/", middleware.APINotFound)
+{{- end }}
+{{- if .IsSvelte }}
+	build, _ := fs.Sub(web.Build, "build")
+	spa := NewSPA(build, SPAConfig{
+{{- if .Storage }}
+		S3Endpoint: app.Cfg.S3Endpoint,
+{{- end }}
+	})
+	mux.Handle("/", middleware.Gzip(spa))
+{{- end }}
+{{- end }}
+{{- if .HasHTMLFrontend }}
+	mux.HandleFunc("/{path...}", home.NotFoundPage)
+{{- end }}
+
+	return middleware.Chain(
+		mux,
+{{- if .HasHTMLFrontend }}
+		middleware.RenderConfig(renderConfig),
+		middleware.NonceMiddleware,
+{{- end }}
+		securityHeaders,
+		middleware.RequestLogging(app.Cfg.LogHTTP, clientIPs),
+{{- if .API }}
+		middleware.CORS(app.Cfg.CORSAllowedOrigins),
+{{- end }}
+		middleware.CSRFProtection(app.Cfg.IsProduction(), clientIPs),
+{{- if not .Workspaces }}
+		middleware.AuthMiddleware(app.AuthService, app.UserService, app.SubscriptionService),
+{{- if .API }}
+		middleware.APITokenAuth(app.APITokenService, app.UserService, app.SubscriptionService),
+{{- end }}
+{{- else }}
+		middleware.AuthMiddleware(app.AuthService, app.UserService),
+{{- if .API }}
+		middleware.APITokenAuth(app.APITokenService, app.UserService),
+{{- end }}
+{{- end }}
+		middleware.BlockImpersonatedWrites,
+		middleware.AdminContext(app.AdminService),
+{{- if .HasHTMLFrontend }}
+		middleware.WithURLPath,
+{{- end }}
+	)
+}

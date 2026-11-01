@@ -1,0 +1,14 @@
+{
+  "project_name": "Workspace Minimal",
+  "module_path": "example.com/workspace-minimal",
+  "framework": "htmx",
+  "database": "sqlite",
+  "payment": "stripe",
+  "mail": "smtp",
+  "workspaces": true,
+  "oauth": [],
+  "storage": false,
+  "content": [],
+  "api": false,
+  "mcp": false
+}

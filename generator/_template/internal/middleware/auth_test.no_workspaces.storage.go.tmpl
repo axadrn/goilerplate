@@ -1,0 +1,171 @@
+package middleware
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	"{{.ModulePath}}/internal/ctxkeys"
+{{- if .HasHTMLFrontend }}
+	"{{.ModulePath}}/internal/model"
+{{- end }}
+	"{{.ModulePath}}/internal/repository"
+	"{{.ModulePath}}/internal/service"
+	"{{.ModulePath}}/internal/testutil"
+)
+
+func TestAuthMiddlewareLoadsAuthenticatedContext(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	fixture := testutil.SeedUser(t, database, testutil.UserOptions{
+		ID:       "authenticated-user",
+		Name:     "Authenticated User",
+		Password: "correct horse battery staple",
+		Verified: true,
+	})
+	authService, userService, subscriptionService := authenticationServices(database)
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(http.MethodGet, "/auth", nil)
+	session, err := authService.StartSession(loginRecorder, loginRequest, fixture.User.ID)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	sessionCookie := loginRecorder.Result().Cookies()[0]
+
+	var contextChecked bool
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := ctxkeys.User(r.Context())
+		subscription := ctxkeys.Subscription(r.Context())
+		currentSession := ctxkeys.Session(r.Context())
+		if user == nil || user.ID != fixture.User.ID {
+			t.Fatalf("context user = %#v", user)
+		}
+		if user.PasswordHash != nil || !user.PasswordSet {
+			t.Fatalf("context exposed password hash or lost password state: %#v", user)
+		}
+		if user.Name != fixture.User.Name {
+			t.Fatalf("context user name = %q", user.Name)
+		}
+		if subscription == nil || subscription.ID != fixture.Subscription.ID {
+			t.Fatalf("context subscription = %#v", subscription)
+		}
+		if currentSession == nil || currentSession.ID != session.ID {
+			t.Fatalf("context session = %#v", currentSession)
+		}
+		contextChecked = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/app/dashboard", nil)
+	request.AddCookie(sessionCookie)
+	recorder := httptest.NewRecorder()
+	AuthMiddleware(authService, userService, subscriptionService)(next).ServeHTTP(recorder, request)
+
+	if !contextChecked || recorder.Code != http.StatusNoContent {
+		t.Fatalf("contextChecked = %t, status = %d", contextChecked, recorder.Code)
+	}
+}
+
+func TestAuthMiddlewareClearsInvalidSessionAndContinuesAsGuest(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	authService, userService, subscriptionService := authenticationServices(database)
+	var authenticated bool
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authenticated = ctxkeys.User(r.Context()) != nil
+		w.WriteHeader(http.StatusNoContent)
+	})
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.AddCookie(&http.Cookie{Name: "session_token", Value: "invalid-token"})
+	recorder := httptest.NewRecorder()
+
+	AuthMiddleware(authService, userService, subscriptionService)(next).ServeHTTP(recorder, request)
+
+	if authenticated {
+		t.Fatal("invalid session authenticated the request")
+	}
+	cookies := recorder.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "session_token" || cookies[0].MaxAge != -1 {
+		t.Fatalf("cleared cookies = %#v", cookies)
+	}
+}
+
+{{ if .HasHTMLFrontend -}}
+func TestRequireAuthRedirectsGuestsAndIncompleteProfiles(t *testing.T) {
+	tests := []struct {
+		name         string
+		context      func(*http.Request) *http.Request
+		wantLocation string
+		wantCalled   bool
+	}{
+		{name: "guest", wantLocation: "/auth"},
+		{
+			name: "incomplete profile",
+			context: func(request *http.Request) *http.Request {
+				return request.WithContext(ctxkeys.WithUser(request.Context(), &model.User{ID: "user-1"}))
+			},
+			wantLocation: "/auth/onboarding",
+		},
+		{
+			name: "authenticated",
+			context: func(request *http.Request) *http.Request {
+				return request.WithContext(ctxkeys.WithUser(request.Context(), &model.User{ID: "user-1", Name: "User"}))
+			},
+			wantCalled: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			called := false
+			handler := RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusNoContent)
+			})
+			request := httptest.NewRequest(http.MethodGet, "/app/dashboard", nil)
+			if test.context != nil {
+				request = test.context(request)
+			}
+			recorder := httptest.NewRecorder()
+
+			handler(recorder, request)
+
+			if called != test.wantCalled {
+				t.Fatalf("handler called = %t, want %t", called, test.wantCalled)
+			}
+			if test.wantCalled {
+				if recorder.Code != http.StatusNoContent {
+					t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+				}
+				return
+			}
+			if got := recorder.Header().Get("Location"); got != test.wantLocation {
+				t.Fatalf("Location = %q, want %q", got, test.wantLocation)
+			}
+		})
+	}
+}
+
+{{ end -}}
+func authenticationServices(database *sqlx.DB) (*service.AuthService, *service.UserService, *service.SubscriptionService) {
+	userRepository := repository.NewUserRepository(database)
+	subscriptionRepository := repository.NewSubscriptionRepository(database)
+	fileService := service.NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage())
+	subscriptionService := service.NewSubscriptionService(subscriptionRepository)
+	authService := service.NewAuthService(
+		userRepository,
+		repository.NewTokenRepository(database),
+		repository.NewSessionRepository(database),
+		subscriptionService,
+		service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App"),
+		false,
+		7*24*time.Hour,
+		24*time.Hour,
+		time.Hour,
+		24*time.Hour,
+		10*time.Minute,
+	)
+	userService := service.NewUserService(userRepository, fileService, nil, subscriptionService)
+	return authService, userService, subscriptionService
+}

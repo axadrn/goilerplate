@@ -1,0 +1,31 @@
+package middleware
+
+import "net/http"
+
+type SecurityHeadersConfig struct {
+	RobotsNoIndex bool
+}
+
+{{ if .IsSvelte -}}
+// SecurityHeaders adds security headers to every response. The JSON API
+// needs nothing to load, run or frame, so the content security policy allows
+// nothing. The SvelteKit app handler in internal/routes replaces it with the
+// app policy on the files it serves. It needs no nonce.
+{{- else -}}
+// SecurityHeaders adds security headers to every response. A headless
+// project serves JSON only, so the content security policy allows nothing to
+// load, run or frame. It needs no nonce.
+{{- end }}
+func SecurityHeaders(cfg SecurityHeadersConfig, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=()")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		if cfg.RobotsNoIndex {
+			w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+		}
+		next.ServeHTTP(w, r)
+	})
+}

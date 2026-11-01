@@ -1,0 +1,52 @@
+package pages
+
+import (
+	"strconv"
+
+	"{{.ModulePath}}/internal/ui/components"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/empty"
+	"{{.ModulePath}}/internal/ui/components/icon"
+)
+
+templ ErrorPage(status int, title, description string) {
+	<!DOCTYPE html>
+	<html lang="en" data-nonce={ templ.GetNonce(ctx) }>
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<meta name="robots" content="noindex, nofollow"/>
+			<title>{ title }</title>
+			<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"/>
+			<script nonce={ templ.GetNonce(ctx) }>
+				const theme = localStorage.getItem('theme') || 'system';
+				const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+				document.documentElement.classList.toggle('dark', dark);
+			</script>
+			<link href="/assets/css/output.css" rel="stylesheet"/>
+			@components.Scripts()
+		</head>
+		<body class="style-nova min-h-screen">
+			@empty.Empty(empty.Props{Class: "min-h-svh rounded-none border-0"}) {
+				@empty.Header() {
+					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+						@icon.CircleAlert(icon.Props{Class: "size-5"})
+					}
+					<p class="text-sm font-medium text-muted-foreground">{ strconv.Itoa(status) }</p>
+					@empty.Title(empty.TitleProps{Class: "text-xl"}) {
+						{ title }
+					}
+					@empty.Description() {
+						{ description }
+					}
+				}
+				@empty.Content() {
+					@button.Button(button.Props{Href: "/"}) {
+						@icon.House(icon.Props{Class: "size-4"})
+						Back to home
+					}
+				}
+			}
+		</body>
+	</html>
+}

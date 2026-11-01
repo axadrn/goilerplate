@@ -1,0 +1,18 @@
+{
+  "project_name": "SQLite Ship",
+  "module_path": "example.com/sqlite-ship",
+  "framework": "htmx",
+  "database": "sqlite",
+  "payment": "stripe",
+  "mail": "smtp",
+  "workspaces": false,
+  "oauth": [
+    "github"
+  ],
+  "storage": true,
+  "content": [
+    "blog"
+  ],
+  "api": true,
+  "mcp": false
+}

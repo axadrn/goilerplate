@@ -1,0 +1,33 @@
+package layouts
+
+import (
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/sidebar"
+)
+
+templ AppSidebarNavigation() {
+	{{ member := ctxkeys.WorkspaceMember(ctx) }}
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/dashboard", IsActive: ctxkeys.URLPath(ctx) == basePath+"/dashboard"}) {
+			@icon.House(icon.Props{Class: "size-4"})
+			<span>Dashboard</span>
+		}
+	}
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/workspace", IsActive: ctxkeys.URLPath(ctx) == basePath+"/workspace"}) {
+			@icon.Building2(icon.Props{Class: "size-4"})
+			<span>Workspace</span>
+		}
+	}
+	if member.Can(model.WorkspacePermissionViewAuditLog) {
+		@sidebar.MenuItem() {
+			@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/workspace/activity", IsActive: ctxkeys.URLPath(ctx) == basePath+"/workspace/activity"}) {
+				@icon.Activity(icon.Props{Class: "size-4"})
+				<span>Activity</span>
+			}
+		}
+	}
+}

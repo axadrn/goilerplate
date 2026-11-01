@@ -1,0 +1,15 @@
+package blocks
+
+templ FooterNewsletterForm(errorMsg string) {
+	@FooterNewsletterSection() {
+		<form
+			class="mt-6 flex flex-col sm:flex-row gap-3 items-start"
+			data-on:submit="@post('/newsletter/subscribe', {contentType: 'form'})"
+			data-indicator:_newsletter
+			data-attr:inert="$_newsletter"
+			data-attr:aria-busy="$_newsletter"
+		>
+			@FooterNewsletterFields(errorMsg)
+		</form>
+	}
+}

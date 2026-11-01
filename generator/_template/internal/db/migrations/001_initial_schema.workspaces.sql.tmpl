@@ -1,0 +1,299 @@
+-- +goose Up
+-- Initial database schema for goilerplate
+-- Compatible with both PostgreSQL and SQLite
+
+-- ============================================================================
+-- USERS TABLE
+-- Core user accounts with optional password (supports OAuth/magic link)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    -- Explicitly nullable for passwordless authentication.
+    password_hash TEXT NULL,
+    pending_email TEXT NULL,
+    email_verified_at {{.DatabaseTimestamp}} NULL,
+    created_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    name TEXT NOT NULL DEFAULT '',
+    updated_at {{.DatabaseTimestamp}}
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_passwordless ON users(id) WHERE password_hash IS NULL;
+
+-- ============================================================================
+-- TOKENS TABLE
+-- Verification tokens, password reset tokens, magic links
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    token_hash TEXT UNIQUE NOT NULL,
+    expires_at {{.DatabaseTimestamp}} NOT NULL,
+    created_at {{.DatabaseTimestamp}} DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id);
+
+-- ============================================================================
+-- SESSIONS TABLE
+-- Revocable browser sessions. Only a hash of the browser token is stored.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    impersonator_user_id TEXT,
+    token_hash TEXT UNIQUE NOT NULL,
+    user_agent TEXT NOT NULL DEFAULT '',
+    expires_at {{.DatabaseTimestamp}} NOT NULL,
+    last_seen_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (impersonator_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_impersonator_user_id ON sessions(impersonator_user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+
+-- ============================================================================
+-- WORKSPACES AND MEMBERS
+-- Customer workspaces and workspace-scoped roles
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    created_by TEXT,
+    created_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspaces_slug ON workspaces(slug);
+
+CREATE TABLE IF NOT EXISTS workspace_members (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
+    created_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE (workspace_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace_id ON workspace_members(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_members_user_id ON workspace_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace_role ON workspace_members(workspace_id, role);
+
+CREATE TABLE IF NOT EXISTS workspace_invitations (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'member')),
+    token_hash TEXT UNIQUE NOT NULL,
+    invited_by TEXT NOT NULL,
+    expires_at {{.DatabaseTimestamp}} NOT NULL,
+    accepted_at {{.DatabaseTimestamp}},
+    revoked_at {{.DatabaseTimestamp}},
+    created_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+    FOREIGN KEY (invited_by) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspace_invitations_workspace_id ON workspace_invitations(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_invitations_email ON workspace_invitations(email);
+CREATE INDEX IF NOT EXISTS idx_workspace_invitations_expires_at ON workspace_invitations(expires_at);
+CREATE INDEX IF NOT EXISTS idx_workspace_invitations_pending ON workspace_invitations(workspace_id, accepted_at, revoked_at, expires_at);
+
+CREATE TABLE IF NOT EXISTS workspace_audit_events (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    actor_user_id TEXT,
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    metadata TEXT NOT NULL DEFAULT '{}',
+    created_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+    FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspace_audit_events_workspace_created ON workspace_audit_events(workspace_id, created_at);
+
+{{- if .API }}
+
+-- ============================================================================
+-- API TOKENS TABLE
+-- Personal API tokens for scripts and agents. Only a hash of the token is
+-- stored; prefix is the start of the token for display. Each token is bound
+-- to one workspace.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS api_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    token_hash TEXT UNIQUE NOT NULL,
+    prefix TEXT NOT NULL,
+    scopes TEXT NOT NULL CHECK (scopes IN ('read', 'read,write')),
+    last_used_at {{.DatabaseTimestamp}},
+    expires_at {{.DatabaseTimestamp}},
+    created_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_workspace_id ON api_tokens(workspace_id);
+{{- end }}
+
+-- ==========================================================================
+-- ADMIN AUDIT EVENTS
+-- Operator-level security and billing history retained after tenant deletion.
+-- No foreign keys by design because referenced records may be deleted first.
+-- ==========================================================================
+CREATE TABLE IF NOT EXISTS admin_audit_events (
+    id TEXT PRIMARY KEY,
+    actor_user_id TEXT,
+    workspace_id TEXT,
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    metadata TEXT NOT NULL DEFAULT '{}',
+    created_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_events_created_at ON admin_audit_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_events_workspace_id ON admin_audit_events(workspace_id);
+
+-- ============================================================================
+-- SUBSCRIPTIONS TABLE
+-- Subscription plans and billing information
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT UNIQUE NOT NULL,
+    plan_id TEXT NOT NULL DEFAULT 'free',
+    status TEXT NOT NULL DEFAULT 'active',
+    provider_customer_id TEXT,
+    provider_subscription_id TEXT,
+    provider_subscription_created_at {{.DatabaseTimestamp}},
+    provider_state_updated_at {{.DatabaseTimestamp}},
+    provider_payment_updated_at {{.DatabaseTimestamp}},
+    checkout_attempt_id TEXT,
+    checkout_provider TEXT NOT NULL DEFAULT '',
+    checkout_plan_id TEXT NOT NULL DEFAULT '',
+    checkout_interval TEXT NOT NULL DEFAULT '',
+    checkout_url TEXT,
+    checkout_expires_at {{.DatabaseTimestamp}},
+    checkout_pending_until {{.DatabaseTimestamp}},
+    current_period_end {{.DatabaseTimestamp}},
+    amount INTEGER,
+    currency TEXT NOT NULL DEFAULT '',
+    interval TEXT,
+    created_at {{.DatabaseTimestamp}} DEFAULT CURRENT_TIMESTAMP,
+    updated_at {{.DatabaseTimestamp}} DEFAULT CURRENT_TIMESTAMP,
+    provider TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_workspace_id ON subscriptions(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_provider ON subscriptions(provider);
+
+{{ if .Storage }}
+-- ============================================================================
+-- FILES TABLE
+-- Stored file metadata for the selected storage provider.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS files (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    owner_type TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    original_name TEXT,
+    mime_type TEXT,
+    size INTEGER,
+    storage_path TEXT NOT NULL,
+    public BOOLEAN DEFAULT true,
+    created_at {{.DatabaseTimestamp}} DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id);
+CREATE INDEX IF NOT EXISTS idx_files_owner ON files(owner_type, owner_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_files_owner_type ON files(owner_type, owner_id, type) WHERE type IN ('avatar');
+{{ end }}
+{{ if .HasBlog }}
+-- ============================================================================
+-- NEWSLETTER SUBSCRIBERS TABLE
+-- Email addresses captured by the selected blog module.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+    email TEXT PRIMARY KEY,
+    created_at {{.DatabaseTimestamp}} NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+{{ end }}
+
+-- +goose Down
+-- Drop all tables in reverse order (respecting foreign keys)
+
+{{- if .API }}
+DROP INDEX IF EXISTS idx_api_tokens_user_id;
+DROP INDEX IF EXISTS idx_api_tokens_workspace_id;
+DROP TABLE IF EXISTS api_tokens;
+{{- end }}
+
+{{ if .HasBlog }}
+DROP TABLE IF EXISTS newsletter_subscribers;
+{{ end }}
+{{ if .Storage }}
+DROP INDEX IF EXISTS idx_files_owner_type;
+DROP INDEX IF EXISTS idx_files_owner;
+DROP INDEX IF EXISTS idx_files_user_id;
+DROP TABLE IF EXISTS files;
+{{ end }}
+DROP INDEX IF EXISTS idx_subscriptions_provider;
+DROP INDEX IF EXISTS idx_subscriptions_status;
+DROP INDEX IF EXISTS idx_subscriptions_workspace_id;
+DROP TABLE IF EXISTS subscriptions;
+
+
+DROP INDEX IF EXISTS idx_admin_audit_events_workspace_id;
+DROP INDEX IF EXISTS idx_admin_audit_events_created_at;
+DROP TABLE IF EXISTS admin_audit_events;
+
+DROP INDEX IF EXISTS idx_workspace_audit_events_workspace_created;
+DROP TABLE IF EXISTS workspace_audit_events;
+
+DROP INDEX IF EXISTS idx_workspace_invitations_expires_at;
+DROP INDEX IF EXISTS idx_workspace_invitations_email;
+DROP INDEX IF EXISTS idx_workspace_invitations_workspace_id;
+DROP INDEX IF EXISTS idx_workspace_invitations_pending;
+DROP TABLE IF EXISTS workspace_invitations;
+
+DROP INDEX IF EXISTS idx_workspace_members_user_id;
+DROP INDEX IF EXISTS idx_workspace_members_workspace_id;
+DROP INDEX IF EXISTS idx_workspace_members_workspace_role;
+DROP TABLE IF EXISTS workspace_members;
+
+DROP INDEX IF EXISTS idx_workspaces_slug;
+DROP TABLE IF EXISTS workspaces;
+
+DROP INDEX IF EXISTS idx_sessions_expires_at;
+DROP INDEX IF EXISTS idx_sessions_impersonator_user_id;
+DROP INDEX IF EXISTS idx_sessions_user_id;
+DROP TABLE IF EXISTS sessions;
+
+DROP INDEX IF EXISTS idx_tokens_user_id;
+DROP INDEX IF EXISTS idx_tokens_expires_at;
+DROP TABLE IF EXISTS tokens;
+
+DROP INDEX IF EXISTS idx_users_passwordless;
+DROP TABLE IF EXISTS users;

@@ -1,0 +1,50 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/dialog"
+	field "{{.ModulePath}}/internal/ui/components/field"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/input"
+)
+
+templ SettingsAvatarFields() {
+	<div class="space-y-2">
+		@field.Label(field.LabelProps{For: "avatar"}) {
+			Choose Image
+		}
+		@input.Input(input.Props{Type: "file", ID: "avatar", Name: "avatar", Attributes: templ.Attributes{"accept": "image/jpeg,image/jpg,image/png,image/webp"}})
+		<p class="text-sm text-muted-foreground">JPEG, PNG or WebP. Max file size 5MB.</p>
+	</div>
+}
+
+templ SettingsAvatarUploadButton() {
+	@button.Button(button.Props{Type: "submit", Class: "w-full sm:w-auto"}) {
+		@icon.Upload(icon.Props{Class: "mr-2 size-4"})
+		Upload Avatar
+	}
+}
+
+templ SettingsAvatarDeleteTrigger() {
+	@button.Button(button.Props{Type: "button", Variant: button.VariantOutline, Class: "w-full sm:w-auto", Attributes: dialog.Trigger(ctx)}) {
+		@icon.Trash2(icon.Props{Class: "mr-2 size-4"})
+		Remove Avatar
+	}
+}
+
+templ SettingsAvatarDeleteDialog() {
+	@dialog.Header() {
+		@dialog.Title() {
+			Remove Avatar
+		}
+		@dialog.Description() {
+			Are you sure you want to remove your avatar? This action cannot be undone.
+		}
+	}
+}
+
+templ SettingsAvatarDeleteCancel() {
+	@button.Button(button.Props{Variant: button.VariantOutline, Attributes: dialog.Close(ctx)}) {
+		Cancel
+	}
+}

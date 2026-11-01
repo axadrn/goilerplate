@@ -1,0 +1,61 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/blocks"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/field"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/csrf"
+	"{{.ModulePath}}/internal/ui/layouts"
+)
+
+templ AuthMagicLinkSent(email string) {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "Check Your Email",
+		Description: "Magic link sent to your email",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("Check your email", "We sent a sign-in link to "+email) {
+				@field.Group() {
+					@field.Field() {
+						@AuthMagicLinkResend(email, false)
+						@field.Description(field.DescriptionProps{Class: "text-center"}) {
+							<a href="/auth">Use another email</a>
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ AuthMagicLinkResend(email string, sent bool) {
+	<div id="magic-link-resend" class="space-y-2">
+		<form
+			id="magic-link-resend-form"
+			data-on:submit="@post('/auth/magic-link?resend=true', {contentType: 'form'})"
+			data-indicator:_resend-magic-link
+			data-attr:inert="$_resendMagicLink"
+			data-attr:aria-busy="$_resendMagicLink"
+		>
+			@csrf.Token()
+			<input type="hidden" name="email" value={ email }/>
+			@button.Button(button.Props{Variant: button.VariantOutline, Class: "w-full", Type: button.TypeSubmit}) {
+				if sent {
+					Resend again
+				} else {
+					Resend email
+				}
+			}
+		</form>
+		if sent {
+			<p role="status" class="flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground">
+				@icon.Check(icon.Props{Class: "size-4"})
+				Email sent. A new sign-in link is on its way.
+			</p>
+		}
+	</div>
+}

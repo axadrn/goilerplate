@@ -1,0 +1,223 @@
+package service
+
+import (
+	"crypto/rand"
+	"encoding/base32"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/repository"
+	"github.com/google/uuid"
+)
+
+const (
+	// APITokenMarker starts every raw personal API token.
+	APITokenMarker = "pat_"
+	// MaxAPITokensPerUser caps the tokens one account may hold.
+	MaxAPITokensPerUser = 50
+	// MaxAPITokenExpiryDays is the longest expiry a token can be given.
+	MaxAPITokenExpiryDays = 365
+	maxAPITokenNameLength = 64
+	apiTokenPrefixLength  = 8
+	// apiTokenTouchInterval limits last_used_at writes to one per minute.
+	apiTokenTouchInterval = time.Minute
+)
+
+var (
+	ErrAPITokenName   = errors.New("api token name must contain between 1 and 64 characters")
+	ErrAPITokenScope  = errors.New("api token scopes must be read or read and write")
+	ErrAPITokenExpiry = errors.New("api token expiry must be between 1 and 365 days")
+	ErrAPITokenLimit  = errors.New("api token limit reached")
+{{- if .Workspaces }}
+	ErrAPITokenWorkspace = errors.New("api token workspace must be one of your workspaces")
+{{- end }}
+)
+
+var apiTokenEncoding = base32.StdEncoding.WithPadding(base32.NoPadding)
+
+// CreateAPITokenInput describes a new personal API token.
+type CreateAPITokenInput struct {
+	Name string
+	// Scopes holds "read", "write" or both. Write implies read. Empty means
+	// read only.
+	Scopes []string
+	// ExpiresInDays is between 1 and MaxAPITokenExpiryDays, or 0 for a token
+	// that never expires.
+	ExpiresInDays int
+{{- if .Workspaces }}
+	// WorkspaceID binds the token to one of the user's workspaces.
+	WorkspaceID string
+{{- end }}
+}
+
+// APITokenService creates, lists, revokes and authenticates personal API
+// tokens. A token acts for its user with the scopes it was given.
+type APITokenService struct {
+	tokens repository.APITokenRepository
+{{- if .Workspaces }}
+	workspaces *WorkspaceService
+{{- end }}
+	now func() time.Time
+}
+
+{{ if .Workspaces -}}
+func NewAPITokenService(tokens repository.APITokenRepository, workspaces *WorkspaceService) *APITokenService {
+	return &APITokenService{tokens: tokens, workspaces: workspaces, now: time.Now}
+}
+{{- else -}}
+func NewAPITokenService(tokens repository.APITokenRepository) *APITokenService {
+	return &APITokenService{tokens: tokens, now: time.Now}
+}
+{{- end }}
+
+// Create stores a new token and returns it with the raw token, which is never
+// available again.
+func (s *APITokenService) Create(userID string, input CreateAPITokenInput) (*model.APIToken, string, error) {
+	name := strings.TrimSpace(input.Name)
+	if name == "" || utf8.RuneCountInString(name) > maxAPITokenNameLength || strings.IndexFunc(name, unicode.IsControl) >= 0 {
+		return nil, "", ErrAPITokenName
+	}
+	scopes, err := normalizeAPITokenScopes(input.Scopes)
+	if err != nil {
+		return nil, "", err
+	}
+	if input.ExpiresInDays < 0 || input.ExpiresInDays > MaxAPITokenExpiryDays {
+		return nil, "", ErrAPITokenExpiry
+	}
+{{- if .Workspaces }}
+	err = s.requireMembership(userID, input.WorkspaceID)
+	if err != nil {
+		return nil, "", err
+	}
+{{- end }}
+	count, err := s.tokens.CountByUserID(userID)
+	if err != nil {
+		return nil, "", err
+	}
+	if count >= MaxAPITokensPerUser {
+		return nil, "", ErrAPITokenLimit
+	}
+
+	secret := make([]byte, 32)
+	_, err = rand.Read(secret)
+	if err != nil {
+		return nil, "", fmt.Errorf("generate api token: %w", err)
+	}
+	body := strings.ToLower(apiTokenEncoding.EncodeToString(secret))
+	raw := APITokenMarker + body
+	now := s.now().UTC()
+	token := &model.APIToken{
+		ID:     uuid.New().String(),
+		UserID: userID,
+{{- if .Workspaces }}
+		WorkspaceID: input.WorkspaceID,
+{{- end }}
+		Name:      name,
+		TokenHash: hashToken(raw),
+		Prefix:    body[:apiTokenPrefixLength],
+		Scopes:    scopes,
+		CreatedAt: now,
+	}
+	if input.ExpiresInDays > 0 {
+		expiresAt := now.Add(time.Duration(input.ExpiresInDays) * 24 * time.Hour)
+		token.ExpiresAt = &expiresAt
+	}
+	err = s.tokens.Create(token)
+	if err != nil {
+		return nil, "", err
+	}
+	return token, raw, nil
+}
+
+// List returns the tokens of a user, newest first. Expired tokens stay listed
+// until they are revoked.
+func (s *APITokenService) List(userID string) ([]model.APIToken, error) {
+	return s.tokens.ListByUserID(userID)
+}
+
+// Revoke deletes one token of the user. Another user's token is not found.
+func (s *APITokenService) Revoke(userID, tokenID string) error {
+	return s.tokens.DeleteByIDForUser(tokenID, userID)
+}
+
+// RevokeAllForUser deletes every token of the user. Account recovery, password
+// changes and the admin kill switch call it through AuthService.
+func (s *APITokenService) RevokeAllForUser(userID string) error {
+	return s.tokens.DeleteByUserID(userID)
+}
+
+// Authenticate returns the token for a raw "pat_" token. Unknown and expired
+// tokens are not found.
+func (s *APITokenService) Authenticate(raw string) (*model.APIToken, error) {
+	if !strings.HasPrefix(raw, APITokenMarker) || len(raw) == len(APITokenMarker) {
+		return nil, repository.ErrAPITokenNotFound
+	}
+	token, err := s.tokens.ByTokenHash(hashToken(raw))
+	if err != nil {
+		return nil, err
+	}
+	now := s.now().UTC()
+	if token.IsExpired(now) {
+		return nil, repository.ErrAPITokenNotFound
+	}
+	s.TouchLastUsed(token, now)
+	return token, nil
+}
+
+// TouchLastUsed records a use of the token, at most once per minute so busy
+// clients do not write on every request.
+func (s *APITokenService) TouchLastUsed(token *model.APIToken, now time.Time) {
+	if token.LastUsedAt != nil && now.Sub(*token.LastUsedAt) < apiTokenTouchInterval {
+		return
+	}
+	err := s.tokens.TouchLastUsed(token.ID, now)
+	if err != nil {
+		slog.Warn("failed to record api token use", "error", err, "token_id", token.ID)
+		return
+	}
+	token.LastUsedAt = &now
+}
+
+{{- if .Workspaces }}
+
+func (s *APITokenService) requireMembership(userID, workspaceID string) error {
+	if workspaceID == "" {
+		return ErrAPITokenWorkspace
+	}
+	memberships, err := s.workspaces.ListForUser(userID)
+	if err != nil {
+		return err
+	}
+	for _, membership := range memberships {
+		if membership.ID == workspaceID {
+			return nil
+		}
+	}
+	return ErrAPITokenWorkspace
+}
+{{- end }}
+
+// normalizeAPITokenScopes turns requested scopes into the stored form. Write
+// implies read.
+func normalizeAPITokenScopes(requested []string) (string, error) {
+	write := false
+	for _, scope := range requested {
+		switch strings.TrimSpace(scope) {
+		case model.APITokenScopeRead:
+		case model.APITokenScopeWrite:
+			write = true
+		default:
+			return "", ErrAPITokenScope
+		}
+	}
+	if write {
+		return model.APITokenScopeRead + "," + model.APITokenScopeWrite, nil
+	}
+	return model.APITokenScopeRead, nil
+}

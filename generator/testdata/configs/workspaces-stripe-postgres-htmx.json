@@ -1,0 +1,1 @@
+{"project_name":"Stripe Postgres","module_path":"example.com/stripe-postgres","framework":"htmx","database":"postgres","payment":"stripe","mail":"resend","workspaces":true,"oauth":["google"],"storage":true,"content":["blog"],"api":false,"mcp":false}

@@ -1,0 +1,28 @@
+package pages
+
+import (
+	"github.com/axadrn/goilerplate/v4/site/ui/blocks"
+	"github.com/axadrn/goilerplate/v4/site/ui/layouts"
+)
+
+templ Changelog(htmlContent string) {
+	@layouts.Home(layouts.SEOProps{Title: "Changelog", Description: "What shipped in goilerplate, newest first.", Path: "/changelog"}) {
+		<main>
+			<section class="pt-16 sm:pt-28">
+				<div class={ homeWrap }>
+					<h1 class={ homeDisplay, "text-[clamp(2.9rem,8.4vw,6.6rem)]" }>What shipped.</h1>
+					<p class="mt-7 max-w-[32rem] text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">Updates, improvements and fixes. Newest first.</p>
+				</div>
+			</section>
+			<section class="pt-12 pb-32 sm:pt-16 sm:pb-44">
+				<div class={ homeWrap }>
+					<article class={ homeSurface, "changelog-typeset min-w-0 p-7 sm:p-12 lg:p-16" }>
+						<div class="max-w-3xl">
+							@blocks.Typeset(htmlContent)
+						</div>
+					</article>
+				</div>
+			</section>
+		</main>
+	}
+}

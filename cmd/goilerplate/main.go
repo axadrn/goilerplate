@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,17 +12,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/goilerplate/v3/internal/cli"
-	"github.com/axadrn/goilerplate/v3/internal/config"
-	"github.com/axadrn/goilerplate/v3/internal/desktop"
-	"github.com/axadrn/goilerplate/v3/internal/doctor"
-	"github.com/axadrn/goilerplate/v3/internal/github"
-	"github.com/axadrn/goilerplate/v3/internal/service"
-	"github.com/axadrn/goilerplate/v3/internal/tui"
+	"github.com/axadrn/goilerplate/v4/internal/cli"
+	"github.com/axadrn/goilerplate/v4/internal/doctor"
+	"github.com/axadrn/goilerplate/v4/internal/github"
+	"github.com/axadrn/goilerplate/v4/internal/tui"
+	"github.com/axadrn/goilerplate/v4/internal/update"
 	"github.com/charmbracelet/x/term"
 )
-
-const githubClientID = "Ov23liBIZFEy7FHommLT"
 
 var version = "dev"
 
@@ -38,31 +35,20 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	store, err := config.DefaultStore()
-	if err != nil {
-		return err
-	}
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	application := &cli.App{
-		Out:            os.Stdout,
-		StyledOutput:   styledTerminal(os.Stdout),
-		Store:          store,
-		Device:         github.NewDeviceClient(httpClient),
-		GitHubClientID: githubClientID,
-		DefaultAPIURL:  "https://goilerplate.com",
-		APIURLOverride: strings.TrimSpace(os.Getenv("GOILERPLATE_API_URL")),
-		Version:        buildVersion(),
+		Out:          os.Stdout,
+		StyledOutput: styledTerminal(os.Stdout),
+		Version:      buildVersion(),
 		FetchReleases: func(ctx context.Context) ([]github.Release, error) {
 			return github.ListReleases(ctx, httpClient)
 		},
 		RunDoctor: doctor.Inspect,
-		NewService: func(baseURL string) (cli.ServiceClient, error) {
-			return service.NewClient(baseURL, httpClient)
+		FetchTemplate: func(ctx context.Context, version string) (fs.FS, error) {
+			return update.FetchTemplate(ctx, httpClient, moduleProxy(os.Getenv("GOPROXY")), version)
 		},
 	}
 	if isTerminal(os.Stdin) && isTerminal(os.Stdout) {
-		application.OpenBrowser = desktop.OpenBrowser
-		application.CopyToClipboard = desktop.CopyToClipboard
 		application.RunNewProjectWizard = func(ctx context.Context) ([]string, error) {
 			return tui.Run(ctx, os.Stdin, os.Stdout)
 		}
@@ -77,6 +63,19 @@ func isTerminal(file *os.File) bool {
 func styledTerminal(file *os.File) bool {
 	_, noColor := os.LookupEnv("NO_COLOR")
 	return isTerminal(file) && !noColor
+}
+
+// moduleProxy returns the first HTTP proxy of GOPROXY, as the go command would
+// try it, or the public Go module proxy.
+func moduleProxy(goproxy string) string {
+	for _, entry := range strings.FieldsFunc(goproxy, func(r rune) bool { return r == ',' || r == '|' }) {
+		entry = strings.TrimSpace(entry)
+		if strings.HasPrefix(entry, "https://") || strings.HasPrefix(entry, "http://") {
+			return entry
+		}
+		break
+	}
+	return update.DefaultProxy
 }
 
 func buildVersion() string {

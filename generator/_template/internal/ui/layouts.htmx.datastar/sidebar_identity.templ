@@ -1,0 +1,9 @@
+package layouts
+
+import "{{.ModulePath}}/internal/model"
+
+templ SidebarIdentityUpdates(user *model.User) {
+	@AppSidebarAvatar(user)
+	@AppSidebarUserSummary(user)
+	@AppSidebarUserLabel(user)
+}

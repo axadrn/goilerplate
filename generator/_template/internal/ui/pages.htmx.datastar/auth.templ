@@ -1,0 +1,39 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/blocks"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/field"
+	"{{.ModulePath}}/internal/ui/layouts"
+)
+
+templ Auth(errorMsg string) {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "Welcome",
+		Description: "Sign in or create your account",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("Welcome", "Sign in or create your account") {
+				@field.Group() {
+					@AuthMagicLinkForm(errorMsg)
+					if config.GoogleOAuthEnabled || config.GitHubOAuthEnabled {
+						@field.Separator(field.SeparatorProps{Class: "*:data-[slot=field-separator-content]:bg-card"}) {
+							Or continue with 
+						}
+						@blocks.OAuthButtons(config.GoogleOAuthEnabled, config.GitHubOAuthEnabled)
+					}
+					@field.Separator(field.SeparatorProps{Class: "*:data-[slot=field-separator-content]:bg-card"}) {
+						Or 
+					}
+					@button.Button(button.Props{Href: "/auth/password", Variant: button.VariantOutline, Class: "w-full"}) {
+						Sign in with password
+					}
+				}
+			}
+		}
+	}
+}

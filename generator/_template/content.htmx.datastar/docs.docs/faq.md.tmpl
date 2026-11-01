@@ -1,0 +1,33 @@
+---
+title: "FAQ"
+description: "Common questions about editing and publishing these example docs"
+order: 5
+---
+
+## Where do the pages live?
+
+Documentation is plain Markdown in `content/docs`. Folders create navigation groups. `_index.md` names a group and controls its order.
+
+## How do I add a page?
+
+Create a Markdown file with frontmatter:
+
+```md
+---
+title: "Invite a teammate"
+description: "Add someone to a workspace"
+order: 2
+---
+
+## Invite a teammate
+
+Write the shortest path to a successful result.
+```
+
+## Are these pages available to LLM tools?
+
+Yes. `/llms.txt` lists the public documentation and every page has a raw `.md` version. Remove those routes if the product should not publish machine-readable docs.
+
+## Can I replace these pages?
+
+Yes. Replace these pages with real product documentation or remove the Docs module from the owned application code.

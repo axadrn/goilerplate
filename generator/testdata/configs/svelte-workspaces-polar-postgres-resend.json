@@ -1,0 +1,16 @@
+{
+  "project_name": "SvelteKit Workspaces",
+  "module_path": "example.com/svelte-workspaces",
+  "framework": "svelte",
+  "database": "postgres",
+  "payment": "polar",
+  "mail": "resend",
+  "workspaces": true,
+  "oauth": [
+    "google"
+  ],
+  "storage": false,
+  "content": [],
+  "api": true,
+  "mcp": false
+}

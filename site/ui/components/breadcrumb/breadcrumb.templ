@@ -1,0 +1,193 @@
+package breadcrumb
+
+import (
+	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
+	"github.com/axadrn/goilerplate/v4/site/ui/utils"
+)
+
+type Props struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type ListProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type ItemProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type LinkProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	Href       string
+}
+
+type SeparatorProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+templ Breadcrumb(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<nav
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="breadcrumb"
+		class={
+			utils.CN(
+				"",
+				p.Class,
+			),
+		}
+		aria-label="breadcrumb"
+		{ p.Attributes... }
+	>
+		{ children... }
+	</nav>
+}
+
+templ List(props ...ListProps) {
+	{{ var p ListProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<ol
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="breadcrumb-list"
+		class={
+			utils.CN(
+				"text-muted-foreground gap-1.5 text-sm flex flex-wrap items-center wrap-break-word",
+				p.Class,
+			),
+		}
+		{ p.Attributes... }
+	>
+		{ children... }
+	</ol>
+}
+
+templ Item(props ...ItemProps) {
+	{{ var p ItemProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<li
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="breadcrumb-item"
+		class={
+			utils.CN(
+				"gap-1 inline-flex items-center",
+				p.Class,
+			),
+		}
+		{ p.Attributes... }
+	>
+		{ children... }
+	</li>
+}
+
+templ Link(props ...LinkProps) {
+	{{ var p LinkProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<a
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		if p.Href != "" {
+			href={ templ.SafeURL(p.Href) }
+		}
+		data-slot="breadcrumb-link"
+		class={
+			utils.CN(
+				"hover:text-foreground transition-colors",
+				p.Class,
+			),
+		}
+		{ p.Attributes... }
+	>
+		{ children... }
+	</a>
+}
+
+templ Separator(props ...SeparatorProps) {
+	{{ var p SeparatorProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<li
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="breadcrumb-separator"
+		role="presentation"
+		aria-hidden="true"
+		class={
+			utils.CN(
+				"[&>svg]:size-3.5",
+				p.Class,
+			),
+		}
+		{ p.Attributes... }
+	>
+		// The children ?? <ChevronRight/> of the reference: children render
+		// when the caller passed any, the icon fills the default case.
+		{{ childrenHTML, _ := templ.ToGoHTML(ctx, templ.GetChildren(ctx)) }}
+		if childrenHTML != "" {
+			@templ.Raw(childrenHTML)
+		} else {
+			@icon.ChevronRight(icon.Props{Class: ""})
+		}
+	</li>
+}
+
+templ Page(props ...ItemProps) {
+	{{ var p ItemProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<span
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="breadcrumb-page"
+		role="link"
+		aria-disabled="true"
+		aria-current="page"
+		class={
+			utils.CN(
+				"text-foreground font-normal",
+				p.Class,
+			),
+		}
+		{ p.Attributes... }
+	>
+		{ children... }
+	</span>
+}
+
+// Ellipsis marks collapsed breadcrumb items.
+templ Ellipsis() {
+	<span aria-hidden="true" data-slot="breadcrumb-ellipsis" role="presentation" class="size-5 [&>svg]:size-4 flex items-center justify-center">
+		@icon.Ellipsis()
+		<span class="sr-only">More</span>
+	</span>
+}

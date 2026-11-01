@@ -1,0 +1,36 @@
+package layouts
+
+import (
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/blocks"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/icon"
+)
+
+templ Admin(title string) {
+	@Base(SEOProps{Title: title, Description: "Operator administration", Path: ctxkeys.URLPath(ctx), NoIndex: true}) {
+		<div class="min-h-screen bg-muted/20">
+			<header class="border-b bg-background">
+				<div class="flex h-16 w-full items-center gap-4 px-6 lg:px-8">
+					<a href="/admin" class="flex items-center gap-2 font-semibold">
+						<span class="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+							@icon.Shield(icon.Props{Class: "size-4"})
+						</span>
+						<span>{ brand.Name } Admin</span>
+					</a>
+					<div class="ml-auto flex items-center gap-2">
+						@blocks.ThemeSwitcher()
+						@button.Button(button.Props{Href: "/app", Variant: button.VariantOutline, Size: button.SizeSm}) {
+							@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							Back to app
+						}
+					</div>
+				</div>
+			</header>
+			<main class="w-full px-6 py-8 lg:px-8">
+				{ children... }
+			</main>
+		</div>
+	}
+}

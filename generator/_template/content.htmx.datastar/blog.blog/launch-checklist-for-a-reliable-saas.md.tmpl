@@ -1,0 +1,37 @@
+---
+title: "A Launch Checklist for a Reliable SaaS"
+date: "2026-07-26"
+author: {{.YAMLProjectTeamName}}
+description: "Cover the operational details that turn a working application into a product ready for customers."
+tags: ["launch", "operations", "security"]
+---
+
+A launch is more than deploying a working binary. Customers need the product to remain understandable and recoverable when traffic, integrations, and real data arrive.
+
+## Verify the Critical Journeys
+
+Test the complete paths a customer depends on:
+
+- Create an account and verify an email address
+- Sign in, sign out, and recover access
+- Start, change, and cancel a subscription
+- Complete the product's primary workflow
+- Delete or export customer data when applicable
+
+Run these checks against the production configuration, not only a local environment.
+
+## Prepare for Failure
+
+Confirm that database backups can be restored. Add health checks for the application and its dependencies. Make provider callbacks safe to retry, and ensure an unavailable email or payment provider does not corrupt local state.
+
+Logs should explain failures without exposing passwords, tokens, or personal data.
+
+## Review the Public Surface
+
+Check metadata, social previews, legal pages, support links, and transactional email copy. Remove placeholder credentials and verify that production security headers allow only the resources the application actually uses.
+
+## Decide How You Will Respond
+
+Document the first steps for common incidents and choose where alerts should go. A small, practiced response plan is more useful than an elaborate document nobody can follow under pressure.
+
+Once these foundations are in place, launch to a focused group, watch the system closely, and improve it with evidence from real customers.

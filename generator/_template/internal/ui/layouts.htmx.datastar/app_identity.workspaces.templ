@@ -1,0 +1,7 @@
+package layouts
+
+import "{{.ModulePath}}/internal/ctxkeys"
+
+templ AppSidebarIdentity() {
+	@WorkspaceIdentity(ctxkeys.Workspace(ctx), ctxkeys.Workspaces(ctx))
+}

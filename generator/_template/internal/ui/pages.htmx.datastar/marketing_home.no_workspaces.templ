@@ -1,0 +1,218 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/access"
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/card"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/layouts"
+	"fmt"
+)
+
+templ Home() {
+	@layouts.Home(layouts.SEOProps{
+		Title:       fmt.Sprintf("Welcome to %s", brand.Name),
+		Description: brand.Description,
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		<div class="min-h-screen">
+			@HomeHero()
+			@HomeFeatures()
+			@HomePricing()
+			@HomeFAQ()
+			@HomeCTA()
+		</div>
+	}
+}
+
+templ HomeHero() {
+	<section id="hero" class="relative overflow-hidden py-24 sm:py-32">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-4xl text-center">
+				<div class="mb-6 inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm text-muted-foreground">
+					@icon.Sparkles(icon.Props{Class: "size-4 text-primary"})
+					Built for focused teams
+				</div>
+				<h1 class="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
+					A solid foundation for
+					<span class="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">your next product</span>
+				</h1>
+				<p class="mx-auto mt-6 max-w-2xl text-xl text-muted-foreground">
+					Launch with secure authentication, subscriptions, and the application structure you need to keep moving.
+				</p>
+				<div class="mt-10 flex flex-col items-center justify-center gap-3 px-4 sm:flex-row sm:px-0">
+					@button.Button(button.Props{Href: "/auth", Size: button.SizeLg, Class: "w-full sm:w-auto"}) {
+						Create your account
+					}
+					@button.Button(button.Props{Href: "#features", Variant: button.VariantOutline, Size: button.SizeLg, Class: "w-full sm:w-auto"}) {
+						Explore features
+					}
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ HomeFeatures() {
+	<section id="features" class="scroll-mt-[60px] border-y bg-muted/30 py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto mb-16 max-w-3xl text-center">
+				<h2 class="text-4xl font-bold">The essentials are already connected</h2>
+				<p class="mt-4 text-lg text-muted-foreground">
+					Spend your time on the workflows that make your product unique.
+				</p>
+			</div>
+			<div class="mx-auto grid max-w-6xl gap-6 md:grid-cols-2 lg:grid-cols-3">
+				@HomeFeatureCard("ShieldCheck", "Secure authentication", "Email, password, magic links, verification, and account recovery work together from day one.")
+				@HomeFeatureCard("CreditCard", "Subscription billing", "Offer free and paid plans with provider webhooks, checkout, and a customer billing portal.")
+				@HomeFeatureCard("Shield", "Operator tools", "Run support safely with an allowlisted Admin panel, read-only impersonation, and durable audit events.")
+				@HomeFeatureCard("PanelsTopLeft", "Application shell", "A responsive dashboard, settings, billing, and marketing pages are ready to extend.")
+				@HomeFeatureCard("FileText", "Owned product code", "Extend ordinary Go packages and Markdown legal pages without adopting another application framework.")
+				@HomeFeatureCard("LockKeyhole", "Production safeguards", "CSRF protection, CSP nonces, security headers, and structured logging are part of the foundation.")
+			</div>
+		</div>
+	</section>
+}
+
+templ HomeFeatureCard(iconName string, title string, description string) {
+	@card.Card(card.Props{Class: "h-full"}) {
+		@card.Header() {
+			<div class="mb-3 flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+				switch iconName {
+					case "ShieldCheck":
+						@icon.ShieldCheck(icon.Props{Class: "size-5"})
+					case "CreditCard":
+						@icon.CreditCard(icon.Props{Class: "size-5"})
+					case "CloudUpload":
+						@icon.CloudUpload(icon.Props{Class: "size-5"})
+					case "PanelsTopLeft":
+						@icon.PanelsTopLeft(icon.Props{Class: "size-5"})
+					case "FileText":
+						@icon.FileText(icon.Props{Class: "size-5"})
+					default:
+						@icon.LockKeyhole(icon.Props{Class: "size-5"})
+				}
+			</div>
+			@card.Title() {
+				{ title }
+			}
+			@card.Description() {
+				{ description }
+			}
+		}
+	}
+}
+
+templ HomePricing() {
+	<section id="pricing" class="scroll-mt-[60px] py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-3xl text-center">
+				<h2 class="text-4xl font-bold">Plans that grow with your product</h2>
+				<p class="mt-4 text-lg text-muted-foreground">Start with the core experience, then unlock more as your needs grow.</p>
+			</div>
+			<div class="mx-auto mt-16 grid max-w-6xl gap-8 lg:grid-cols-3">
+				for _, plan := range access.Product.Plans {
+					@HomePricingCard(plan)
+				}
+			</div>
+		</div>
+	</section>
+}
+
+templ HomePricingCard(plan access.Plan) {
+	@card.Card(card.Props{Class: "relative flex h-full flex-col overflow-visible"}) {
+		if plan.ID == model.SubscriptionPlanPro {
+			<div class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+				Most popular
+			</div>
+		}
+		@card.Header() {
+			@card.Title() {
+				{ plan.Name }
+			}
+			@card.Description() {
+				{ plan.Description }
+			}
+		}
+		@card.Content(card.ContentProps{Class: "flex flex-1 flex-col"}) {
+			<div class="flex items-baseline gap-1">
+				<span class="text-4xl font-bold">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
+				<span class="text-muted-foreground">per month</span>
+			</div>
+			<ul class="mt-8 flex-1 space-y-4">
+				for _, feature := range plan.Benefits {
+					<li class="flex items-start gap-3">
+						@icon.Check(icon.Props{Class: "mt-0.5 size-4 shrink-0 text-primary"})
+						<span class="text-sm">{ feature }</span>
+					</li>
+				}
+			</ul>
+			<div class="mt-8">
+				@button.Button(button.Props{
+					Href:  "/auth",
+					Class: "w-full",
+					Variant: func() button.Variant {
+						if plan.ID == model.SubscriptionPlanPro {
+							return button.VariantDefault
+						}
+						return button.VariantOutline
+					}(),
+				}) {
+					Get started
+				}
+			</div>
+		}
+	}
+}
+
+templ HomeFAQ() {
+	<section id="faq" class="scroll-mt-[60px] border-y bg-muted/30 py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-3xl">
+				<div class="mb-12 text-center">
+					<h2 class="text-4xl font-bold">Common questions</h2>
+					<p class="mt-4 text-lg text-muted-foreground">A few details before you get started.</p>
+				</div>
+				<div class="space-y-4">
+					@HomeFAQItem("Can I start for free?", "Yes. Create an account and use the Free plan without entering payment details.")
+					@HomeFAQItem("Can I manage my subscription myself?", "Yes. Checkout, upgrades, and the billing portal are connected to your account.")
+					@HomeFAQItem("Is the application mobile friendly?", "Yes. The marketing pages and signed in application are responsive across common screen sizes.")
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ HomeFAQItem(question string, answer string) {
+	@card.Card() {
+		@card.Header() {
+			@card.Title(card.TitleProps{Class: "text-lg"}) {
+				{ question }
+			}
+			@card.Description() {
+				{ answer }
+			}
+		}
+	}
+}
+
+templ HomeCTA() {
+	<section class="py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-4xl rounded-2xl bg-primary px-8 py-16 text-center text-primary-foreground">
+				<h2 class="text-4xl font-bold">Ready to get started?</h2>
+				<p class="mx-auto mt-4 max-w-2xl text-lg text-primary-foreground/80">
+					Create your account and make the application your own.
+				</p>
+				<div class="mt-8">
+					@button.Button(button.Props{Href: "/auth", Size: button.SizeLg, Variant: button.VariantSecondary}) {
+						Create your account
+					}
+				</div>
+			</div>
+		</div>
+	</section>
+}

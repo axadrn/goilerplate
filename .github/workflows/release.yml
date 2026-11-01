@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v3.*"
+      - "v4.*"
 
 permissions:
   contents: write
@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
-          test "$(go list -m)" = "github.com/axadrn/goilerplate/v3"
+          test "$(go list -m)" = "github.com/axadrn/goilerplate/v4"
           go mod tidy -diff
           go test ./...
           go vet ./...

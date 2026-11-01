@@ -1,0 +1,70 @@
+# Binaries
+/bin/
+/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# User uploads
+/uploads/
+
+{{ if .HasHTMLFrontend -}}
+# Generated files
+*_templ.go
+output.css
+
+{{ end -}}
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Air tmp
+/tmp/
+
+{{- if .HasHTMLFrontend }}
+
+# Node (if using npm for Tailwind)
+node_modules/
+package-lock.json
+tailwindcss
+{{- end }}
+{{- if .IsSvelte }}
+
+# SvelteKit. The Go binary embeds web/build, .gitkeep keeps it for go build.
+web/node_modules/
+web/.svelte-kit/
+web/build/*
+!web/build/.gitkeep
+{{- end }}

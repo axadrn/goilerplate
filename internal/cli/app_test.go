@@ -1,292 +1,33 @@
 package cli
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
+	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
-	"github.com/axadrn/goilerplate/v3/api"
-	"github.com/axadrn/goilerplate/v3/internal/config"
-	"github.com/axadrn/goilerplate/v3/internal/doctor"
-	"github.com/axadrn/goilerplate/v3/internal/github"
+	"github.com/axadrn/goilerplate/v4/generator"
+	"github.com/axadrn/goilerplate/v4/internal/doctor"
+	"github.com/axadrn/goilerplate/v4/internal/github"
+	"github.com/axadrn/goilerplate/v4/internal/project"
+	projectupdate "github.com/axadrn/goilerplate/v4/internal/update"
 )
 
-func TestLoginStoresOnlyGoilerplateSession(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{}
-	device := &fakeDevice{githubToken: "temporary-github-token"}
-	service := &fakeService{
-		login: api.GitHubLoginResponse{
-			SessionToken: "goilerplate-session",
-			Account:      api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-		},
-	}
-	app := testApp(output, store, device, service)
-
-	if err := app.Run(context.Background(), []string{"login"}); err != nil {
-		t.Fatal(err)
-	}
-	if service.receivedGitHubToken != "temporary-github-token" {
-		t.Fatalf("GitHub token = %q", service.receivedGitHubToken)
-	}
-	if store.configuration.SessionToken != "goilerplate-session" {
-		t.Fatalf("stored session = %q", store.configuration.SessionToken)
-	}
-	if strings.Contains(output.String(), "temporary-github-token") || strings.Contains(output.String(), "goilerplate-session") {
-		t.Fatalf("secret appeared in output: %q", output.String())
-	}
-	if got := output.String(); !strings.Contains(got, "Code: ABCD-EFGH") || !strings.Contains(got, "Open: https://github.com/login/device") || !strings.Contains(got, "Waiting for approval...") {
-		t.Fatalf("login instructions = %q", got)
-	}
-}
-
-func TestLoginUsesDesktopConveniences(t *testing.T) {
-	output := &bytes.Buffer{}
-	service := &fakeService{login: api.GitHubLoginResponse{
-		SessionToken: "goilerplate-session",
-		Account:      api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-	}}
-	app := testApp(output, &memoryStore{}, &fakeDevice{githubToken: "temporary-github-token"}, service)
-	var copied, opened string
-	app.CopyToClipboard = func(_ context.Context, value string) error {
-		copied = value
-		return nil
-	}
-	app.OpenBrowser = func(_ context.Context, address string) error {
-		opened = address
-		return nil
-	}
-
-	if err := app.Run(context.Background(), []string{"login"}); err != nil {
-		t.Fatal(err)
-	}
-	if copied != "ABCD-EFGH" || opened != "https://github.com/login/device" {
-		t.Fatalf("copied = %q, opened = %q", copied, opened)
-	}
-	if got := output.String(); !strings.Contains(got, "Code: ABCD-EFGH (copied)") || !strings.Contains(got, "Browser opened. Waiting for approval...") {
-		t.Fatalf("output = %q", got)
-	}
-}
-
-func TestLoginDesktopFailuresFallBackWithoutBlocking(t *testing.T) {
-	output := &bytes.Buffer{}
-	service := &fakeService{login: api.GitHubLoginResponse{
-		SessionToken: "goilerplate-session",
-		Account:      api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-	}}
-	app := testApp(output, &memoryStore{}, &fakeDevice{githubToken: "temporary-github-token"}, service)
-	app.CopyToClipboard = func(context.Context, string) error { return errors.New("clipboard unavailable") }
-	app.OpenBrowser = func(context.Context, string) error { return errors.New("browser unavailable") }
-
-	if err := app.Run(context.Background(), []string{"login"}); err != nil {
-		t.Fatal(err)
-	}
-	if got := output.String(); !strings.Contains(got, "Code: ABCD-EFGH\n") || strings.Contains(got, "copied") || !strings.Contains(got, "Open: https://github.com/login/device") || !strings.Contains(got, "Waiting for approval...") {
-		t.Fatalf("fallback output = %q", got)
-	}
-}
-
-func TestLoginPrefersAndStoresAPIURLOverride(t *testing.T) {
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com"}}
-	service := &fakeService{login: api.GitHubLoginResponse{
-		SessionToken: "beta-session",
-		Account:      api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-	}}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{githubToken: "temporary-github-token"}, service)
-	app.APIURLOverride = "https://beta.goilerplate.com"
-	var serviceURL string
-	app.NewService = func(baseURL string) (ServiceClient, error) {
-		serviceURL = baseURL
-		return service, nil
-	}
-
-	if err := app.Run(context.Background(), []string{"login"}); err != nil {
-		t.Fatal(err)
-	}
-	if serviceURL != "https://beta.goilerplate.com" {
-		t.Fatalf("service URL = %q", serviceURL)
-	}
-	if store.configuration.APIURL != "https://beta.goilerplate.com" {
-		t.Fatalf("stored API URL = %q", store.configuration.APIURL)
-	}
-}
-
-func TestSignedInCommandPrefersAPIURLOverride(t *testing.T) {
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{who: api.WhoAmIResponse{Account: api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"}}}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
-	app.APIURLOverride = "https://beta.goilerplate.com"
-	var serviceURL string
-	app.NewService = func(baseURL string) (ServiceClient, error) {
-		serviceURL = baseURL
-		return service, nil
-	}
-
-	if err := app.Run(context.Background(), []string{"whoami"}); err != nil {
-		t.Fatal(err)
-	}
-	if serviceURL != "https://beta.goilerplate.com" {
-		t.Fatalf("service URL = %q", serviceURL)
-	}
-}
-
-func TestLoginRevokesNewSessionWhenSavingFails(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{saveError: errors.New("disk full")}
-	service := &fakeService{login: api.GitHubLoginResponse{
-		SessionToken: "goilerplate-session",
-		Account:      api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-	}}
-	app := testApp(output, store, &fakeDevice{githubToken: "temporary-github-token"}, service)
-
-	if err := app.Run(context.Background(), []string{"login"}); !errors.Is(err, store.saveError) {
-		t.Fatalf("login error = %v", err)
-	}
-	if !service.loggedOut {
-		t.Fatal("new server session was not revoked")
-	}
-	if store.configuration.SessionToken != "" {
-		t.Fatalf("stored session = %q", store.configuration.SessionToken)
-	}
-}
-
-func TestWhoAmIShowsTheActiveLicense(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{who: api.WhoAmIResponse{
-		Account: api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-		Licenses: []api.License{
-			{ID: "lic_1", Status: api.LicenseStatusActive, Role: api.LicenseRoleMember},
-		},
-	}}
-	app := testApp(output, store, &fakeDevice{}, service)
-
-	if err := app.Run(context.Background(), []string{"whoami"}); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(output.String(), "License: active\n") || !strings.Contains(output.String(), "lic_1  active  member") {
-		t.Fatalf("output = %q", output.String())
-	}
-}
-
-func TestWhoAmIPointsToPricingWithoutALicense(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{who: api.WhoAmIResponse{
-		Account:  api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-		Licenses: []api.License{{ID: "lic_1", Status: api.LicenseStatusRevoked, Role: api.LicenseRoleOwner}},
-	}}
-	app := testApp(output, store, &fakeDevice{}, service)
-
-	if err := app.Run(context.Background(), []string{"whoami"}); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(output.String(), "License: none, see https://goilerplate.com/pricing\n") {
-		t.Fatalf("output = %q", output.String())
-	}
-}
-
-func TestLogoutRevokesServerBeforeClearingSession(t *testing.T) {
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
-	if err := app.Run(context.Background(), []string{"logout"}); err != nil {
-		t.Fatal(err)
-	}
-	if store.configuration.SessionToken != "" || store.configuration.APIURL == "" {
-		t.Fatalf("configuration = %#v", store.configuration)
-	}
-	if !service.loggedOut {
-		t.Fatal("server session was not revoked")
-	}
-}
-
-func TestLogoutPreservesTokenWhenRevocationFails(t *testing.T) {
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{logoutError: errors.New("temporary failure")}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
-	if err := app.Run(context.Background(), []string{"logout"}); !errors.Is(err, service.logoutError) {
-		t.Fatalf("logout error = %v", err)
-	}
-	if store.configuration.SessionToken != "session" {
-		t.Fatalf("session token = %q, want preserved token", store.configuration.SessionToken)
-	}
-}
-
-func TestLicenseCommandsUseExplicitLicenseIDs(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{
-		members: api.LicenseMembersResponse{Members: []api.LicenseMember{{
-			UserID: "user-1", GitHubLogin: "developer", Email: "developer@example.com", Role: api.LicenseRoleMember,
-		}}},
-	}
-	app := testApp(output, store, &fakeDevice{}, service)
-	if err := app.Run(context.Background(), []string{"license", "members", "license-1"}); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(output.String(), "@developer") {
-		t.Fatalf("output = %q", output.String())
-	}
-}
-
-func TestAccountDeleteRequiresConfirmationAndClearsLocalSession(t *testing.T) {
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
-	if err := app.Run(context.Background(), []string{"account", "delete"}); err == nil {
-		t.Fatal("account delete accepted no confirmation")
-	}
-	if err := app.Run(context.Background(), []string{"account", "delete", "--confirm", "axadrn"}); err != nil {
-		t.Fatal(err)
-	}
-	if service.deletedAccount != "axadrn" || store.configuration.SessionToken != "" {
-		t.Fatalf("confirmation = %q, configuration = %#v", service.deletedAccount, store.configuration)
-	}
-}
-
-func TestClaimStartsAndConfirmsPurchaseEmailProof(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{}
-	app := testApp(output, store, &fakeDevice{}, service)
-
-	if err := app.Run(context.Background(), []string{"claim", "buyer@example.com"}); err != nil {
-		t.Fatal(err)
-	}
-	if service.claimEmail != "buyer@example.com" || !strings.Contains(output.String(), "claim code") {
-		t.Fatalf("email = %q, output = %q", service.claimEmail, output.String())
-	}
-	if err := app.Run(context.Background(), []string{"claim", "--code", "abcd2345ef"}); err != nil {
-		t.Fatal(err)
-	}
-	if service.claimCode != "ABCD2345EF" || !strings.Contains(output.String(), "License claimed") {
-		t.Fatalf("code = %q, output = %q", service.claimCode, output.String())
-	}
-}
-
-func TestClaimValidatesArgumentsBeforeLogin(t *testing.T) {
-	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, &fakeService{})
-	if err := app.Run(context.Background(), []string{"claim"}); err == nil || !strings.Contains(err.Error(), "usage:") {
-		t.Fatalf("claim error = %v", err)
-	}
-}
-
 func TestHelpCoversEveryCommand(t *testing.T) {
-	for _, command := range []string{"new", "update", "login", "whoami", "logout", "claim", "license", "account", "changelog", "doctor", "version"} {
+	for _, command := range []string{"new", "update", "changelog", "doctor", "version"} {
 		t.Run(command, func(t *testing.T) {
 			output := &bytes.Buffer{}
-			app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+			app := testApp(output)
 			if err := app.Run(context.Background(), []string{"help", command}); err != nil {
 				t.Fatal(err)
 			}
@@ -299,7 +40,7 @@ func TestHelpCoversEveryCommand(t *testing.T) {
 
 func TestUnknownCommandPrintsUsage(t *testing.T) {
 	output := &bytes.Buffer{}
-	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	app := testApp(output)
 	if err := app.Run(context.Background(), []string{"wat"}); err == nil {
 		t.Fatal("unknown command succeeded")
 	}
@@ -310,7 +51,7 @@ func TestUnknownCommandPrintsUsage(t *testing.T) {
 
 func TestChangelogPrintsPublishedReleaseNotes(t *testing.T) {
 	output := &bytes.Buffer{}
-	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	app := testApp(output)
 	app.FetchReleases = func(context.Context) ([]github.Release, error) {
 		return []github.Release{{
 			Tag: "v3.0.0-beta.1", Name: "Beta", Body: "Everything\x1b[31m you need.\x07",
@@ -327,7 +68,7 @@ func TestChangelogPrintsPublishedReleaseNotes(t *testing.T) {
 
 func TestDoctorPrintsChecksAndFailsOnErrors(t *testing.T) {
 	output := &bytes.Buffer{}
-	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	app := testApp(output)
 	app.WorkingDirectory = "/project"
 	app.RunDoctor = func(_ context.Context, directory string) doctor.Report {
 		if directory != "/project" {
@@ -350,12 +91,10 @@ func TestDoctorPrintsChecksAndFailsOnErrors(t *testing.T) {
 	}
 }
 
-func TestNewGeneratesAndExtractsProject(t *testing.T) {
+func TestNewRendersTheProjectLocally(t *testing.T) {
 	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{generatedVersion: "v3.0.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme"), who: api.WhoAmIResponse{Licenses: []api.License{{Status: api.LicenseStatusActive}}}}
-	app := testApp(output, store, &fakeDevice{}, service)
-	app.Version = "v3.0.0-beta.1"
+	app := testApp(output)
+	app.Version = "v4.0.0-beta.1"
 	destination := filepath.Join(t.TempDir(), "acme")
 
 	err := app.Run(context.Background(), []string{
@@ -372,13 +111,17 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	content, err := os.ReadFile(filepath.Join(destination, "go.mod"))
-	if err != nil || string(content) != "module example.com/acme" {
+	if err != nil || !strings.HasPrefix(string(content), "module example.com/acme\n") {
 		t.Fatalf("go.mod = %q, %v", content, err)
 	}
-	if service.generateToken != "session" || service.generateRequest.TemplateVersion != "" || service.generateRequest.Answers.Framework != "datastar" || service.generateRequest.Answers.Edition != "paid" || service.generateRequest.Answers.Payment != "stripe" || !service.generateRequest.Answers.Workspaces {
-		t.Fatalf("generation request = %#v", service.generateRequest)
+	version, answers := readProjectLock(t, destination)
+	if version != "v4.0.0-beta.1" {
+		t.Fatalf("template version = %q", version)
 	}
-	if !strings.Contains(output.String(), "Created Acme") {
+	if answers.ProjectName != "Acme" || answers.Framework != "datastar" || answers.Database != "postgres" || answers.Payment != "stripe" || !answers.Workspaces || !slices.Equal(answers.OAuth, []generator.OAuth{generator.OAuthGoogle, generator.OAuthGitHub}) {
+		t.Fatalf("answers = %#v", answers)
+	}
+	if !strings.Contains(output.String(), "Created Acme") || !strings.Contains(output.String(), "with v4.0.0-beta.1") {
 		t.Fatalf("output = %q", output.String())
 	}
 	if branch := strings.TrimSpace(runCLIGit(t, destination, "branch", "--show-current")); branch != "main" {
@@ -395,17 +138,57 @@ func TestNewGeneratesAndExtractsProject(t *testing.T) {
 	}
 }
 
-func TestNewWithoutArgumentsUsesWizardThenExistingGenerationPath(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{
-		generatedVersion: "v3.0.0",
-		archive:          cliTestArchive(t, "go.mod", "module example.com/acme"),
-		who: api.WhoAmIResponse{Licenses: []api.License{{
-			Status: api.LicenseStatusActive,
-		}}},
+func TestNewMatchesTheGenerator(t *testing.T) {
+	app := testApp(&bytes.Buffer{})
+	app.Version = "v4.0.0"
+	destination := filepath.Join(t.TempDir(), "acme")
+	err := app.Run(context.Background(), []string{
+		"new", "--name", "Acme", "--module", "example.com/acme",
+		"--payment", "polar", "--mail", "resend", "--storage", "--content", "blog,docs", "--api", "--mcp",
+		destination,
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-	app := testApp(output, store, &fakeDevice{}, service)
+	want := filepath.Join(t.TempDir(), "want")
+	err = generator.Generate(want, "v4.0.0", generator.Config{
+		ProjectName: "Acme",
+		ModulePath:  "example.com/acme",
+		Framework:   generator.FrameworkHTMX,
+		Database:    generator.DatabaseSQLite,
+		Payment:     generator.PaymentPolar,
+		Mail:        generator.MailResend,
+		Storage:     true,
+		Content:     []generator.Content{generator.ContentBlog, generator.ContentDocs},
+		API:         true,
+		MCP:         true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, wanted := readCLITree(t, destination), readCLITree(t, want)
+	if len(got) != len(wanted) {
+		t.Fatalf("new wrote %d files, the generator %d", len(got), len(wanted))
+	}
+	for name, content := range wanted {
+		if got[name] != content {
+			t.Fatalf("%s differs from the generator", name)
+		}
+	}
+}
+
+func TestNewWithoutAReleaseVersionUsesTheDevVersion(t *testing.T) {
+	app := testApp(&bytes.Buffer{})
+	destination := filepath.Join(t.TempDir(), "acme")
+	if err := app.Run(context.Background(), []string{"new", "--module", "example.com/acme", destination}); err != nil {
+		t.Fatal(err)
+	}
+	if version, _ := readProjectLock(t, destination); version != devTemplateVersion {
+		t.Fatalf("template version = %q", version)
+	}
+}
+func TestNewWithoutArgumentsUsesTheWizard(t *testing.T) {
+	app := testApp(&bytes.Buffer{})
 	destination := filepath.Join(t.TempDir(), "acme")
 	wizardCalled := false
 	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
@@ -422,18 +205,15 @@ func TestNewWithoutArgumentsUsesWizardThenExistingGenerationPath(t *testing.T) {
 	if err := app.Run(context.Background(), []string{"new"}); err != nil {
 		t.Fatal(err)
 	}
-	if !wizardCalled || !service.generateCalled {
-		t.Fatalf("wizard called = %v, generated = %v", wizardCalled, service.generateCalled)
+	if !wizardCalled {
+		t.Fatal("wizard was not called")
 	}
-	if service.generateRequest.Answers.Database != "postgres" || !service.generateRequest.Answers.Workspaces {
-		t.Fatalf("generation request = %#v", service.generateRequest)
+	if _, answers := readProjectLock(t, destination); answers.Database != "postgres" || !answers.Workspaces {
+		t.Fatalf("answers = %#v", answers)
 	}
 }
-
-func TestNewWizardHeadlessArgumentsReachTheService(t *testing.T) {
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{generatedVersion: "v3.1.0", archive: cliTestArchive(t, "go.mod", "module example.com/acme"), who: api.WhoAmIResponse{Licenses: []api.License{{Status: api.LicenseStatusActive}}}}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+func TestNewWizardHeadlessArgumentsReachTheGenerator(t *testing.T) {
+	app := testApp(&bytes.Buffer{})
 	destination := filepath.Join(t.TempDir(), "acme")
 	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
 		return []string{
@@ -448,62 +228,14 @@ func TestNewWizardHeadlessArgumentsReachTheService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	answers := service.generateRequest.Answers
-	if answers.Framework != "headless" || !answers.API || answers.Edition != "paid" || answers.Payment != "stripe" {
+	_, answers := readProjectLock(t, destination)
+	if answers.Framework != "headless" || !answers.API || answers.Payment != "stripe" {
 		t.Fatalf("answers = %#v", answers)
 	}
 }
-
-func TestNewWithoutLicenseOpensPricingBeforeTheWizard(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{SessionToken: "session"}}
-	service := &fakeService{}
-	app := testApp(output, store, &fakeDevice{}, service)
-	app.OpenBrowser = func(_ context.Context, address string) error {
-		if address != "https://goilerplate.com/pricing" {
-			t.Fatalf("pricing URL = %q", address)
-		}
-		return nil
-	}
-	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
-		t.Fatal("wizard ran without a license")
-		return nil, nil
-	}
-
-	err := app.Run(context.Background(), []string{"new"})
-	if err == nil || err.Error() != "no active license" {
-		t.Fatalf("new error = %v", err)
-	}
-	if service.generateCalled {
-		t.Fatal("project was generated without a license")
-	}
-	if got := output.String(); !strings.Contains(got, "goilerplate needs a license") || !strings.Contains(got, "Pricing opened") || !strings.Contains(got, "No new login needed") {
-		t.Fatalf("output = %q", got)
-	}
-}
-
-func TestNewWithFlagsWithoutLicenseDoesNotGenerate(t *testing.T) {
-	output := &bytes.Buffer{}
-	store := &memoryStore{configuration: config.Config{SessionToken: "session"}}
-	service := &fakeService{who: api.WhoAmIResponse{Licenses: []api.License{{Status: api.LicenseStatusRevoked}}}}
-	app := testApp(output, store, &fakeDevice{}, service)
-
-	err := app.Run(context.Background(), []string{"new", "--module", "example.com/acme", filepath.Join(t.TempDir(), "acme")})
-	if err == nil || err.Error() != "no active license" {
-		t.Fatalf("new error = %v", err)
-	}
-	if service.generateCalled {
-		t.Fatal("project was generated without a license")
-	}
-	if got := output.String(); !strings.Contains(got, "Open pricing: https://goilerplate.com/pricing") {
-		t.Fatalf("output = %q", got)
-	}
-}
-
-func TestNewReturnsWizardErrorWithoutCallingService(t *testing.T) {
+func TestNewReturnsWizardError(t *testing.T) {
 	wizardError := errors.New("cancelled")
-	service := &fakeService{who: api.WhoAmIResponse{Licenses: []api.License{{Status: api.LicenseStatusActive}}}}
-	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+	app := testApp(&bytes.Buffer{})
 	app.RunNewProjectWizard = func(context.Context) ([]string, error) {
 		return nil, wizardError
 	}
@@ -511,51 +243,36 @@ func TestNewReturnsWizardErrorWithoutCallingService(t *testing.T) {
 	if err := app.Run(context.Background(), []string{"new"}); !errors.Is(err, wizardError) {
 		t.Fatalf("new error = %v", err)
 	}
-	if service.generateCalled {
-		t.Fatal("service was called after wizard failure")
-	}
 }
 
 func TestNewWithoutArgumentsRequiresInteractiveTerminal(t *testing.T) {
-	service := &fakeService{}
-	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+	app := testApp(&bytes.Buffer{})
 
 	err := app.Run(context.Background(), []string{"new"})
 	if err == nil || !strings.Contains(err.Error(), "usage: goilerplate new") {
 		t.Fatalf("new error = %v", err)
 	}
-	if service.generateCalled {
-		t.Fatal("service was called without project arguments")
-	}
 }
 
-func TestNewRejectsUnknownPaymentBeforeCallingService(t *testing.T) {
+func TestNewRejectsUnknownPaymentBeforeGenerating(t *testing.T) {
 	for _, payment := range []string{"none", "paddle"} {
-		service := &fakeService{}
-		app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+		app := testApp(&bytes.Buffer{})
 		err := app.Run(context.Background(), []string{
 			"new", "--module", "example.com/acme", "--payment", payment, filepath.Join(t.TempDir(), "acme"),
 		})
 		if err == nil || !strings.Contains(err.Error(), "use stripe or polar") {
 			t.Fatalf("new --payment %s error = %v", payment, err)
 		}
-		if service.generateCalled {
-			t.Fatal("service was called for an invalid selection")
-		}
 	}
 }
 
 func TestNewRejectsTheRemovedEditionFlag(t *testing.T) {
-	service := &fakeService{}
-	app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+	app := testApp(&bytes.Buffer{})
 	err := app.Run(context.Background(), []string{
 		"new", "--module", "example.com/acme", "--edition", "free", filepath.Join(t.TempDir(), "acme"),
 	})
 	if err == nil || !strings.Contains(err.Error(), "-edition") {
 		t.Fatalf("new error = %v", err)
-	}
-	if service.generateCalled {
-		t.Fatal("service was called with --edition")
 	}
 }
 
@@ -577,7 +294,7 @@ func TestNewSendsHeadlessAndTheJSONAPI(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			answers := runNew(t, test.arguments)
-			if answers.Edition != "paid" || answers.Framework != test.wantFramework || answers.Payment != test.wantPayment || answers.API != test.wantAPI {
+			if string(answers.Framework) != test.wantFramework || string(answers.Payment) != test.wantPayment || answers.API != test.wantAPI {
 				t.Fatalf("answers = %#v", answers)
 			}
 			if len(answers.Content) != 0 {
@@ -587,7 +304,7 @@ func TestNewSendsHeadlessAndTheJSONAPI(t *testing.T) {
 	}
 }
 
-func TestNewRejectsInvalidHeadlessSelectionsBeforeCallingService(t *testing.T) {
+func TestNewRejectsInvalidHeadlessSelectionsBeforeGenerating(t *testing.T) {
 	for _, test := range []struct {
 		name      string
 		arguments []string
@@ -601,8 +318,7 @@ func TestNewRejectsInvalidHeadlessSelectionsBeforeCallingService(t *testing.T) {
 		{name: "unknown framework", arguments: []string{"--framework", "react"}, want: `unsupported framework "react"`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			service := &fakeService{}
-			app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+			app := testApp(&bytes.Buffer{})
 			arguments := append([]string{"new", "--module", "example.com/acme"}, test.arguments...)
 			arguments = append(arguments, filepath.Join(t.TempDir(), "acme"))
 
@@ -610,15 +326,12 @@ func TestNewRejectsInvalidHeadlessSelectionsBeforeCallingService(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("new error = %v, want %q", err, test.want)
 			}
-			if service.generateCalled {
-				t.Fatal("service was called for an invalid selection")
-			}
 		})
 	}
 }
 
 func TestValidateSelectionRequiresTheJSONAPIForHeadless(t *testing.T) {
-	answers := api.GenerationAnswers{Edition: "paid", Framework: "headless", Database: "sqlite", Payment: "stripe", Mail: "smtp"}
+	answers := generator.Config{Framework: "headless", Database: "sqlite", Payment: "stripe", Mail: "smtp"}
 	err := validateSelection(answers)
 	if err == nil || err.Error() != "Headless requires the JSON API" {
 		t.Fatalf("validation error = %v", err)
@@ -631,7 +344,7 @@ func TestValidateSelectionRequiresTheJSONAPIForHeadless(t *testing.T) {
 }
 
 func TestValidateSelectionRequiresTheJSONAPIForSvelteKit(t *testing.T) {
-	answers := api.GenerationAnswers{Edition: "paid", Framework: "svelte", Database: "sqlite", Payment: "polar", Mail: "smtp"}
+	answers := generator.Config{Framework: "svelte", Database: "sqlite", Payment: "polar", Mail: "smtp"}
 	err := validateSelection(answers)
 	if err == nil || err.Error() != "SvelteKit requires the JSON API" {
 		t.Fatalf("validation error = %v", err)
@@ -647,13 +360,12 @@ func TestValidateSelectionRequiresTheJSONAPIForSvelteKit(t *testing.T) {
 func TestNewHelpFlagShowsHelpNew(t *testing.T) {
 	for _, flag := range []string{"--help", "-h"} {
 		output := &bytes.Buffer{}
-		service := &fakeService{}
-		app := testApp(output, &memoryStore{}, &fakeDevice{}, service)
+		app := testApp(output)
 		err := app.Run(context.Background(), []string{"new", flag})
 		if err != nil {
 			t.Fatalf("new %s error = %v", flag, err)
 		}
-		if !strings.HasPrefix(output.String(), "goilerplate new --module <path> [options] <directory>\n") || service.generateCalled {
+		if !strings.HasPrefix(output.String(), "goilerplate new --module <path> [options] <directory>\n") {
 			t.Fatalf("new %s output = %q", flag, output.String())
 		}
 	}
@@ -661,7 +373,7 @@ func TestNewHelpFlagShowsHelpNew(t *testing.T) {
 
 func TestHelpNewListsTheFrontendsAndTheJSONAPI(t *testing.T) {
 	output := &bytes.Buffer{}
-	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	app := testApp(output)
 	err := app.Run(context.Background(), []string{"help", "new"})
 	if err != nil {
 		t.Fatal(err)
@@ -669,7 +381,7 @@ func TestHelpNewListsTheFrontendsAndTheJSONAPI(t *testing.T) {
 	if strings.Contains(output.String(), "edition") || strings.Contains(output.String(), "Free") {
 		t.Fatalf("output = %q mentions the removed edition", output.String())
 	}
-	for _, want := range []string{"active license", "--payment stripe or polar", "--framework htmx, datastar, svelte or headless", "--framework svelte", "Node.js 22.17 or newer and pnpm", "--api", "--headless", "--mcp"} {
+	for _, want := range []string{"No account and no network needed", "--payment stripe or polar", "--framework htmx, datastar, svelte or headless", "--framework svelte", "Node.js 22.17 or newer and pnpm", "--api", "--headless", "--mcp"} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("output = %q, want %q", output.String(), want)
 		}
@@ -690,42 +402,82 @@ func TestNewSendsTheMCPServer(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			answers := runNew(t, test.arguments)
-			if answers.Framework != test.wantFramework || !answers.API || answers.MCP != test.wantMCP {
+			if string(answers.Framework) != test.wantFramework || !answers.API || answers.MCP != test.wantMCP {
 				t.Fatalf("answers = %#v", answers)
 			}
 		})
 	}
 }
 
-// runNew runs goilerplate new with a licensed account and returns the answers
-// sent to the service.
-func runNew(t *testing.T, arguments []string) api.GenerationAnswers {
+// runNew runs goilerplate new and returns the answers in the lock file of the
+// generated project.
+func runNew(t *testing.T, arguments []string) generator.Config {
 	t.Helper()
-	store := &memoryStore{configuration: config.Config{APIURL: "https://goilerplate.com", SessionToken: "session"}}
-	service := &fakeService{
-		generatedVersion: "v3.1.0",
-		archive:          cliTestArchive(t, "go.mod", "module example.com/acme"),
-		who:              api.WhoAmIResponse{Licenses: []api.License{{Status: api.LicenseStatusActive}}},
-	}
-	app := testApp(&bytes.Buffer{}, store, &fakeDevice{}, service)
+	app := testApp(&bytes.Buffer{})
+	destination := filepath.Join(t.TempDir(), "acme")
 	command := append([]string{"new", "--module", "example.com/acme"}, arguments...)
-	command = append(command, filepath.Join(t.TempDir(), "acme"))
+	command = append(command, destination)
 
 	err := app.Run(context.Background(), command)
 	if err != nil {
 		t.Fatalf("new error = %v", err)
 	}
-	return service.generateRequest.Answers
+	_, answers := readProjectLock(t, destination)
+	return answers
 }
 
+func readProjectLock(t *testing.T, root string) (string, generator.Config) {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join(root, "goilerplate.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lock struct {
+		TemplateVersion string           `json:"template_version"`
+		Config          generator.Config `json:"config"`
+	}
+	if err := json.Unmarshal(content, &lock); err != nil {
+		t.Fatal(err)
+	}
+	return lock.TemplateVersion, lock.Config
+}
+
+func readCLITree(t *testing.T, root string) map[string]string {
+	t.Helper()
+	tree := make(map[string]string)
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		name, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		tree[filepath.ToSlash(name)] = string(content)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tree
+}
 func TestNewRejectsTheMCPServerWithoutTheJSONAPI(t *testing.T) {
 	for _, arguments := range [][]string{
 		{"--mcp"},
 		{"--framework", "datastar", "--mcp"},
 		{"--payment", "polar", "--mcp"},
 	} {
-		service := &fakeService{}
-		app := testApp(&bytes.Buffer{}, &memoryStore{}, &fakeDevice{}, service)
+		app := testApp(&bytes.Buffer{})
 		command := append([]string{"new", "--module", "example.com/acme"}, arguments...)
 		command = append(command, filepath.Join(t.TempDir(), "acme"))
 
@@ -733,266 +485,187 @@ func TestNewRejectsTheMCPServerWithoutTheJSONAPI(t *testing.T) {
 		if err == nil || err.Error() != "MCP requires the JSON API" {
 			t.Fatalf("new %v error = %v", arguments, err)
 		}
-		if service.generateCalled {
-			t.Fatalf("service was called for %v", arguments)
-		}
 	}
 }
 
-func TestGenerationAnswersEncodeAndDecodeTheMCPServer(t *testing.T) {
-	encoded, err := json.Marshal(api.GenerationAnswers{API: true, MCP: true})
+func TestUpdateMergesTheNewTemplateLocally(t *testing.T) {
+	oldFiles := templateWith(t, map[string]string{"AGENTS.md.tmpl": "old agents\n"})
+	oldTemplate, err := generator.NewTemplate("v4.0.0", oldFiles)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(encoded), `"mcp":true`) {
-		t.Fatalf("encoded = %s", encoded)
+	var archive bytes.Buffer
+	answers := generator.Config{ProjectName: "Acme", ModulePath: "example.com/acme", Framework: "headless", Database: "sqlite", Payment: "stripe", Mail: "smtp", API: true, MCP: true}
+	if err := oldTemplate.WriteArchive(&archive, answers); err != nil {
+		t.Fatal(err)
 	}
-	var older api.ProjectLock
-	err = json.Unmarshal([]byte(`{"schema_version":1,"template_version":"v3.0.3","config":{"edition":"free","framework":"htmx","api":true}}`), &older)
+	repository := filepath.Join(t.TempDir(), "acme")
+	if err := project.Create(context.Background(), &archive, repository); err != nil {
+		t.Fatal(err)
+	}
+	runCLIGit(t, repository, "config", "user.name", "Test User")
+	runCLIGit(t, repository, "config", "user.email", "test@example.com")
+	readme := filepath.Join(repository, "README.md")
+	content, err := os.ReadFile(readme)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if older.Config.MCP {
-		t.Fatal("a lock without mcp decoded as true")
+	if err := os.WriteFile(readme, append(content, "Our own notes.\n"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runCLIGit(t, repository, "commit", "-am", "Our notes")
+
+	output := &bytes.Buffer{}
+	app := testApp(output)
+	app.Version = "v4.1.0"
+	app.WorkingDirectory = repository
+	var fetched []string
+	app.FetchTemplate = func(_ context.Context, version string) (fs.FS, error) {
+		fetched = append(fetched, version)
+		return oldFiles, nil
+	}
+
+	if err := app.Run(context.Background(), []string{"update"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(fetched, ",") != "v4.0.0" {
+		t.Fatalf("fetched = %v", fetched)
+	}
+	branch := "goilerplate-update-v4.1.0"
+	if agents := runCLIGit(t, repository, "show", branch+":AGENTS.md"); !strings.HasPrefix(agents, "# AGENTS.md\n") {
+		t.Fatalf("AGENTS.md on %s = %q", branch, agents)
+	}
+	if updated := runCLIGit(t, repository, "show", branch+":README.md"); !strings.HasSuffix(updated, "Our own notes.\n") {
+		t.Fatalf("README.md lost the project's own change: %q", updated)
+	}
+	if lock := runCLIGit(t, repository, "show", branch+":goilerplate.lock"); !strings.Contains(lock, `"template_version": "v4.1.0"`) {
+		t.Fatalf("goilerplate.lock = %q", lock)
+	}
+	if current := strings.TrimSpace(runCLIGit(t, repository, "branch", "--show-current")); current != "main" {
+		t.Fatalf("current branch = %q", current)
+	}
+	if !strings.Contains(output.String(), "Created "+branch) {
+		t.Fatalf("output = %q", output.String())
 	}
 }
 
-func TestUpdateCreatesGitBranchFromLockedConfig(t *testing.T) {
-	service, output := runUpdate(t, "paid")
-	if len(service.updateRequests) != 2 || service.updateRequests[0].TemplateVersion != "v3.0.0" || service.updateRequests[1].TemplateVersion != "" {
-		t.Fatalf("update requests = %#v", service.updateRequests)
+func TestUpdateAlreadyOnTheCurrentTemplate(t *testing.T) {
+	repository := lockedRepository(t, "v4.1.0")
+	output := &bytes.Buffer{}
+	app := testApp(output)
+	app.Version = "v4.1.0"
+	app.WorkingDirectory = repository
+	app.FetchTemplate = func(context.Context, string) (fs.FS, error) {
+		t.Fatal("fetched a template for a project on the current version")
+		return nil, nil
 	}
-	for _, request := range service.updateRequests {
-		if request.Answers.Framework != "headless" || !request.Answers.API || !request.Answers.MCP {
-			t.Fatalf("update answers = %#v", request.Answers)
-		}
+	if err := app.Run(context.Background(), []string{"update"}); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(output, "Created goilerplate-update-v3.1.0") {
-		t.Fatalf("output = %q", output)
-	}
-}
-
-func TestUpdateSendsTheLockedEditionUnchanged(t *testing.T) {
-	service, _ := runUpdate(t, "free")
-	if len(service.updateRequests) != 2 {
-		t.Fatalf("update requests = %#v", service.updateRequests)
-	}
-	for _, request := range service.updateRequests {
-		if request.Answers.Edition != "free" || request.Answers.Payment != "stripe" {
-			t.Fatalf("update answers = %#v, want the lock config unchanged", request.Answers)
-		}
+	if !strings.Contains(output.String(), "Already using goilerplate template v4.1.0") {
+		t.Fatalf("output = %q", output.String())
 	}
 }
 
-func runUpdate(t *testing.T, edition string) (*fakeService, string) {
+func TestUpdateExplainsWhatItCannotUpdate(t *testing.T) {
+	for _, test := range []struct {
+		project string
+		want    string
+	}{
+		{project: "v3.2.3", want: "made with goilerplate v3.2.3. goilerplate update works for projects made with v4 or newer. The project keeps working as it is"},
+		{project: "v4.0.0-dev", want: "development build"},
+		{project: "v4.2.0", want: "newer than this CLI (v4.1.0)"},
+		{project: "latest", want: "invalid template version"},
+	} {
+		t.Run(test.project, func(t *testing.T) {
+			app := testApp(&bytes.Buffer{})
+			app.Version = "v4.1.0"
+			app.WorkingDirectory = lockedRepository(t, test.project)
+			app.FetchTemplate = func(context.Context, string) (fs.FS, error) {
+				t.Fatal("fetched a template for a project it cannot update")
+				return nil, nil
+			}
+			err := app.Run(context.Background(), []string{"update"})
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("update error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestUpdateNamesAVersionMissingFromTheProxy(t *testing.T) {
+	app := testApp(&bytes.Buffer{})
+	app.Version = "v4.1.0"
+	app.WorkingDirectory = lockedRepository(t, "v4.0.0")
+	app.FetchTemplate = func(_ context.Context, version string) (fs.FS, error) {
+		return nil, fmt.Errorf("%w: %s", projectupdate.ErrVersionNotFound, version)
+	}
+	err := app.Run(context.Background(), []string{"update"})
+	if err == nil || !strings.Contains(err.Error(), "goilerplate v4.0.0 was not found on the Go module proxy") {
+		t.Fatalf("update error = %v", err)
+	}
+}
+
+// lockedRepository creates a Git repository whose goilerplate.lock names version.
+func lockedRepository(t *testing.T, version string) string {
 	t.Helper()
-	lock := api.ProjectLock{
-		SchemaVersion:   api.LockSchemaVersion,
-		TemplateVersion: "v3.0.0",
-		Config: api.GenerationAnswers{
-			ProjectName: "Acme", ModulePath: "example.com/acme", Edition: edition,
-			Framework: "headless", Database: "sqlite", Payment: "stripe", Mail: "smtp", API: true, MCP: true,
-		},
+	config := map[string]any{
+		"project_name": "Acme", "module_path": "example.com/acme",
+		"framework": "htmx", "database": "sqlite", "payment": "stripe", "mail": "smtp",
 	}
-	lockBytes, err := json.MarshalIndent(lock, "", "  ")
+	if strings.HasPrefix(version, "v3.") {
+		// goilerplate v3 wrote the edition into every lock file.
+		config["edition"] = "paid"
+	}
+	lock, err := json.MarshalIndent(map[string]any{
+		"schema_version":   generator.LockSchemaVersion,
+		"template_version": version,
+		"config":           config,
+	}, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
-	lockBytes = append(lockBytes, '\n')
-	oldFiles := map[string]string{"app.txt": "old\n", "goilerplate.lock": string(lockBytes)}
 	repository := t.TempDir()
-	writeCLIFiles(t, repository, oldFiles)
+	writeCLIFiles(t, repository, map[string]string{"goilerplate.lock": string(lock) + "\n"})
 	runCLIGit(t, repository, "init", "-b", "main")
 	runCLIGit(t, repository, "config", "user.name", "Test User")
 	runCLIGit(t, repository, "config", "user.email", "test@example.com")
 	runCLIGit(t, repository, "add", ".")
 	runCLIGit(t, repository, "commit", "-m", "Generated project")
+	return repository
+}
 
-	newLock := lock
-	newLock.TemplateVersion = "v3.1.0"
-	newLockBytes, err := json.MarshalIndent(newLock, "", "  ")
+// templateWith returns the template of this checkout with some files replaced.
+func templateWith(t *testing.T, replaced map[string]string) fstest.MapFS {
+	t.Helper()
+	files := make(fstest.MapFS)
+	source := os.DirFS(filepath.Join("..", "..", "generator"))
+	err := fs.WalkDir(source, "_template", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(source, name)
+		if err != nil {
+			return err
+		}
+		files[name] = &fstest.MapFile{Data: data, Mode: 0o644}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	newLockBytes = append(newLockBytes, '\n')
-	service := &fakeService{
-		oldUpdateArchive: cliTestArchiveFiles(t, oldFiles),
-		newUpdateArchive: cliTestArchiveFiles(t, map[string]string{"app.txt": "new\n", "goilerplate.lock": string(newLockBytes)}),
-		updateVersion:    "v3.1.0",
-	}
-	output := &bytes.Buffer{}
-	app := testApp(output, &memoryStore{configuration: config.Config{SessionToken: "session"}}, &fakeDevice{}, service)
-	app.WorkingDirectory = repository
-
-	if err := app.Run(context.Background(), []string{"update"}); err != nil {
-		t.Fatal(err)
-	}
-	if content := runCLIGit(t, repository, "show", "goilerplate-update-v3.1.0:app.txt"); content != "new\n" {
-		t.Fatalf("updated app = %q", content)
-	}
-	if branch := strings.TrimSpace(runCLIGit(t, repository, "branch", "--show-current")); branch != "main" {
-		t.Fatalf("current branch = %q", branch)
-	}
-	return service, output.String()
-}
-
-func testApp(output *bytes.Buffer, store *memoryStore, device *fakeDevice, service *fakeService) *App {
-	return &App{
-		Out:            output,
-		Store:          store,
-		Device:         device,
-		GitHubClientID: "client-123",
-		DefaultAPIURL:  "https://goilerplate.com",
-		Version:        "dev",
-		NewService: func(string) (ServiceClient, error) {
-			return service, nil
-		},
-	}
-}
-
-type memoryStore struct {
-	configuration config.Config
-	saveError     error
-}
-
-func (s *memoryStore) Load() (config.Config, error) {
-	return s.configuration, nil
-}
-
-func (s *memoryStore) Save(configuration config.Config) error {
-	if s.saveError != nil {
-		return s.saveError
-	}
-	s.configuration = configuration
-	return nil
-}
-
-type fakeDevice struct {
-	githubToken string
-}
-
-func (d *fakeDevice) Start(context.Context, string) (github.DeviceAuthorization, error) {
-	return github.DeviceAuthorization{UserCode: "ABCD-EFGH", VerificationURI: "https://github.com/login/device"}, nil
-}
-
-func (d *fakeDevice) Wait(context.Context, string, github.DeviceAuthorization) (string, error) {
-	return d.githubToken, nil
-}
-
-type fakeService struct {
-	login               api.GitHubLoginResponse
-	who                 api.WhoAmIResponse
-	receivedGitHubToken string
-	loggedOut           bool
-	logoutError         error
-	generateRequest     api.GenerateRequest
-	generateToken       string
-	generatedVersion    string
-	archive             []byte
-	oldUpdateArchive    []byte
-	newUpdateArchive    []byte
-	updateVersion       string
-	updateRequests      []api.GenerateRequest
-	generateCalled      bool
-	members             api.LicenseMembersResponse
-	invited             api.InviteLicenseMemberResponse
-	removedMember       string
-	deletedAccount      string
-	claimEmail          string
-	claimCode           string
-}
-
-func (s *fakeService) LoginWithGitHub(_ context.Context, token string) (api.GitHubLoginResponse, error) {
-	s.receivedGitHubToken = token
-	return s.login, nil
-}
-
-func (s *fakeService) WhoAmI(context.Context, string) (api.WhoAmIResponse, error) {
-	return s.who, nil
-}
-
-func (s *fakeService) Logout(context.Context, string) error {
-	s.loggedOut = true
-	return s.logoutError
-}
-
-func (s *fakeService) Generate(_ context.Context, token string, request api.GenerateRequest, destination io.Writer) (string, error) {
-	s.generateCalled = true
-	s.generateToken = token
-	s.generateRequest = request
-	if _, err := destination.Write(s.archive); err != nil {
-		return "", err
-	}
-	return s.generatedVersion, nil
-}
-
-func (s *fakeService) UpdateTree(_ context.Context, token string, request api.GenerateRequest, destination io.Writer) (string, error) {
-	s.generateToken = token
-	s.updateRequests = append(s.updateRequests, request)
-	archive := s.newUpdateArchive
-	version := s.updateVersion
-	if request.TemplateVersion != "" {
-		archive = s.oldUpdateArchive
-		version = request.TemplateVersion
-	}
-	if _, err := destination.Write(archive); err != nil {
-		return "", err
-	}
-	return version, nil
-}
-
-func (s *fakeService) BeginLicenseClaim(_ context.Context, _ string, email string) error {
-	s.claimEmail = email
-	return nil
-}
-
-func (s *fakeService) ConfirmLicenseClaim(_ context.Context, _ string, code string) error {
-	s.claimCode = code
-	return nil
-}
-
-func (s *fakeService) LicenseMembers(context.Context, string, string) (api.LicenseMembersResponse, error) {
-	return s.members, nil
-}
-
-func (s *fakeService) InviteLicenseMember(context.Context, string, string, api.InviteLicenseMemberRequest) (api.InviteLicenseMemberResponse, error) {
-	return s.invited, nil
-}
-
-func (s *fakeService) RemoveLicenseMember(_ context.Context, _ string, _ string, userID string) error {
-	s.removedMember = userID
-	return nil
-}
-
-func (s *fakeService) DeleteAccount(_ context.Context, _ string, confirmation string) error {
-	s.deletedAccount = confirmation
-	return nil
-}
-
-func cliTestArchive(t *testing.T, name, content string) []byte {
-	return cliTestArchiveFiles(t, map[string]string{name: content})
-}
-
-func cliTestArchiveFiles(t *testing.T, files map[string]string) []byte {
-	t.Helper()
-	var archive bytes.Buffer
-	gzipWriter := gzip.NewWriter(&archive)
-	tarWriter := tar.NewWriter(gzipWriter)
-	for name, content := range files {
-		if err := tarWriter.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(content)), Typeflag: tar.TypeReg}); err != nil {
-			t.Fatal(err)
+	for name, content := range replaced {
+		name = "_template/" + name
+		if _, ok := files[name]; !ok {
+			t.Fatalf("template has no %s", name)
 		}
-		if _, err := tarWriter.Write([]byte(content)); err != nil {
-			t.Fatal(err)
-		}
+		files[name] = &fstest.MapFile{Data: []byte(content), Mode: 0o644}
 	}
-	if err := tarWriter.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := gzipWriter.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return archive.Bytes()
+	return files
+}
+
+func testApp(output *bytes.Buffer) *App {
+	return &App{Out: output, Version: "dev"}
 }
 
 func writeCLIFiles(t *testing.T, root string, files map[string]string) {
@@ -1021,7 +694,7 @@ func runCLIGit(t *testing.T, directory string, arguments ...string) string {
 
 func TestHelpNewListsEveryOption(t *testing.T) {
 	output := &bytes.Buffer{}
-	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
+	app := testApp(output)
 	err := app.Run(context.Background(), []string{"help", "new"})
 	if err != nil {
 		t.Fatal(err)

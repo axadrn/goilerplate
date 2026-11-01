@@ -1,0 +1,168 @@
+package api
+
+import (
+	"log/slog"
+	"net/http"
+	"strings"
+
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/service"
+	"{{.ModulePath}}/internal/validation"
+)
+
+// AuthHandler serves sign-in, onboarding, logout and the account summary.
+type AuthHandler struct {
+	authService      *service.AuthService
+	userService      *service.UserService
+	workspaceService *service.WorkspaceService
+{{- if .IsSvelte }}
+	invitations      InvitationCookie
+{{- end }}
+}
+
+{{ if .IsSvelte -}}
+func NewAuthHandler(authService *service.AuthService, userService *service.UserService, workspaceService *service.WorkspaceService, invitations InvitationCookie) *AuthHandler {
+	return &AuthHandler{authService: authService, userService: userService, workspaceService: workspaceService, invitations: invitations}
+}
+{{- else -}}
+func NewAuthHandler(authService *service.AuthService, userService *service.UserService, workspaceService *service.WorkspaceService) *AuthHandler {
+	return &AuthHandler{authService: authService, userService: userService, workspaceService: workspaceService}
+}
+{{- end }}
+
+// onboardingRequest carries the name and, for people who arrive through a
+// workspace invitation, the invitation token.
+type onboardingRequest struct {
+	Name            string `json:"name"`
+	InvitationToken string `json:"invitation_token"`
+}
+
+type onboardingResponse struct {
+	User      User       `json:"user"`
+	Workspace *Workspace `json:"workspace"`
+}
+
+// CompleteOnboarding sets the name of a new account and creates its default
+// workspace when the user has none yet. An available invitation for the
+// account's email address skips the default workspace, like the pending
+// invitation of the web sign-in, because the account joins that workspace
+// next.{{ if .IsSvelte }} Without invitation_token the pending_invitation
+// cookie of the invitation page counts.{{ end }}
+func (h *AuthHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	var request onboardingRequest
+	if !Decode(w, r, &request) {
+		return
+	}
+	err := validation.ValidateName(request.Name)
+	if err != nil {
+		ValidationError(w, map[string]string{"name": FieldMessage(err)})
+		return
+	}
+
+{{ if .IsSvelte -}}
+	token := request.InvitationToken
+	if token == "" {
+		token = h.pendingInvitation(w, r, user.Email)
+	}
+	createDefault := !h.invitedTo(token, user.Email)
+{{- else -}}
+	createDefault := !h.invitedTo(request.InvitationToken, user.Email)
+{{- end }}
+	workspace, err := h.authService.CompleteOnboarding(user.ID, request.Name, createDefault)
+	if err != nil {
+		slog.Error("onboarding failed", "error", err, "user_id", user.ID)
+		ServiceError(w, err)
+		return
+	}
+
+	updatedUser, err := h.userService.ByID(user.ID)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	response := onboardingResponse{User: NewUser(updatedUser)}
+	if workspace != nil {
+		created := NewWorkspace(workspace)
+		response.Workspace = &created
+	}
+	slog.Info("onboarding completed", "user_id", user.ID)
+	JSON(w, http.StatusOK, response)
+}
+
+// invitedTo reports whether token names an available invitation for email.
+// Unknown, used, revoked, expired and foreign invitations count as none.
+func (h *AuthHandler) invitedTo(token, email string) bool {
+	if token == "" {
+		return false
+	}
+	invitation, err := h.workspaceService.WorkspaceInvitation(token)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(invitation.Email, email)
+}
+{{- if .IsSvelte }}
+
+// pendingInvitation returns the token of the pending_invitation cookie when
+// it names an available invitation for email. Otherwise it clears the cookie
+// and returns "".
+func (h *AuthHandler) pendingInvitation(w http.ResponseWriter, r *http.Request, email string) string {
+	token := h.invitations.Token(r)
+	if token == "" {
+		return ""
+	}
+	if !h.invitedTo(token, email) {
+		h.invitations.Clear(w)
+		return ""
+	}
+	return token
+}
+{{- end }}
+
+type accountResponse struct {
+	User               User         `json:"user"`
+	OnboardingRequired bool         `json:"onboarding_required"`
+	Workspaces         []Membership `json:"workspaces"`
+	IsAdmin            bool         `json:"is_admin"`
+{{- if .IsSvelte }}
+	PendingInvitation  *string      `json:"pending_invitation"`
+{{- end }}
+{{- if .Storage }}
+	AvatarURL          *string      `json:"avatar_url"`
+{{- end }}
+}
+
+// Account returns the signed-in user, whether onboarding is still open, the
+// workspaces the user belongs to, and whether the session belongs to an
+// operator. Subscriptions belong to workspaces and are read through the
+// workspace billing endpoint.{{ if .IsSvelte }} pending_invitation is the token of an
+// invitation this browser opened before signing in, so the app can return
+// to it.{{ end }}
+func (h *AuthHandler) Account(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	memberships, err := h.workspaceService.ListForUser(user.ID)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+{{- if .IsSvelte }}
+	var pending *string
+	token := h.pendingInvitation(w, r, user.Email)
+	if token != "" {
+		pending = &token
+	}
+{{- end }}
+	JSON(w, http.StatusOK, accountResponse{
+		User:               NewUser(user),
+		OnboardingRequired: user.Name == "",
+		Workspaces:         NewMemberships(visibleMemberships(r, memberships)),
+		IsAdmin:            ctxkeys.IsAdmin(r.Context()),
+{{- if .IsSvelte }}
+		PendingInvitation:  pending,
+{{- end }}
+{{- if .Storage }}
+		AvatarURL:          avatarURL(user),
+{{- end }}
+	})
+}

@@ -1,0 +1,59 @@
+package layouts
+
+import (
+	"strings"
+	"unicode/utf8"
+
+	"{{.ModulePath}}/internal/model"
+	dropdown "{{.ModulePath}}/internal/ui/components/dropdownmenu"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/sidebar"
+)
+
+templ WorkspaceSwitcher(current *model.Workspace, workspaces []model.WorkspaceMembership) {
+	@dropdown.DropdownMenu() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Size: sidebar.MenuButtonSizeLg, Attributes: dropdown.Trigger(ctx)}) {
+			<span class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
+				{ workspaceInitial(current.Name) }
+			</span>
+			<div class="min-w-0 flex-1 text-left">
+				<span class="block truncate text-sm font-bold">{ current.Name }</span>
+				<span class="block text-xs text-muted-foreground">Switch workspace</span>
+			</div>
+			@icon.ChevronsUpDown(icon.Props{Class: "ml-auto size-4"})
+		}
+		@dropdown.Content(dropdown.ContentProps{Class: "w-72", Side: dropdown.SideBottom, Align: dropdown.AlignStart}) {
+			@dropdown.Label() {
+				Workspaces
+			}
+			for _, item := range workspaces {
+				@dropdown.Item(dropdown.ItemProps{Href: "/app/" + item.Slug + "/dashboard", Class: "py-2"}) {
+					@icon.Building2(icon.Props{Class: "size-4 shrink-0"})
+					<div class="min-w-0 flex-1">
+						<span class="block truncate">{ item.Name }</span>
+						<span class="block text-xs text-muted-foreground">{ model.WorkspaceRoleLabel(item.Role) }</span>
+					</div>
+					if item.ID == current.ID {
+						@icon.Check(icon.Props{Class: "ml-auto size-4 shrink-0"})
+						<span class="sr-only">Current workspace</span>
+					}
+				}
+			}
+			@dropdown.Separator()
+			@dropdown.Item(dropdown.ItemProps{Href: "/app/" + current.Slug + "/workspace"}) {
+				@icon.Settings(icon.Props{Class: "size-4"})
+				Workspace settings
+			}
+			@dropdown.Item(dropdown.ItemProps{Href: "/workspaces/new"}) {
+				@icon.Plus(icon.Props{Class: "size-4"})
+				New workspace
+			}
+		}
+	}
+}
+
+// workspaceInitial is the first letter of a name, also when it is not ASCII.
+func workspaceInitial(name string) string {
+	first, _ := utf8.DecodeRuneInString(name)
+	return strings.ToUpper(string(first))
+}

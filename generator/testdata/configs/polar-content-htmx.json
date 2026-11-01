@@ -1,0 +1,1 @@
+{"project_name":"Content App","module_path":"example.com/content-app","framework":"htmx","database":"sqlite","payment":"polar","mail":"smtp","workspaces":false,"oauth":["github"],"storage":false,"content":["blog","docs"],"api":false,"mcp":false}

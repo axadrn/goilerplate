@@ -1,0 +1,94 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"{{.ModulePath}}/internal/app"
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/logger"
+	"{{.ModulePath}}/internal/routes"
+	"github.com/joho/godotenv"
+)
+
+const shutdownTimeout = 10 * time.Second
+
+func main() {
+	envErr := godotenv.Load()
+	if envErr != nil && !errors.Is(envErr, os.ErrNotExist) {
+		logger.Errors("application stopped", fmt.Errorf("load .env: %w", envErr))
+		os.Exit(1)
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Errors("application stopped", err)
+		os.Exit(1)
+	}
+	logger.Init(logger.Load(cfg.IsDevelopment()))
+	err = run(cfg)
+	if err != nil {
+		logger.Errors("application stopped", err)
+		os.Exit(1)
+	}
+}
+
+func run(cfg *config.Config) error {
+	application, err := app.New(cfg)
+	if err != nil {
+		return fmt.Errorf("initialize app: %w", err)
+	}
+	defer func() {
+		if closeErr := application.Close(); closeErr != nil {
+			slog.Error("failed to close app", "error", closeErr)
+		}
+	}()
+	server := &http.Server{
+		Addr: ":" + cfg.Port, Handler: routes.SetupRoutes(application),
+		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
+		WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
+	}
+	slog.Info("server starting", "port", cfg.Port, "env", cfg.AppEnv, "url", "http://localhost:"+cfg.Port)
+	if err := serve(server); err != nil {
+		return err
+	}
+	slog.Info("server stopped")
+	return nil
+}
+
+func serve(server *http.Server) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// ListenAndServe blocks. Keep SIGTERM responsive.
+	serverError := make(chan error, 1)
+	go func() {
+		serverError <- server.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serverError:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return fmt.Errorf("serve HTTP: %w", err)
+	case <-ctx.Done():
+	}
+
+	slog.Info("server shutting down")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		// The grace period is over. Close what remains.
+		_ = server.Close()
+		return fmt.Errorf("shut down HTTP server: %w", err)
+	}
+	return nil
+}

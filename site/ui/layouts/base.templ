@@ -1,0 +1,110 @@
+package layouts
+
+import "github.com/axadrn/goilerplate/v4/site/brand"
+import "github.com/axadrn/goilerplate/v4/site/ui/components"
+
+type SEOProps struct {
+	Title        string
+	Description  string
+	Path         string
+	NoIndex      bool
+	MarkdownPath string
+}
+
+templ Base(props ...SEOProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			if len(props) > 0 {
+				@seo(props[0])
+			} else {
+				<title>{ brand.Name }</title>
+			}
+			<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"/>
+			<link href="/assets/css/output.css" rel="stylesheet"/>
+			@components.Scripts()
+			@themeScript()
+		</head>
+		<body class="style-nova min-h-screen">
+			{ children... }
+		</body>
+	</html>
+}
+
+templ seo(props SEOProps) {
+	{{ baseURL := brand.URL }}
+	{{ appName := brand.Name }}
+	{{ appTagline := brand.Tagline }}
+	{{ fullTitle := props.Title + " · " + appName }}
+	<title>{ fullTitle }</title>
+	<meta name="description" content={ props.Description }/>
+	// Author
+	<meta name="author" content={ appName }/>
+	// Robots Tags
+	if props.NoIndex {
+		<meta name="robots" content="noindex, nofollow"/>
+	} else {
+		<meta name="robots" content="index, follow"/>
+	}
+	// Canonical URL
+	<link rel="canonical" href={ baseURL + props.Path }/>
+	<link rel="describedby" href="/llms.txt"/>
+	if props.MarkdownPath != "" {
+		<link rel="alternate" type="text/markdown" href={ props.MarkdownPath }/>
+	}
+	// OpenGraph Tags
+	<meta property="og:title" content={ fullTitle }/>
+	<meta property="og:description" content={ props.Description }/>
+	<meta property="og:type" content="website"/>
+	<meta property="og:url" content={ baseURL + props.Path }/>
+	<meta property="og:site_name" content={ appName }/>
+	// OpenGraph Image
+	<meta property="og:image" content={ baseURL + "/assets/img/og.png" }/>
+	<meta property="og:image:width" content="1200"/>
+	<meta property="og:image:height" content="630"/>
+	<meta property="og:image:alt" content={ appName + " - " + appTagline }/>
+	// Twitter Card
+	<meta name="twitter:card" content="summary_large_image"/>
+	<meta name="twitter:title" content={ fullTitle }/>
+	<meta name="twitter:description" content={ props.Description }/>
+	<meta name="twitter:image" content={ baseURL + "/assets/img/og.png" }/>
+	<meta name="twitter:image:alt" content={ appName + " - " + appTagline }/>
+	// Theme Color
+	<meta name="theme-color" content="#000000"/>
+}
+
+templ themeScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(function() {
+			window.themeUtils = window.themeUtils || {};
+			const media = window.matchMedia('(prefers-color-scheme: dark)');
+			window.themeUtils.getThemePreference = function() {
+				return localStorage.getItem('theme') || 'system';
+			};
+			window.themeUtils.applyTheme = function() {
+				const preference = window.themeUtils.getThemePreference();
+				const isDark = preference === 'system' ? media.matches : preference === 'dark';
+				document.documentElement.classList.toggle('dark', isDark);
+				document.dispatchEvent(new CustomEvent('theme-changed'));
+			};
+			window.themeUtils.cycleTheme = function() {
+				const current = window.themeUtils.getThemePreference();
+				const next = current === 'system' ? (media.matches ? 'light' : 'dark') : (current === 'light' ? 'dark' : 'light');
+				localStorage.setItem('theme', next);
+				window.themeUtils.applyTheme();
+			};
+			window.themeUtils.applyTheme();
+			media.addEventListener('change', function() {
+				if (window.themeUtils.getThemePreference() === 'system') window.themeUtils.applyTheme();
+			});
+			document.addEventListener('click', function(event) {
+				const switcher = event.target.closest('[data-theme-switcher]');
+				if (!switcher) return;
+				event.preventDefault();
+				window.themeUtils.cycleTheme();
+			});
+		})();
+	</script>
+}

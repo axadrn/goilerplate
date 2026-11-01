@@ -1,0 +1,33 @@
+---
+title: "Choosing a Billing Model That Scales"
+date: "2026-08-02"
+author: {{.YAMLProjectTeamName}}
+description: "Choose pricing that reflects customer value while keeping billing logic and support manageable."
+tags: ["billing", "pricing", "growth"]
+---
+
+Pricing shapes the product as much as it shapes revenue. The model determines what must be measured, which limits need to be enforced, and what customers expect when their usage changes.
+
+## Match the Value Metric
+
+Start with the reason customers pay. A collaboration product might charge per active member. An infrastructure product might charge for usage. A focused tool may work best with a simple flat subscription.
+
+The strongest value metric is easy for customers to predict and easy for the application to measure.
+
+## Keep the First Plans Simple
+
+Most products can begin with a small set of choices:
+
+- A free or trial experience that shows the core value
+- A primary paid plan for the target customer
+- A higher plan only when a distinct customer group needs it
+
+Too many tiers create edge cases across checkout, entitlements, upgrades, invoices, and support. Add complexity after customer behavior justifies it.
+
+## Store Provider State Carefully
+
+Treat the payment provider as the source of truth for transactions while keeping the product's current entitlements available locally. Process webhook events idempotently, record provider identifiers, and make newer events take precedence over stale deliveries.
+
+## Make Changes Understandable
+
+Before a customer confirms an upgrade or cancellation, show the price, effective date, and resulting access. Clear expectations reduce support work and build trust around the most sensitive part of the product.

@@ -95,7 +95,7 @@ func gitVersion(output string) ([2]int, bool) {
 
 func Merge(ctx context.Context, repository Repository, oldRoot, newRoot, targetVersion string) (Result, error) {
 	if !safeVersion(targetVersion) {
-		return Result{}, fmt.Errorf("service returned invalid template version %q", targetVersion)
+		return Result{}, fmt.Errorf("invalid template version %q", targetVersion)
 	}
 	branch := "goilerplate-update-" + targetVersion
 	oldCommit, newCommit, err := importTemplates(ctx, repository.Root, oldRoot, newRoot)

@@ -1,0 +1,13 @@
+package layouts
+
+import "github.com/axadrn/goilerplate/v4/site/ui/blocks"
+
+templ Home(seo SEOProps) {
+	@Base(seo) {
+		<div class="min-h-svh bg-background">
+			@blocks.Navbar()
+			{ children... }
+			@blocks.Footer()
+		</div>
+	}
+}

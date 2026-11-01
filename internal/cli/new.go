@@ -1,30 +1,22 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/axadrn/goilerplate/v3/api"
-	"github.com/axadrn/goilerplate/v3/internal/config"
-	"github.com/axadrn/goilerplate/v3/internal/project"
+	"github.com/axadrn/goilerplate/v4/generator"
+	"github.com/axadrn/goilerplate/v4/internal/project"
 )
 
 func (a *App) newProject(ctx context.Context, arguments []string) error {
-	interactive := len(arguments) == 0 && a.RunNewProjectWizard != nil
-	var configuration config.Config
-	var client ServiceClient
-	if interactive {
+	if len(arguments) == 0 && a.RunNewProjectWizard != nil {
 		var err error
-		configuration, client, err = a.licensedClient(ctx)
-		if err != nil {
-			return err
-		}
 		arguments, err = a.RunNewProjectWizard(ctx)
 		if err != nil {
 			return err
@@ -79,18 +71,17 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	if strings.TrimSpace(*name) == "" {
 		*name = filepath.Base(filepath.Clean(destination))
 	}
-	answers := api.GenerationAnswers{
+	answers := generator.Config{
 		ProjectName: strings.TrimSpace(*name),
 		ModulePath:  strings.TrimSpace(*modulePath),
-		Edition:     api.EditionPaid,
-		Framework:   strings.TrimSpace(*framework),
-		Database:    strings.TrimSpace(*database),
-		Payment:     strings.TrimSpace(*payment),
-		Mail:        strings.TrimSpace(*mail),
+		Framework:   generator.Framework(strings.TrimSpace(*framework)),
+		Database:    generator.Database(strings.TrimSpace(*database)),
+		Payment:     generator.Payment(strings.TrimSpace(*payment)),
+		Mail:        generator.Mail(strings.TrimSpace(*mail)),
 		Workspaces:  *workspaces,
-		OAuth:       splitList(*oauth),
+		OAuth:       splitList[generator.OAuth](*oauth),
 		Storage:     *storage,
-		Content:     splitList(*content),
+		Content:     splitList[generator.Content](*content),
 		API:         *jsonAPI,
 		MCP:         *mcp,
 	}
@@ -99,126 +90,52 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 		return err
 	}
 
-	if client == nil {
-		configuration, client, err = a.licensedClient(ctx)
-		if err != nil {
-			return err
-		}
-	}
-	archive, err := os.CreateTemp("", "goilerplate-project-*.tar.gz")
-	if err != nil {
-		return fmt.Errorf("create project download: %w", err)
-	}
-	archivePath := archive.Name()
-	defer os.Remove(archivePath)
-	defer archive.Close()
-
-	generatedVersion, err := client.Generate(ctx, configuration.SessionToken, api.GenerateRequest{
-		Answers: answers,
-	}, archive)
+	version := a.templateVersion()
+	template, err := generator.CurrentTemplate(version)
 	if err != nil {
 		return err
 	}
-	if _, err := archive.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("read project download: %w", err)
-	}
-	if err := project.Create(ctx, archive, destination); err != nil {
+	var archive bytes.Buffer
+	if err := template.WriteArchive(&archive, answers); err != nil {
 		return err
 	}
-	a.printSuccess(fmt.Sprintf("Created %s in %s with %s", answers.ProjectName, destination, generatedVersion))
+	if err := project.Create(ctx, &archive, destination); err != nil {
+		return err
+	}
+	a.printSuccess(fmt.Sprintf("Created %s in %s with %s", answers.ProjectName, destination, version))
 	a.printInfo("Git is ready on main with an initial commit")
 	return nil
 }
 
-func (a *App) projectClient(ctx context.Context) (config.Config, ServiceClient, error) {
-	configuration, err := a.Store.Load()
-	if err != nil {
-		return config.Config{}, nil, err
+// devTemplateVersion names the template of a build without a release
+// version, such as go run or go build from a checkout.
+const devTemplateVersion = "v4.0.0-dev"
+
+// templateVersion is the version written to goilerplate.lock. The template is
+// embedded in the CLI, so it is the version of the CLI itself.
+func (a *App) templateVersion() string {
+	if generator.ValidateVersion(a.Version) == nil {
+		return a.Version
 	}
-	if configuration.SessionToken == "" {
-		if err := a.login(ctx, nil); err != nil {
-			return config.Config{}, nil, err
-		}
-		configuration, err = a.Store.Load()
-		if err != nil {
-			return config.Config{}, nil, err
-		}
-	}
-	client, err := a.NewService(a.apiURL(configuration))
-	if err != nil {
-		return config.Config{}, nil, err
-	}
-	return configuration, client, nil
+	return devTemplateVersion
 }
 
-// licensedClient returns a client for an account with an active license.
-// Without one it opens pricing and fails, so nothing is asked or generated.
-func (a *App) licensedClient(ctx context.Context) (config.Config, ServiceClient, error) {
-	configuration, client, err := a.projectClient(ctx)
-	if err != nil {
-		return config.Config{}, nil, err
-	}
-	identity, err := client.WhoAmI(ctx, configuration.SessionToken)
-	if err != nil {
-		return config.Config{}, nil, err
-	}
-	if !hasActiveLicense(identity) {
-		a.openPricing(ctx, configuration)
-		return config.Config{}, nil, errors.New("no active license")
-	}
-	return configuration, client, nil
-}
-
-func (a *App) pricingURL(configuration config.Config) string {
-	return strings.TrimRight(a.apiURL(configuration), "/") + "/pricing"
-}
-
-func (a *App) openPricing(ctx context.Context, configuration config.Config) {
-	pricingURL := a.pricingURL(configuration)
-	opened := a.OpenBrowser != nil && a.OpenBrowser(ctx, pricingURL) == nil
-	if a.StyledOutput {
-		a.printHeading("license")
-		fmt.Fprintln(a.Out)
-	}
-	a.printInfo("goilerplate needs a license")
-	if opened {
-		a.printSuccess("Pricing opened in your browser")
-	} else {
-		a.printField("Open pricing", pricingURL)
-	}
-	if a.StyledOutput {
-		a.printInfo("Buy with your verified GitHub email")
-		a.printInfo("Then run goilerplate new again. No new login needed")
-		return
-	}
-	fmt.Fprintln(a.Out, "Buy with your verified GitHub email, then run goilerplate new again. No new login needed")
-}
-
-func hasActiveLicense(identity api.WhoAmIResponse) bool {
-	for _, license := range identity.Licenses {
-		if license.Status == api.LicenseStatusActive {
-			return true
-		}
-	}
-	return false
-}
-
-func splitList(value string) []string {
+func splitList[T ~string](value string) []T {
 	if strings.TrimSpace(value) == "" {
-		return []string{}
+		return []T{}
 	}
 	parts := strings.Split(value, ",")
-	result := make([]string, 0, len(parts))
+	result := make([]T, 0, len(parts))
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part != "" {
-			result = append(result, part)
+			result = append(result, T(part))
 		}
 	}
 	return result
 }
 
-func validateSelection(answers api.GenerationAnswers) error {
+func validateSelection(answers generator.Config) error {
 	switch answers.Framework {
 	case "htmx", "datastar":
 	case "headless":

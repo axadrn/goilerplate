@@ -1,16 +1,17 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/axadrn/goilerplate/v3/api"
-	"github.com/axadrn/goilerplate/v3/internal/project"
-	projectupdate "github.com/axadrn/goilerplate/v3/internal/update"
+	"github.com/axadrn/goilerplate/v4/generator"
+	"github.com/axadrn/goilerplate/v4/internal/project"
+	projectupdate "github.com/axadrn/goilerplate/v4/internal/update"
+	"golang.org/x/mod/semver"
 )
 
 func (a *App) updateProject(ctx context.Context, arguments []string) error {
@@ -33,7 +34,29 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
-	client, token, err := a.updateClient(ctx)
+	current := a.templateVersion()
+	if lock.TemplateVersion == current {
+		a.printInfo("Already using goilerplate template " + current)
+		return nil
+	}
+	if err := checkUpdatable(lock.TemplateVersion, current); err != nil {
+		return err
+	}
+	if a.FetchTemplate == nil {
+		return errors.New("goilerplate update cannot download templates in this build")
+	}
+	oldFiles, err := a.FetchTemplate(ctx, lock.TemplateVersion)
+	if errors.Is(err, projectupdate.ErrVersionNotFound) {
+		return fmt.Errorf("goilerplate %s was not found on the Go module proxy, so its template cannot be compared", lock.TemplateVersion)
+	}
+	if err != nil {
+		return err
+	}
+	oldTemplate, err := generator.NewTemplate(lock.TemplateVersion, oldFiles)
+	if err != nil {
+		return err
+	}
+	newTemplate, err := generator.CurrentTemplate(current)
 	if err != nil {
 		return err
 	}
@@ -43,44 +66,16 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 		return fmt.Errorf("create update workspace: %w", err)
 	}
 	defer os.RemoveAll(workspace)
-	oldArchive, err := os.Create(filepath.Join(workspace, "old.tar.gz"))
-	if err != nil {
-		return err
-	}
-	defer oldArchive.Close()
-	oldVersion, err := client.UpdateTree(ctx, token, api.GenerateRequest{
-		TemplateVersion: lock.TemplateVersion,
-		Answers:         lock.Config,
-	}, oldArchive)
-	if err != nil {
-		return err
-	}
-	if oldVersion != lock.TemplateVersion {
-		return fmt.Errorf("service returned old template %s, want %s", oldVersion, lock.TemplateVersion)
-	}
-
-	newArchive, err := os.Create(filepath.Join(workspace, "new.tar.gz"))
-	if err != nil {
-		return err
-	}
-	defer newArchive.Close()
-	targetVersion, err := client.UpdateTree(ctx, token, api.GenerateRequest{Answers: lock.Config}, newArchive)
-	if err != nil {
-		return err
-	}
-	if targetVersion == lock.TemplateVersion {
-		a.printInfo("Already using goilerplate template " + targetVersion)
-		return nil
-	}
+	configuration := lock.Config
 	oldRoot := filepath.Join(workspace, "old")
+	if err := renderTree(oldTemplate, configuration, oldRoot); err != nil {
+		return fmt.Errorf("render goilerplate %s: %w", lock.TemplateVersion, err)
+	}
 	newRoot := filepath.Join(workspace, "new")
-	if err := extractArchive(oldArchive, oldRoot); err != nil {
-		return err
+	if err := renderTree(newTemplate, configuration, newRoot); err != nil {
+		return fmt.Errorf("render goilerplate %s: %w", current, err)
 	}
-	if err := extractArchive(newArchive, newRoot); err != nil {
-		return err
-	}
-	result, err := projectupdate.Merge(ctx, repository, oldRoot, newRoot, targetVersion)
+	result, err := projectupdate.Merge(ctx, repository, oldRoot, newRoot, current)
 	if err != nil {
 		return err
 	}
@@ -88,33 +83,32 @@ func (a *App) updateProject(ctx context.Context, arguments []string) error {
 	return nil
 }
 
-func (a *App) updateClient(ctx context.Context) (ServiceClient, string, error) {
-	configuration, err := a.Store.Load()
-	if err != nil {
-		return nil, "", err
+// checkUpdatable says plainly when a project cannot be updated by this CLI.
+func checkUpdatable(projectVersion, current string) error {
+	if !semver.IsValid(projectVersion) {
+		return fmt.Errorf("goilerplate.lock names an invalid template version %q", projectVersion)
 	}
-	if configuration.SessionToken == "" {
-		if err := a.login(ctx, nil); err != nil {
-			return nil, "", err
-		}
-		configuration, err = a.Store.Load()
-		if err != nil {
-			return nil, "", err
-		}
+	if semver.Compare(semver.Major(projectVersion), projectupdate.FirstUpdatableMajor) < 0 {
+		return fmt.Errorf("this project was made with goilerplate %s. goilerplate update works for projects made with %s or newer. The project keeps working as it is", projectVersion, projectupdate.FirstUpdatableMajor)
 	}
-	client, err := a.NewService(a.apiURL(configuration))
-	if err != nil {
-		return nil, "", err
+	if semver.Prerelease(projectVersion) == "-dev" {
+		return fmt.Errorf("this project was made with a development build of goilerplate (%s), which has no published template to update from", projectVersion)
 	}
-	return client, configuration.SessionToken, nil
+	if semver.Compare(projectVersion, current) > 0 {
+		return fmt.Errorf("this project uses goilerplate %s, which is newer than this CLI (%s). Update the CLI: go install github.com/axadrn/goilerplate/v4/cmd/goilerplate@latest", projectVersion, current)
+	}
+	return nil
 }
 
-func extractArchive(file *os.File, destination string) error {
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("read update download: %w", err)
+// renderTree renders a template the way goilerplate new does: through the
+// same archive and extraction, so both trees match a generated project.
+func renderTree(template generator.Template, configuration generator.Config, destination string) error {
+	var archive bytes.Buffer
+	if err := template.WriteArchive(&archive, configuration); err != nil {
+		return err
 	}
-	if err := project.Extract(file, destination); err != nil {
-		return fmt.Errorf("extract update tree: %w", err)
+	if err := project.Extract(&archive, destination); err != nil {
+		return fmt.Errorf("extract template tree: %w", err)
 	}
 	return nil
 }

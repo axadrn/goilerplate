@@ -1,0 +1,17 @@
+package layouts
+
+import (
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/sidebar"
+)
+
+templ AppSidebarNavigation() {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@sidebar.MenuItem() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{Href: basePath + "/dashboard", IsActive: ctxkeys.URLPath(ctx) == basePath+"/dashboard"}) {
+			@icon.House(icon.Props{Class: "size-4"})
+			<span>Dashboard</span>
+		}
+	}
+}

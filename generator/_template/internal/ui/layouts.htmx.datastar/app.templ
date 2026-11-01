@@ -1,0 +1,96 @@
+package layouts
+
+import (
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/blocks"
+	dropdown "{{.ModulePath}}/internal/ui/components/dropdownmenu"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/sidebar"
+)
+
+templ App(title string) {
+	{{ cfg := ctxkeys.RenderConfig(ctx) }}
+	@Base(SEOProps{
+		Title:       title,
+		Description: "Application Dashboard",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@sidebar.Provider(sidebar.ProviderProps{Attributes: templ.Attributes{"style": "--sidebar-width: calc(var(--spacing) * 72); --sidebar-width-icon: 3rem; --header-height: calc(var(--spacing) * 12);"}}) {
+			@sidebar.Sidebar(sidebar.Props{Collapsible: sidebar.CollapsibleOffcanvas, Variant: sidebar.VariantInset}) {
+				@sidebar.Header() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@AppSidebarIdentity()
+						}
+					}
+				}
+				@sidebar.Content() {
+					@sidebar.Group() {
+						@sidebar.GroupLabel() {
+							Overview
+						}
+						@sidebar.Menu() {
+							@AppSidebarNavigation()
+						}
+					}
+				}
+				@sidebar.Footer() {
+					@sidebar.Menu() {
+						@AppSidebarDocumentation()
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Href: "mailto:" + cfg.SupportEmail,
+								Size: sidebar.MenuButtonSizeSm,
+							}) {
+								@icon.MessageCircleQuestionMark(icon.Props{Class: "size-4"})
+								<span>Support</span>
+							}
+						}
+					}
+					@sidebar.Separator()
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							{{ user := ctxkeys.User(ctx) }}
+							if user != nil {
+								@AppSidebarDropdown(user)
+							}
+						}
+					}
+				}
+				@sidebar.Rail()
+			}
+			@sidebar.Inset() {
+				@blocks.AppHeader(title)
+				// App Content
+				<main class="flex-1">
+					{ children... }
+				</main>
+			}
+		}
+	}
+}
+
+templ AppSidebarDropdown(user *model.User) {
+	@dropdown.DropdownMenu() {
+		@sidebar.MenuButton(sidebar.MenuButtonProps{
+			Size:       sidebar.MenuButtonSizeLg,
+			Attributes: dropdown.Trigger(ctx),
+		}) {
+			@AppSidebarAvatar(user)
+			@AppSidebarUserSummary(user)
+			@icon.ChevronsUpDown(icon.Props{Class: "ml-auto size-4"})
+		}
+		@dropdown.Content(dropdown.ContentProps{
+			Class: "w-56",
+			Side:  dropdown.SideTop,
+			Align: dropdown.AlignStart,
+		}) {
+			@AppSidebarUserLabel(user)
+			@dropdown.Separator()
+			@AppSidebarAccountLinks()
+			@dropdown.Separator()
+			@AppSidebarLogout()
+		}
+	}
+}

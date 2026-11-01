@@ -1,0 +1,114 @@
+package repository
+
+import (
+	"database/sql"
+	"errors"
+	"time"
+
+	"{{.ModulePath}}/internal/model"
+	"github.com/jmoiron/sqlx"
+)
+
+var ErrAPITokenNotFound = errors.New("api token not found")
+
+type APITokenRepository interface {
+	Create(token *model.APIToken) error
+	ByTokenHash(tokenHash string) (*model.APIToken, error)
+	ListByUserID(userID string) ([]model.APIToken, error)
+	CountByUserID(userID string) (int, error)
+	TouchLastUsed(id string, lastUsedAt time.Time) error
+	DeleteByIDForUser(id, userID string) error
+	DeleteByUserID(userID string) error
+}
+
+type apiTokenRepository struct {
+	db *sqlx.DB
+}
+
+func NewAPITokenRepository(db *sqlx.DB) APITokenRepository {
+	return &apiTokenRepository{db: db}
+}
+
+func (r *apiTokenRepository) Create(token *model.APIToken) error {
+	_, err := r.db.Exec(`
+		INSERT INTO api_tokens (
+{{- if .Workspaces }}
+			id, user_id, workspace_id, name, token_hash, prefix, scopes, last_used_at, expires_at, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`,
+		token.ID,
+		token.UserID,
+		token.WorkspaceID,
+{{- else }}
+			id, user_id, name, token_hash, prefix, scopes, last_used_at, expires_at, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`,
+		token.ID,
+		token.UserID,
+{{- end }}
+		token.Name,
+		token.TokenHash,
+		token.Prefix,
+		token.Scopes,
+		token.LastUsedAt,
+		token.ExpiresAt,
+		token.CreatedAt,
+	)
+	return err
+}
+
+func (r *apiTokenRepository) ByTokenHash(tokenHash string) (*model.APIToken, error) {
+	token := &model.APIToken{}
+	err := r.db.Get(token, `SELECT * FROM api_tokens WHERE token_hash = $1`, tokenHash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrAPITokenNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+// ListByUserID returns the tokens of a user, newest first.
+func (r *apiTokenRepository) ListByUserID(userID string) ([]model.APIToken, error) {
+	tokens := []model.APIToken{}
+	err := r.db.Select(&tokens, `
+		SELECT * FROM api_tokens
+		WHERE user_id = $1
+		ORDER BY created_at DESC, id DESC
+	`, userID)
+	return tokens, err
+}
+
+func (r *apiTokenRepository) CountByUserID(userID string) (int, error) {
+	var count int
+	err := r.db.Get(&count, `SELECT COUNT(*) FROM api_tokens WHERE user_id = $1`, userID)
+	return count, err
+}
+
+func (r *apiTokenRepository) TouchLastUsed(id string, lastUsedAt time.Time) error {
+	_, err := r.db.Exec(`UPDATE api_tokens SET last_used_at = $1 WHERE id = $2`, lastUsedAt, id)
+	return err
+}
+
+// DeleteByIDForUser revokes a token. Another user's token is not found.
+func (r *apiTokenRepository) DeleteByIDForUser(id, userID string) error {
+	result, err := r.db.Exec(`DELETE FROM api_tokens WHERE id = $1 AND user_id = $2`, id, userID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrAPITokenNotFound
+	}
+	return nil
+}
+
+// DeleteByUserID revokes every token of a user.
+func (r *apiTokenRepository) DeleteByUserID(userID string) error {
+	_, err := r.db.Exec(`DELETE FROM api_tokens WHERE user_id = $1`, userID)
+	return err
+}

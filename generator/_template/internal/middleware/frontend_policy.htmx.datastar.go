@@ -1,0 +1,3 @@
+package middleware
+
+const frontendScriptPolicy = ""

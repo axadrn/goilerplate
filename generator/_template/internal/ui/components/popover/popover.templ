@@ -1,0 +1,239 @@
+package popover
+
+import (
+	"context"
+	"strconv"
+
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+type Side string
+
+const (
+	SideTop    Side = "top"
+	SideRight  Side = "right"
+	SideBottom Side = "bottom"
+	SideLeft   Side = "left"
+)
+
+type Align string
+
+const (
+	AlignStart  Align = "start"
+	AlignCenter Align = "center"
+	AlignEnd    Align = "end"
+)
+
+type ctxKey string
+
+const stateKey ctxKey = "popoverState"
+
+type ctxState struct {
+	id          string
+	open        *bool
+	defaultOpen bool
+}
+
+func state(ctx context.Context) ctxState {
+	if s, ok := ctx.Value(stateKey).(ctxState); ok {
+		return s
+	}
+	return ctxState{}
+}
+
+// triggerID derives the trigger's id from the id Root, Trigger and Content
+// already share. The popup names itself after its Title, so nothing points
+// here yet; a caller wiring their own aria-describedby needs it to exist.
+func triggerID(popoverID string) string {
+	return popoverID + "-trigger"
+}
+
+// Trigger returns the attributes that turn any element (usually a button)
+// into the popover trigger — the asChild equivalent: no wrapper element.
+// The element keeps its own data-slot; data-base-ui-click-trigger is the
+// identifier Base UI's PopoverTrigger renders, data-templ-controls names the popover.
+func Trigger(ctx context.Context) templ.Attributes {
+	return templ.Attributes{
+		// useButton: tabIndex 0 and the native type.
+		"tabindex":                   "0",
+		"type":                       "button",
+		"data-slot":                  "popover-trigger",
+		"data-base-ui-click-trigger": true,
+		"id":                         triggerID(state(ctx).id),
+		"data-templ-controls":        state(ctx).id,
+		"aria-haspopup":              "dialog",
+		"aria-expanded":              "false",
+	}
+}
+
+type Props struct {
+	ID string
+	// Open is the server-rendered controlled state. In a static templ render,
+	// a non-nil value overrides DefaultOpen, matching Base UI's optional open.
+	Open *bool
+	// DefaultOpen renders an uncontrolled popover initially open, matching
+	// Base UI Popover.Root's defaultOpen prop.
+	DefaultOpen bool
+}
+
+type ContentProps struct {
+	Class      string
+	Attributes templ.Attributes
+	// Side of the trigger to open against. Defaults to bottom.
+	Side Side
+	// Align along the trigger edge. Defaults to center.
+	Align Align
+	// SideOffset is the gap to the trigger, in px. Defaults to 4.
+	SideOffset int
+	// AlignOffset shifts the content along the aligned edge, in px.
+	AlignOffset int
+}
+
+type HeaderProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type TitleProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type DescriptionProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+// Root renders no element: it only carries the id that links Trigger and
+// Content (via ctx).
+templ Popover(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.ID == "" {
+		{{ p.ID = utils.RandomID() }}
+	}
+	{{ ctx = context.WithValue(ctx, stateKey, ctxState{id: p.ID, open: p.Open, defaultOpen: p.DefaultOpen}) }}
+	{ children... }
+}
+
+templ Content(props ...ContentProps) {
+	{{ var p ContentProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.Side == "" {
+		{{ p.Side = SideBottom }}
+	}
+	if p.Align == "" {
+		{{ p.Align = AlignCenter }}
+	}
+	{{
+		sideOffset := p.SideOffset
+		if sideOffset == 0 {
+			sideOffset = 4
+		}
+		s := state(ctx)
+	}}
+	// Hidden until the script portals the portal node on open, so the SSRd
+	// content never participates in layout or sibling CSS. Inside the portal
+	// node Base UI's positioner around the popup.
+	<div data-templ-portal hidden>
+		<div data-base-ui-portal hidden>
+		<div
+			data-templ-side={ string(p.Side) }
+			data-templ-align={ string(p.Align) }
+			data-templ-side-offset={ strconv.Itoa(sideOffset) }
+			if p.AlignOffset != 0 {
+				data-templ-align-offset={ strconv.Itoa(p.AlignOffset) }
+			}
+			if s.open != nil {
+				data-templ-open={ strconv.FormatBool(*s.open) }
+			}
+			data-templ-default-open?={ s.open == nil && s.defaultOpen }
+			data-closed
+			hidden
+			role="presentation"
+			class="isolate z-50"
+			{ utils.DirectionAttributes(ctx)... }
+		>
+			<div
+				id={ s.id }
+				data-slot="popover-content"
+				data-closed
+				role="dialog"
+				tabindex="-1"
+				data-base-ui-focusable
+				class={
+					utils.CN(
+						// 1:1 base/ui/popover.tsx PopoverContent, the look comes from
+						// and Base UI's standard transform-origin variable.
+						"bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 ring-foreground/10 flex flex-col gap-2.5 rounded-lg p-2.5 text-sm shadow-md ring-1 duration-100 data-[side=inline-start]:slide-in-from-right-2 data-[side=inline-end]:slide-in-from-left-2 z-50 w-72 origin-(--transform-origin) outline-hidden",
+						// The popup stays mounted after animate-out until it unmounts.
+						"data-closed:fill-mode-forwards",
+						p.Class,
+					),
+				}
+				{ p.Attributes... }
+			>
+				{ children... }
+			</div>
+		</div>
+		</div>
+	</div>
+}
+
+templ Header(props ...HeaderProps) {
+	{{ var p HeaderProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="popover-header"
+		class={ utils.CN("flex flex-col gap-0.5 text-sm", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Title(props ...TitleProps) {
+	{{ var p TitleProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<h2
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="popover-title"
+		class={ utils.CN("font-medium", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</h2>
+}
+
+templ Description(props ...DescriptionProps) {
+	{{ var p DescriptionProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<p
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="popover-description"
+		class={ utils.CN("text-muted-foreground", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</p>
+}

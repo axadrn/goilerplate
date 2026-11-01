@@ -1,0 +1,15 @@
+package layouts
+
+import (
+	dropdown "{{.ModulePath}}/internal/ui/components/dropdownmenu"
+	"{{.ModulePath}}/internal/ui/components/icon"
+)
+
+templ AppSidebarBillingLink(basePath string) {
+	@dropdown.Item(dropdown.ItemProps{Href: basePath + "/billing"}) {
+		<span class="flex items-center">
+			@icon.CreditCard(icon.Props{Class: "mr-2 size-4"})
+			Billing
+		</span>
+	}
+}

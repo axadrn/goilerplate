@@ -1,0 +1,34 @@
+package layouts
+
+import (
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/csrf"
+)
+
+templ AppSidebarLogout() {
+	<form
+		class="contents"
+		action="/auth/logout"
+		method="POST"
+		hx-post="/auth/logout"
+		hx-swap="none"
+		hx-disable="find button[type='submit']"
+	>
+		@csrf.Token()
+		@button.Button(button.Props{
+			Type:    button.TypeSubmit,
+			Variant: button.VariantGhost,
+			Size:    button.SizeSm,
+			Class:   "h-auto w-full justify-start gap-1.5 rounded-md px-1.5 py-1 font-normal",
+			Attributes: templ.Attributes{
+				"role": "menuitem",
+			},
+		}) {
+			<span class="flex items-center">
+				@icon.LogOut(icon.Props{Class: "mr-2 size-4"})
+				Log out
+			</span>
+		}
+	</form>
+}

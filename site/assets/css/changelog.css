@@ -1,0 +1,148 @@
+@layer components {
+  .changelog-typeset .typeset {
+    --typeset-size: 0.9375rem;
+    --typeset-leading: 1.7;
+    --typeset-flow: 1rem;
+  }
+
+  .changelog-typeset .typeset > h1:first-child,
+  .changelog-typeset .typeset > h1:first-child + p {
+    display: none;
+  }
+
+  .changelog-typeset .typeset > h2 {
+    margin-block-start: 6rem;
+    border-block-start: 1px solid var(--color-border);
+    padding-block-start: 3rem;
+    font-size: 2.25rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+
+  .changelog-typeset .typeset > h2:first-of-type {
+    margin-block-start: 0;
+    border-block-start: 0;
+    padding-block-start: 0;
+    font-size: clamp(2.35rem, 10.5vw, 3rem);
+    line-height: 0.98;
+  }
+
+  .changelog-typeset .typeset > h2:first-of-type::after {
+    display: inline-flex;
+    margin-inline-start: 0.55rem;
+    border: 1px solid color-mix(in oklab, var(--color-chart-1) 40%, transparent);
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--color-chart-1) 10%, transparent);
+    padding: 0.2rem 0.4rem;
+    color: var(--color-foreground);
+    content: "Latest";
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    vertical-align: middle;
+  }
+
+  .changelog-typeset .typeset > h2 + p {
+    margin-block-start: 0.9rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+
+  .changelog-typeset .typeset > h2 + p + h3 {
+    margin-block-start: 2.25rem;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+  }
+
+  .changelog-typeset .typeset > h3 {
+    margin-block-start: 2.75rem;
+    font-size: clamp(1.25rem, 3vw, 1.5rem);
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+  }
+
+  .changelog-typeset .typeset > :is(p, ul, ol) {
+    max-width: 44rem;
+  }
+
+  .changelog-typeset .typeset > p {
+    color: var(--color-muted-foreground);
+  }
+
+  .changelog-typeset .typeset > :is(ul, ol) > li {
+    padding-inline-start: 0.35rem;
+  }
+
+  .changelog-typeset .typeset > ul > li::marker {
+    color: var(--color-chart-1);
+  }
+
+  .changelog-typeset .typeset > hr {
+    display: none;
+  }
+
+  .changelog-typeset .typeset > details {
+    margin-block-start: 6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklab, var(--color-muted) 35%, transparent);
+    padding: 1.25rem 1.5rem;
+  }
+
+  .changelog-typeset .typeset > details > summary {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .changelog-typeset .typeset > details > :is(h3, p, ul) {
+    margin-inline-start: 0;
+  }
+
+  .changelog-typeset .typeset > details > h3 {
+    margin-block-start: 2rem;
+    border-block-start: 1px solid var(--color-border);
+    padding-block-start: 2rem;
+    font-size: 2.25rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+
+  .changelog-typeset .typeset > details > h3 + p {
+    margin-block-start: 0.9rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+
+  @media (min-width: 40rem) {
+    .changelog-typeset .typeset > h2:not(:first-of-type),
+    .changelog-typeset .typeset > details > h3 {
+      font-size: 3rem;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    .changelog-typeset .typeset > h2:first-of-type {
+      font-size: clamp(3rem, 4.4vw, 4rem);
+      line-height: 0.96;
+    }
+  }
+
+}

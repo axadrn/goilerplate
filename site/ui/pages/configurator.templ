@@ -1,0 +1,189 @@
+package pages
+
+import (
+	"github.com/axadrn/goilerplate/v4/generator"
+	"github.com/axadrn/goilerplate/v4/site/brand"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
+	"github.com/axadrn/goilerplate/v4/site/ui/layouts"
+)
+
+// Configurator is the stack builder: the form writes the goilerplate new
+// command for the chosen stack. assets/js/configurator.js keeps it current.
+templ Configurator() {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Stack builder",
+		Description: "Choose your goilerplate stack and copy one goilerplate new command.",
+		Path:        "/new",
+	}) {
+		<main>
+			<section class="pt-16 sm:pt-28">
+				<div class={ homeWrap }>
+					<h1 class={ homeDisplay, "text-[clamp(2.9rem,8.4vw,6.6rem)]" }>
+						<span class="block">Your stack.</span>
+						<span class="block">One command.</span>
+					</h1>
+					<p class="mt-7 max-w-[34rem] text-lg leading-8 text-muted-foreground sm:mt-9 sm:text-xl sm:leading-9">
+						Pick what your app needs. Copy the command. It runs on your machine, with no account.
+					</p>
+				</div>
+			</section>
+			<section id="configurator" class="pt-12 pb-32 sm:pt-16 sm:pb-44">
+				<div class={ homeWrap, "grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]" }>
+					<div class="grid min-w-0 gap-3">
+						@configuratorStep("1", "Install") {
+							@configuratorCode("configurator-install", brand.Install, "Copy the install command")
+							<p class="mt-4 text-[15px] leading-7 text-muted-foreground">Go 1.26 or newer, Git and Task, on macOS, Linux or WSL. <a href="/docs/installation" class="font-medium text-foreground underline underline-offset-4">Installation guide</a></p>
+						}
+						@configuratorStep("2", "Choose") {
+							<form id="configurator-form" class="grid gap-8" autocomplete="off">
+								<div class="grid gap-4 sm:grid-cols-2">
+									@configuratorInput("name", "Project name", "My App", "sm:col-span-2", false)
+									@configuratorInput("module", "Go module", "example.com/my-app", "", true)
+									@configuratorInput("destination", "New folder", "./my-app", "", true)
+								</div>
+								<div class="grid gap-4 border-t border-border pt-8">
+									<p class="text-[15px] font-semibold">Frontend and API</p>
+									@configuratorSelect("framework", "Frontend", []configuratorChoice{{string(generator.FrameworkHTMX), "htmx 4.0"}, {string(generator.FrameworkDatastar), "Datastar 1.0"}, {string(generator.FrameworkSvelte), "SvelteKit"}, {string(generator.FrameworkHeadless), "Headless"}})
+									<div class="grid gap-3 sm:grid-cols-2">
+										@configuratorToggle("api", "JSON API", "Endpoints under /api/v1 for mobile apps and integrations, on the same services as your web app.", false)
+										@configuratorToggle("mcp", "MCP server", "Lets your users connect Claude, ChatGPT or Cursor with a personal API token. Needs the JSON API.", false)
+									</div>
+									<p data-headless-note hidden class="text-[15px] leading-7 text-muted-foreground">Headless is the Go backend with the JSON API and no native frontend. It always includes the API. Blog and docs need a native frontend.</p>
+									<p data-svelte-note hidden class="text-[15px] leading-7 text-muted-foreground">SvelteKit is a static app in <code class="font-mono">web/</code> on the JSON API, embedded and served by the Go binary. It always includes the API. Blog and docs need a server rendered frontend.</p>
+								</div>
+								<div class="grid gap-4 border-t border-border pt-8">
+									<p class="text-[15px] font-semibold">Providers</p>
+									<div class="grid gap-4 sm:grid-cols-3">
+										@configuratorSelect("database", "Database", []configuratorChoice{{string(generator.DatabaseSQLite), "SQLite"}, {string(generator.DatabasePostgres), "PostgreSQL"}})
+										@configuratorSelect("payment", "Payments", []configuratorChoice{{string(generator.PaymentStripe), "Stripe"}, {string(generator.PaymentPolar), "Polar"}})
+										@configuratorSelect("mail", "Email", []configuratorChoice{{string(generator.MailSMTP), "SMTP"}, {string(generator.MailResend), "Resend"}})
+									</div>
+								</div>
+								<div class="grid gap-4 border-t border-border pt-8">
+									<p class="text-[15px] font-semibold">Modules</p>
+									<div class="grid gap-3 sm:grid-cols-2">
+										@configuratorToggle("workspaces", "Workspaces", "Shared workspaces with members, roles, invitations, seats and workspace billing.", false)
+										@configuratorToggle("storage", "File storage", "S3 compatible uploads with ownership and validation.", false)
+										@configuratorToggle("oauth-google", "Google sign in", "OAuth with Google.", true)
+										@configuratorToggle("oauth-github", "GitHub sign in", "OAuth with GitHub.", true)
+										@configuratorToggle("content-blog", "Blog", "Markdown posts, SEO, tags and newsletter capture.", false)
+										@configuratorToggle("content-docs", "Docs", "Markdown docs, navigation and syntax highlighting.", false)
+									</div>
+								</div>
+							</form>
+						}
+						@configuratorStep("3", "Run") {
+							<p class="text-[17px] leading-7 text-muted-foreground">Open the new folder. Copy <code class="font-mono text-foreground">.env.example</code> to <code class="font-mono text-foreground">.env</code>, fill in the settings of your providers, then run <code class="font-mono text-foreground">task dev</code>. Your coding agent reads <code class="font-mono text-foreground">AGENTS.md</code> first.</p>
+						}
+					</div>
+					<aside class="min-w-0">
+						<div class="grid gap-3 lg:sticky lg:top-28">
+							<div class="ops-term overflow-hidden rounded-[24px] bg-terminal text-terminal-foreground">
+								<div class="flex items-center justify-between gap-3 border-b border-terminal-foreground/10 px-5 py-3.5">
+									<span class="text-xs text-terminal-foreground/50">macOS · Linux · WSL</span>
+									<button type="button" id="configurator-copy" class="inline-flex size-8 cursor-pointer items-center justify-center rounded-full text-terminal-foreground/60 transition-colors hover:bg-terminal-foreground/10 hover:text-terminal-foreground" aria-label="Copy command">
+										<span data-copy-icon>
+											@icon.Copy(icon.Props{Class: "size-4"})
+										</span>
+										<span data-copy-check class="hidden">
+											@icon.Check(icon.Props{Class: "size-4"})
+										</span>
+									</button>
+								</div>
+								<div class="px-5 py-5">
+									<code id="configurator-command" class="block min-w-0 font-mono text-[13px] leading-6 break-words whitespace-pre-wrap sm:text-[14px]">goilerplate new --name 'My App' --module example.com/my-app --framework htmx --database sqlite --payment stripe --mail smtp --oauth google,github ./my-app</code>
+									<p id="configurator-copy-status" class="sr-only" aria-live="polite">Copy command</p>
+								</div>
+							</div>
+							<div class={ homeSurface, "p-6" }>
+								<p class="text-sm font-semibold text-muted-foreground">Your stack</p>
+								<div data-stack-preview class="mt-3 flex flex-wrap gap-1.5">
+									@stackChip("htmx 4.0")
+									@stackChip("SQLite")
+									@stackChip("SMTP")
+									@stackChip("Stripe")
+									@stackChip("Admin panel")
+									@stackChip("Google OAuth")
+									@stackChip("GitHub OAuth")
+								</div>
+								<div class="mt-6 border-t border-border pt-5 font-mono text-[12px] leading-5">
+									<p class="font-semibold">AGENTS.md</p>
+									<p class="text-muted-foreground">## Stack</p>
+									<p data-agents-preview class="text-muted-foreground">- templ, htmx 4.0, vanilla JavaScript, and Tailwind CSS.</p>
+								</div>
+							</div>
+						</div>
+					</aside>
+				</div>
+			</section>
+		</main>
+		<script src="/assets/js/configurator.js" defer></script>
+	}
+}
+
+templ configuratorStep(number, title string) {
+	<div class={ homeSurface, "min-w-0 p-7 sm:p-10" }>
+		<p class="flex items-baseline gap-4">
+			<span class="font-mono text-sm text-muted-foreground">{ number }</span>
+			<span class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ title }</span>
+		</p>
+		<div class="mt-6">
+			{ children... }
+		</div>
+	</div>
+}
+
+// configuratorCode is a command with a copy button, the ids the script uses.
+templ configuratorCode(id, command, label string) {
+	<div class="ops-term relative overflow-hidden rounded-[18px] bg-terminal text-terminal-foreground">
+		<button type="button" id={ id + "-copy" } class="absolute top-2.5 right-2.5 inline-flex size-8 cursor-pointer items-center justify-center rounded-full text-terminal-foreground/60 transition-colors hover:bg-terminal-foreground/10 hover:text-terminal-foreground" aria-label={ label }>
+			<span data-copy-icon>
+				@icon.Copy(icon.Props{Class: "size-4"})
+			</span>
+			<span data-copy-check class="hidden">
+				@icon.Check(icon.Props{Class: "size-4"})
+			</span>
+		</button>
+		<pre class="overflow-x-auto px-5 py-4 pr-14 font-mono text-[13px] leading-6 sm:text-[14px]"><code id={ id + "-command" }>{ command }</code></pre>
+		<p id={ id + "-copy-status" } class="sr-only" aria-live="polite">{ label }</p>
+	</div>
+}
+
+templ stackChip(label string) {
+	<span class="rounded-full bg-secondary px-3 py-1 font-mono text-[12px]">{ label }</span>
+}
+
+const configuratorControl = "h-11 w-full rounded-xl border border-input bg-background px-3.5 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+
+templ configuratorInput(name, label, value, class string, mono bool) {
+	<label class={ "grid gap-2", class }>
+		<span class="text-sm font-medium text-muted-foreground">{ label }</span>
+		<input id={ "configurator-" + name } name={ name } value={ value } required maxlength="240" spellcheck="false" class={ configuratorControl, templ.KV("font-mono", mono) }/>
+	</label>
+}
+
+type configuratorChoice struct {
+	Value string
+	Label string
+}
+
+templ configuratorSelect(name, label string, choices []configuratorChoice) {
+	<label class="grid gap-2">
+		<span class="text-sm font-medium text-muted-foreground">{ label }</span>
+		<select id={ "configurator-" + name } name={ name } class={ configuratorControl, "cursor-pointer" }>
+			for _, choice := range choices {
+				<option value={ choice.Value }>{ choice.Label }</option>
+			}
+		</select>
+	</label>
+}
+
+templ configuratorToggle(name, label, description string, checked bool) {
+	<label for={ "configurator-" + name } class="flex cursor-pointer items-start gap-3.5 rounded-[18px] bg-background p-4 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+		<input type="checkbox" id={ "configurator-" + name } name={ name } checked?={ checked } class="mt-1 size-4 shrink-0 cursor-pointer accent-foreground"/>
+		<span class="grid gap-1">
+			<span class="text-[15px] font-semibold">{ label }</span>
+			<span class="text-[14px] leading-6 text-muted-foreground">{ description }</span>
+		</span>
+	</label>
+}

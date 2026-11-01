@@ -1,0 +1,223 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/components/aspectratio"
+	"{{.ModulePath}}/internal/ui/components/badge"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/card"
+	"{{.ModulePath}}/internal/ui/components/empty"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/layouts"
+	"fmt"
+)
+
+templ BlogList(posts []*model.BlogPost, selectedTag ...string) {
+	{{ var tag string }}
+	if len(selectedTag) > 0 {
+		{{ tag = selectedTag[0] }}
+	}
+	{{ title := "Blog" }}
+	{{ description := fmt.Sprintf("Thoughts, tutorials, and updates from the %s team", brand.Name) }}
+	if tag != "" {
+		{{ title = fmt.Sprintf("Posts tagged with %s", tag) }}
+		{{ description = fmt.Sprintf("Blog posts tagged with %s", tag) }}
+	}
+	@layouts.Home(layouts.SEOProps{
+		Title:       title,
+		Description: description,
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		<div class="min-h-screen">
+			// Blog Header
+			<div class="border-b bg-muted/30">
+				<div class="container mx-auto px-4 py-16">
+					<h1 class="text-4xl font-bold mb-4">Blog</h1>
+					if tag != "" {
+						<div class="flex items-center gap-3 mb-4">
+							<p class="text-lg text-muted-foreground">
+								Posts tagged with:
+							</p>
+							@badge.Badge(badge.Props{
+								Variant: badge.VariantSecondary,
+							}) {
+								{ tag }
+							}
+						</div>
+						<a href="/blog" class="text-primary hover:underline">
+							← Show all posts
+						</a>
+					} else {
+						<p class="text-xl text-muted-foreground">
+							{ fmt.Sprintf("Thoughts, tutorials, and updates from the %s team", brand.Name) }
+						</p>
+					}
+				</div>
+			</div>
+			// Blog Posts
+			<main class="container mx-auto px-4 py-12">
+				if len(posts) == 0 {
+					@empty.Empty(empty.Props{Class: "py-16"}) {
+						@empty.Header() {
+							@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+								@icon.Newspaper()
+							}
+							if tag != "" {
+								@empty.Title() {
+									No posts found 
+								}
+								@empty.Description() {
+									No posts match the tag "{ tag }". 
+								}
+							} else {
+								@empty.Title() {
+									No blog posts yet 
+								}
+								@empty.Description() {
+									Check back soon for new articles and updates. 
+								}
+							}
+						}
+						if tag != "" {
+							@empty.Content() {
+								@button.Button(button.Props{Href: "/blog", Variant: button.VariantOutline}) {
+									View all posts 
+								}
+							}
+						}
+					}
+				} else {
+					<div class="space-y-12">
+						// Featured post (first post with hero image, but not on tag pages)
+						if tag == "" && posts[0].HeroImage != "" {
+							@card.Card(card.Props{Class: "overflow-hidden"}) {
+								<div class="flex flex-col lg:flex-row">
+									<div class="lg:w-1/2">
+										@aspectratio.AspectRatio(aspectratio.Props{
+											Ratio: "16/9",
+											Class: "lg:h-full",
+										}) {
+											<img
+												src={ posts[0].HeroImage }
+												alt={ posts[0].Title }
+												class="w-full h-full object-cover transition-transform duration-300"
+											/>
+										}
+									</div>
+									<div class="flex flex-col justify-between p-8 lg:w-1/2">
+										<div>
+											<h2 class="text-2xl font-bold mb-3">
+												<a href={ templ.SafeURL(fmt.Sprintf("/blog/%s", posts[0].Slug)) } class="hover:underline">
+													{ posts[0].Title }
+												</a>
+											</h2>
+											<div class="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+												<time datetime={ posts[0].Date.Format("2006-01-02") }>
+													{ posts[0].Date.Format("January 2, 2006") }
+												</time>
+												if posts[0].Author != "" {
+													<span>•</span>
+													<span>{ posts[0].Author }</span>
+												}
+												if posts[0].ReadTime > 0 {
+													<span>•</span>
+													<span>{ fmt.Sprintf("%d min read", posts[0].ReadTime) }</span>
+												}
+											</div>
+											<p class="text-muted-foreground mb-4 line-clamp-3">
+												{ posts[0].Description }
+											</p>
+											if len(posts[0].Tags) > 0 {
+												<div class="flex flex-wrap gap-2 mb-4">
+													for _, tag := range posts[0].Tags {
+														<a href={ templ.SafeURL(fmt.Sprintf("/blog/tag/%s", tag)) }>
+															@badge.Badge(badge.Props{
+																Variant: badge.VariantSecondary,
+															}) {
+																{ tag }
+															}
+														</a>
+													}
+												</div>
+											}
+										</div>
+										<div>
+											@button.Button(button.Props{
+												Href:    fmt.Sprintf("/blog/%s", posts[0].Slug),
+												Variant: button.VariantDefault,
+											}) {
+												Read article →
+											}
+										</div>
+									</div>
+								</div>
+							}
+						}
+						// Regular posts grid
+						{{ startIndex := 0 }}
+						if tag == "" && posts[0].HeroImage != "" {
+							{{ startIndex = 1 }}
+						}
+						if len(posts) > startIndex {
+							<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+								for i := startIndex; i < len(posts); i++ {
+									{{ post := posts[i] }}
+									@card.Card(card.Props{Class: "flex flex-col h-full"}) {
+										@card.Header() {
+											@card.Title() {
+												<a href={ templ.SafeURL(fmt.Sprintf("/blog/%s", post.Slug)) } class="hover:underline">
+													{ post.Title }
+												</a>
+											}
+											@card.Description() {
+												<div class="flex items-center gap-2 text-sm text-muted-foreground">
+													<time datetime={ post.Date.Format("2006-01-02") }>
+														{ post.Date.Format("Jan 2, 2006") }
+													</time>
+													if post.ReadTime > 0 {
+														<span>•</span>
+														<span>{ fmt.Sprintf("%d min", post.ReadTime) }</span>
+													}
+												</div>
+											}
+										}
+										@card.Content(card.ContentProps{Class: "flex-grow"}) {
+											<p class="text-muted-foreground line-clamp-2">
+												{ post.Description }
+											</p>
+											if len(post.Tags) > 0 {
+												<div class="flex flex-wrap gap-2 mt-3">
+													for _, tag := range post.Tags {
+														<a href={ templ.SafeURL(fmt.Sprintf("/blog/tag/%s", tag)) }>
+															@badge.Badge(badge.Props{
+																Variant: badge.VariantSecondary,
+																Class:   "text-xs",
+															}) {
+																{ tag }
+															}
+														</a>
+													}
+												</div>
+											}
+										}
+										@card.Footer() {
+											@button.Button(button.Props{
+												Href:    fmt.Sprintf("/blog/%s", post.Slug),
+												Variant: button.VariantLink,
+												Class:   "px-0",
+											}) {
+												Read more →
+											}
+										}
+									}
+								}
+							</div>
+						}
+					</div>
+				}
+			</main>
+		</div>
+	}
+}

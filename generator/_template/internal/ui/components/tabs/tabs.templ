@@ -1,0 +1,286 @@
+package tabs
+
+import (
+	"context"
+	"strconv"
+
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+type Orientation string
+
+const (
+	OrientationHorizontal Orientation = "horizontal"
+	OrientationVertical   Orientation = "vertical"
+)
+
+type Props struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	// Orientation of the tabs. Defaults to horizontal.
+	Orientation Orientation
+	// Value is the controlled active tab. Use DefaultValue when the browser
+	// should own the active tab after the initial render.
+	Value *string
+	// DefaultValue is the value of the initially active tab.
+	DefaultValue string
+}
+
+type ctxState struct {
+	id          string
+	value       string
+	orientation Orientation
+	// nextPanel counts the panels for their index.
+	nextPanel *int
+}
+
+type ctxKey string
+
+const stateKey ctxKey = "tabsState"
+
+func initialValue(p Props) string {
+	if p.Value != nil {
+		return *p.Value
+	}
+	return p.DefaultValue
+}
+
+func state(ctx context.Context) ctxState {
+	if s, ok := ctx.Value(stateKey).(ctxState); ok {
+		return s
+	}
+	return ctxState{}
+}
+
+type Variant string
+
+const (
+	VariantDefault Variant = "default"
+	VariantLine    Variant = "line"
+)
+
+type ListProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	// Variant of the list. Options: 'default' (filled), 'line' (underline).
+	Variant Variant
+	// ActivateOnFocus selects a tab as soon as the arrow keys move to it,
+	// the pendant of Base UI's TabsList activateOnFocus. Off by default like
+	// Base UI: with it on, a panel that fetches its content on activation
+	// would fire a request per keystroke.
+	ActivateOnFocus bool
+}
+
+type TriggerProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	Value      string
+	Disabled   bool
+}
+
+type ContentProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	Value      string
+}
+
+templ Tabs(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	{{ tabsID := p.ID }}
+	if tabsID == "" {
+		{{ tabsID = utils.RandomID() }}
+	}
+	if p.Orientation == "" {
+		{{ p.Orientation = OrientationHorizontal }}
+	}
+	{{ value := initialValue(p) }}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		class={ utils.CN("gap-2 group/tabs flex data-horizontal:flex-col", p.Class) }
+		data-slot="tabs"
+		{ utils.DirectionAttributes(ctx)... }
+		data-orientation={ string(p.Orientation) }
+		data-activation-direction="none"
+		if p.Value != nil {
+			data-templ-value={ *p.Value }
+		}
+		{ p.Attributes... }
+	>
+		{{ ctx = context.WithValue(ctx, stateKey, ctxState{id: tabsID, value: value, orientation: p.Orientation, nextPanel: new(int)}) }}
+		{ children... }
+	</div>
+}
+
+// List is Base UI's Tabs.List: the tablist role and aria-orientation, so the
+// arrow keys tabs.js binds are announced as available. The arrows move focus
+// and Enter or Space activates, unless ActivateOnFocus is set.
+templ List(props ...ListProps) {
+	{{ var p ListProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+		<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		role="tablist"
+		if orientation(ctx) == OrientationVertical {
+			aria-orientation="vertical"
+		}
+		data-slot="tabs-list"
+		data-orientation={ string(orientation(ctx)) }
+		data-activation-direction="none"
+		data-templ-activate-on-focus?={ p.ActivateOnFocus }
+		class={
+			utils.CN(
+				"rounded-lg p-[3px] group-data-horizontal/tabs:h-8 data-[variant=line]:rounded-none group/tabs-list inline-flex w-fit items-center justify-center text-muted-foreground group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col",
+				listVariantClasses(p.Variant),
+				p.Class,
+			),
+		}
+		data-variant={ string(listVariant(p.Variant)) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+// Trigger is Base UI's Tabs.Tab: the tab role, aria-selected, the panel it
+// controls and the roving tabindex that makes the list a single tab stop.
+templ Trigger(props ...TriggerProps) {
+	{{ var p TriggerProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	{{ tabsID := IDFromContext(ctx) }}
+	if p.Value == "" {
+		<span class="text-xs text-destructive">Error: Tab Trigger missing required 'Value' attribute.</span>
+	}
+	if p.ID == "" {
+		{{ p.ID = triggerID(tabsID, p.Value) }}
+	}
+	{{ active := tabsIsActive(ctx, p.Value) }}
+	<button
+		id={ p.ID }
+		type="button"
+		role="tab"
+		aria-selected={ utils.IfElse(active, "true", "false") }
+		if active {
+			aria-controls={ contentID(tabsID, p.Value) }
+		}
+		tabindex={ utils.IfElse(active, "0", "-1") }
+		aria-disabled={ utils.IfElse(p.Disabled, "true", "false") }
+		class={
+			utils.CN(
+				"gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium group-data-[variant=default]/tabs-list:data-active:shadow-sm group-data-[variant=line]/tabs-list:data-active:shadow-none [&_svg:not([class*='size-'])]:size-4 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
+				"group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
+				"data-active:bg-background data-active:text-foreground dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground",
+				"after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:bottom-[-5px] group-data-horizontal/tabs:after:h-0.5 group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-active:after:opacity-100",
+				p.Class,
+			),
+		}
+		data-slot="tabs-trigger"
+		data-templ-value={ p.Value }
+		data-orientation={ string(orientation(ctx)) }
+		data-activation-direction="none"
+		data-active?={ active }
+		data-composite-item-active?={ active }
+		data-disabled?={ p.Disabled }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</button>
+}
+
+// Content is Base UI's Tabs.Panel: the tabpanel role labelled by its tab, and
+// tabindex="0" on the active panel so its content is still reachable.
+templ Content(props ...ContentProps) {
+	{{ var p ContentProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	{{ tabsID := IDFromContext(ctx) }}
+	if p.Value == "" {
+		<span class="text-xs text-destructive">Error: Tab Content missing required 'Value' attribute.</span>
+		return templ.NopComponent
+	}
+	if p.ID == "" {
+		{{ p.ID = contentID(tabsID, p.Value) }}
+	}
+	{{ index := *state(ctx).nextPanel }}
+	{{ *state(ctx).nextPanel++ }}
+	<div
+		id={ p.ID }
+		role="tabpanel"
+		aria-labelledby={ triggerID(tabsID, p.Value) }
+		tabindex={ utils.IfElse(tabsIsActive(ctx, p.Value), "0", "-1") }
+		class={
+			utils.CN(
+				"text-sm flex-1 outline-none",
+				map[string]bool{"hidden": !tabsIsActive(ctx, p.Value)},
+				p.Class,
+			),
+		}
+		data-slot="tabs-content"
+		data-templ-value={ p.Value }
+		data-orientation={ string(orientation(ctx)) }
+		data-activation-direction="none"
+		data-index={ strconv.Itoa(index) }
+		data-hidden?={ !tabsIsActive(ctx, p.Value) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+// tabsIsActive reports whether value is the root's initial active value.
+func tabsIsActive(ctx context.Context, value string) bool {
+	s := state(ctx)
+	return s.value != "" && s.value == value
+}
+
+func IDFromContext(ctx context.Context) string {
+	return state(ctx).id
+}
+
+// orientation is Base UI's orientation of the tabs: shadcn's Tabs renders its
+// orientation prop as the root's data-orientation for the styles but does not
+// pass it on to TabsPrimitive.Root, so list, tabs and panels, the list's
+// aria-orientation and the arrow keys stay horizontal, like upstream's.
+func orientation(ctx context.Context) Orientation {
+	return OrientationHorizontal
+}
+
+// triggerID and contentID derive the aria-controls / aria-labelledby pair from
+// the tabs id and the tab's value, so a trigger and its panel resolve each
+// other without sharing state — an htmx swap of one half keeps the pairing.
+func triggerID(tabsID, value string) string {
+	return tabsID + "-tab-" + value
+}
+
+func contentID(tabsID, value string) string {
+	return tabsID + "-panel-" + value
+}
+
+func listVariant(v Variant) Variant {
+	if v == "" {
+		return VariantDefault
+	}
+	return v
+}
+
+func listVariantClasses(v Variant) string {
+	if listVariant(v) == VariantLine {
+		return "gap-1 bg-transparent"
+	}
+	return "bg-muted"
+}

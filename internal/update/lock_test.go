@@ -39,7 +39,7 @@ func TestReadLock(t *testing.T) {
 	}
 }
 
-func TestReadLockAcceptsLegacyFreeEdition(t *testing.T) {
+func TestReadLockDropsTheLegacyEdition(t *testing.T) {
 	root := t.TempDir()
 	content := `{"schema_version":1,"template_version":"v3.0.0","config":{"edition":"free","framework":"htmx","database":"sqlite","payment":"none","mail":"smtp"}}`
 	err := os.WriteFile(filepath.Join(root, "goilerplate.lock"), []byte(content), 0o644)
@@ -50,7 +50,7 @@ func TestReadLockAcceptsLegacyFreeEdition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lock.Config.Edition != "free" || lock.Config.Framework != "htmx" {
+	if lock.Config.Framework != "htmx" || lock.TemplateVersion != "v3.0.0" {
 		t.Fatalf("lock = %#v", lock)
 	}
 }

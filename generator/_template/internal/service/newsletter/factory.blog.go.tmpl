@@ -1,0 +1,12 @@
+package newsletter
+
+import "{{.ModulePath}}/internal/config"
+
+func NewProvider(cfg *config.Config, repository LocalRepository) (Subscriber, error) {
+{{- if eq .Mail "resend" }}
+	if cfg.ResendAudienceID != "" {
+		return NewResendSubscriber(cfg.ResendAPIKey, cfg.ResendAudienceID), nil
+	}
+{{- end }}
+	return NewLocalSubscriber(repository), nil
+}

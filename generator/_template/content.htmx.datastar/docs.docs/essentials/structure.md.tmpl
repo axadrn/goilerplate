@@ -1,0 +1,32 @@
+---
+title: "Documentation Structure"
+description: "Organize pages into predictable sections"
+order: 1
+---
+
+## Pages and sections
+
+Every Markdown file in `content/docs` becomes a page. A folder creates a section in the sidebar.
+
+```text
+content/docs/
+├── introduction.md
+├── getting-started.md
+└── guides/
+    ├── _index.md
+    └── workflow.md
+```
+
+Use `_index.md` to name and order a section. Its frontmatter follows the same shape as a regular page:
+
+```md
+---
+title: "Guides"
+description: "Complete workflows for common jobs"
+order: 4
+---
+```
+
+## Keep the hierarchy shallow
+
+Two levels are enough for most product documentation. Add a nested group only when several pages share a clear purpose.

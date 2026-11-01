@@ -1,0 +1,326 @@
+package api_test
+
+import (
+	"fmt"
+	"net/http"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+
+	"{{.ModulePath}}/internal/api"
+	"{{.ModulePath}}/internal/testutil"
+)
+
+var rawAPITokenPattern = regexp.MustCompile(`^pat_[a-z2-7]{52}$`)
+
+// tokenOwner is a signed-in user who manages personal API tokens.
+type tokenOwner struct {
+	id      string
+	session string
+{{- if .Workspaces }}
+	workspaceID   string
+	workspaceSlug string
+{{- end }}
+}
+
+func seedTokenOwner(t *testing.T, environment *apiEnvironment, id string) tokenOwner {
+	t.Helper()
+	fixture := testutil.SeedUser(t, environment.database, testutil.UserOptions{
+		ID:       id,
+		Email:    id + "@example.com",
+		Name:     strings.ToUpper(id[:1]) + id[1:],
+		Password: testPassword,
+		Verified: true,
+	})
+	return tokenOwner{
+		id:      fixture.User.ID,
+		session: environment.signIn(t, fixture.User.ID),
+{{- if .Workspaces }}
+		workspaceID:   fixture.Workspace.ID,
+		workspaceSlug: fixture.Workspace.Slug,
+{{- end }}
+	}
+}
+
+// tokenBody builds a create request for the owner's workspace, if any.
+func tokenBody(owner tokenOwner, fields string) string {
+{{- if .Workspaces }}
+	if fields == "" {
+		return fmt.Sprintf(`{"workspace_id":%q}`, owner.workspaceID)
+	}
+	return fmt.Sprintf(`{"workspace_id":%q,%s}`, owner.workspaceID, fields)
+{{- else }}
+	_ = owner
+	return "{" + fields + "}"
+{{- end }}
+}
+
+func createAPIToken(t *testing.T, environment *apiEnvironment, owner tokenOwner, fields string) api.CreatedAPIToken {
+	t.Helper()
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: tokenBody(owner, fields), bearer: owner.session})
+	expectStatus(t, recorder, http.StatusCreated)
+	return decodeBody[api.CreatedAPIToken](t, recorder)
+}
+
+func TestCreateAPITokenRevealsItOnce(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "maker")
+
+	created := createAPIToken(t, environment, owner, `"name":"Claude Desktop","scopes":["read","write"],"expires_in_days":30`)
+	if !rawAPITokenPattern.MatchString(created.Token) {
+		t.Fatalf("token = %q", created.Token)
+	}
+	token := created.APIToken
+	if token.Name != "Claude Desktop" || token.Prefix != created.Token[4:12] || strings.Join(token.Scopes, ",") != "read,write" || token.Expired || token.LastUsedAt != nil {
+		t.Fatalf("api token = %#v", token)
+	}
+	if token.ExpiresAt == nil || token.ExpiresAt.Sub(token.CreatedAt) != 30*24*time.Hour {
+		t.Fatalf("expires_at = %v, created_at = %v", token.ExpiresAt, token.CreatedAt)
+	}
+{{- if .Workspaces }}
+	if token.WorkspaceID != owner.workspaceID {
+		t.Fatalf("workspace_id = %q, want %q", token.WorkspaceID, owner.workspaceID)
+	}
+{{- end }}
+
+	readOnly := createAPIToken(t, environment, owner, `"name":"Export"`)
+	if strings.Join(readOnly.APIToken.Scopes, ",") != "read" || readOnly.APIToken.ExpiresAt != nil {
+		t.Fatalf("default token = %#v", readOnly.APIToken)
+	}
+
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", bearer: owner.session})
+	expectStatus(t, recorder, http.StatusOK)
+	for _, hidden := range []string{created.Token, created.Token[4:], readOnly.Token, "token_hash", "hash"} {
+		if strings.Contains(recorder.Body.String(), hidden) {
+			t.Fatalf("token list exposes %q: %s", hidden, recorder.Body.String())
+		}
+	}
+	list := decodeBody[api.APITokenList](t, recorder)
+	if len(list.Items) != 2 || list.Items[0].ID != readOnly.APIToken.ID || list.Items[1].ID != token.ID {
+		t.Fatalf("items = %#v", list.Items)
+	}
+}
+
+func TestCreateAPITokenValidates(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "checker")
+	for _, test := range []struct {
+		body  string
+		field string
+	}{
+		{body: tokenBody(owner, `"name":"  "`), field: "name"},
+		{body: tokenBody(owner, `"name":"`+strings.Repeat("n", 65)+`"`), field: "name"},
+		{body: tokenBody(owner, `"name":"CI","scopes":["admin"]`), field: "scopes"},
+		{body: tokenBody(owner, `"name":"CI","expires_in_days":0`), field: "expires_in_days"},
+		{body: tokenBody(owner, `"name":"CI","expires_in_days":366`), field: "expires_in_days"},
+{{- if .Workspaces }}
+		{body: `{"name":"CI"}`, field: "workspace_id"},
+		{body: `{"name":"CI","workspace_id":"someone-else"}`, field: "workspace_id"},
+{{- end }}
+	} {
+		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: test.body, bearer: owner.session})
+		detail := expectError(t, recorder, http.StatusUnprocessableEntity, "validation_failed")
+		if detail.Fields[test.field] == "" {
+			t.Fatalf("%s: fields = %#v", test.body, detail.Fields)
+		}
+	}
+	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: `{"name":"CI","owner":"x"}`, bearer: owner.session}), http.StatusBadRequest, "invalid_body")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens"}), http.StatusUnauthorized, "unauthenticated")
+}
+
+func TestAPITokenLimit(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "collector")
+	for index := range 50 {
+		createAPIToken(t, environment, owner, fmt.Sprintf(`"name":"Token %d"`, index))
+	}
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: tokenBody(owner, `"name":"One more"`), bearer: owner.session})
+	expectError(t, recorder, http.StatusConflict, "token_limit")
+}
+
+func TestAPITokenAuthenticatesAndRecordsUse(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "caller")
+	created := createAPIToken(t, environment, owner, `"name":"Script"`)
+
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token})
+	expectStatus(t, recorder, http.StatusOK)
+	if !strings.Contains(recorder.Body.String(), `"id":"`+owner.id+`"`) {
+		t.Fatalf("account = %s", recorder.Body.String())
+	}
+	list := decodeBody[api.APITokenList](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", bearer: owner.session}))
+	if list.Items[0].LastUsedAt == nil {
+		t.Fatalf("last_used_at was not recorded: %#v", list.Items[0])
+	}
+
+	for _, bogus := range []string{"pat_", "pat_" + strings.Repeat("a", 52), created.Token + "x"} {
+		expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: bogus}), http.StatusUnauthorized, "unauthenticated")
+	}
+}
+
+func TestExpiredAPITokenIsUnauthenticated(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "late")
+	created := createAPIToken(t, environment, owner, `"name":"Short","expires_in_days":1`)
+	_, err := environment.database.Exec(`UPDATE api_tokens SET expires_at = $1 WHERE id = $2`, time.Now().Add(-time.Minute).UTC(), created.APIToken.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token}), http.StatusUnauthorized, "unauthenticated")
+	list := decodeBody[api.APITokenList](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", bearer: owner.session}))
+	if len(list.Items) != 1 || !list.Items[0].Expired {
+		t.Fatalf("items = %#v", list.Items)
+	}
+}
+
+func TestRevokeAPIToken(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "owner")
+	other := seedTokenOwner(t, environment, "other")
+	created := createAPIToken(t, environment, owner, `"name":"Old"`)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token}), http.StatusOK)
+
+	foreign := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID, bearer: other.session})
+	expectError(t, foreign, http.StatusNotFound, "not_found")
+
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID, bearer: owner.session}), http.StatusNoContent)
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token}), http.StatusUnauthorized, "unauthenticated")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID, bearer: owner.session}), http.StatusNotFound, "not_found")
+}
+
+func TestReadTokenCannotWrite(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "reader")
+	read := createAPIToken(t, environment, owner, `"name":"Reader"`)
+	write := createAPIToken(t, environment, owner, `"name":"Writer","scopes":["write"]`)
+
+	rename := apiRequest{method: http.MethodPatch, path: "/api/v1/account/name", body: `{"name":"Renamed"}`}
+	rename.bearer = read.Token
+	expectError(t, environment.send(t, rename), http.StatusForbidden, "insufficient_scope")
+	rename.bearer = write.Token
+	expectStatus(t, environment.send(t, rename), http.StatusOK)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: read.Token}), http.StatusOK)
+}
+
+func TestTokensCannotReachSessionOnlyRoutes(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "agent")
+	created := createAPIToken(t, environment, owner, `"name":"Agent","scopes":["read","write"]`)
+	denied := []apiRequest{
+		{method: http.MethodGet, path: "/api/v1/account/tokens"},
+		{method: http.MethodPost, path: "/api/v1/account/tokens", body: tokenBody(owner, `"name":"Child"`)},
+		{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID},
+		{method: http.MethodGet, path: "/api/v1/account/sessions"},
+		{method: http.MethodDelete, path: "/api/v1/account/sessions"},
+		{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"new@example.com"}`},
+		{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"another long password"}`},
+		{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"agent@example.com"}`},
+		{method: http.MethodPost, path: "/api/v1/auth/logout"},
+		{method: http.MethodPost, path: "/api/v1/auth/password", body: `{"email":"agent@example.com","password":"` + testPassword + `"}`},
+{{- if .Workspaces }}
+		{method: http.MethodPost, path: "/api/v1/workspaces", body: `{"name":"Side project"}`},
+		{method: http.MethodDelete, path: "/api/v1/workspaces/" + owner.workspaceSlug},
+		{method: http.MethodPost, path: "/api/v1/workspaces/" + owner.workspaceSlug + "/leave"},
+		{method: http.MethodPost, path: "/api/v1/workspaces/" + owner.workspaceSlug + "/billing/checkout", body: `{"plan_id":"pro"}`},
+		{method: http.MethodGet, path: "/api/v1/workspaces/" + owner.workspaceSlug + "/billing/manage"},
+{{- else }}
+		{method: http.MethodPost, path: "/api/v1/billing/checkout", body: `{"plan_id":"pro"}`},
+		{method: http.MethodGet, path: "/api/v1/billing/portal"},
+{{- end }}
+		{method: http.MethodGet, path: "/api/v1/admin/users"},
+		{method: http.MethodPost, path: "/api/v1/admin/users/" + owner.id + "/sessions/revoke"},
+	}
+	for _, request := range denied {
+		request.bearer = created.Token
+		recorder := environment.send(t, request)
+		if recorder.Code != http.StatusForbidden || !strings.Contains(recorder.Body.String(), `"code":"forbidden"`) {
+			t.Fatalf("%s %s: status %d, body %s", request.method, request.path, recorder.Code, recorder.Body.String())
+		}
+	}
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token}), http.StatusOK)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", bearer: owner.session}), http.StatusOK)
+}
+
+func TestAdminTokenCannotReachAdminRoutes(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	operator := tokenOwner{id: seedOperator(t, environment)}
+	operator.session = environment.signIn(t, operator.id)
+{{- if .Workspaces }}
+	memberships, err := environment.workspaces.ListForUser(operator.id)
+	if err != nil || len(memberships) == 0 {
+		t.Fatalf("operator workspaces = %v, %v", memberships, err)
+	}
+	operator.workspaceID = memberships[0].ID
+{{- end }}
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", bearer: operator.session}), http.StatusOK)
+	created := createAPIToken(t, environment, operator, `"name":"Ops","scopes":["write"]`)
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", bearer: created.Token}), http.StatusForbidden, "forbidden")
+}
+{{- if .Workspaces }}
+
+// TestAPITokensNeverManageMembers keeps role changes and member removal
+// session only. A write token of the owner is refused, the owner's session
+// still works.
+func TestAPITokensNeverManageMembers(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	seeded := seedTeam(t, environment)
+	owner := tokenOwner{id: "owner", session: seeded.owner, workspaceID: seeded.workspace.ID, workspaceSlug: seeded.workspace.Slug}
+	created := createAPIToken(t, environment, owner, `"name":"Agent","scopes":["read","write"]`)
+	role := apiRequest{method: http.MethodPatch, path: seeded.path("/members/member-member/role"), body: `{"role":"admin"}`}
+	removal := apiRequest{method: http.MethodDelete, path: seeded.path("/members/member-member")}
+	for _, request := range []apiRequest{role, removal} {
+		request.bearer = created.Token
+		expectError(t, environment.send(t, request), http.StatusForbidden, "forbidden")
+	}
+
+	role.bearer = seeded.owner
+	expectStatus(t, environment.send(t, role), http.StatusOK)
+	removal.bearer = seeded.owner
+	expectStatus(t, environment.send(t, removal), http.StatusNoContent)
+}
+
+func TestAPITokenIsBoundToOneWorkspace(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "binder")
+	second, err := environment.workspaces.Create(owner.id, "Second Workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	created := createAPIToken(t, environment, owner, `"name":"Bound","scopes":["write"]`)
+
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/" + owner.workspaceSlug, bearer: created.Token}), http.StatusOK)
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/" + second.Slug, bearer: created.Token}), http.StatusNotFound, "not_found")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/workspaces/" + second.Slug + "/name", body: `{"name":"Taken over"}`, bearer: created.Token}), http.StatusNotFound, "not_found")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/" + second.Slug + "/activity", bearer: created.Token}), http.StatusNotFound, "not_found")
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/" + second.Slug, bearer: owner.session}), http.StatusOK)
+
+	list := decodeBody[struct {
+		Items []api.Membership `json:"items"`
+	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", bearer: created.Token}))
+	if len(list.Items) != 1 || list.Items[0].Workspace.ID != owner.workspaceID {
+		t.Fatalf("token workspaces = %#v", list.Items)
+	}
+	all := decodeBody[struct {
+		Items []api.Membership `json:"items"`
+	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", bearer: owner.session}))
+	if len(all.Items) != 2 {
+		t.Fatalf("session workspaces = %#v", all.Items)
+	}
+	account := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token})
+	expectStatus(t, account, http.StatusOK)
+	if strings.Contains(account.Body.String(), second.ID) {
+		t.Fatalf("account shows the other workspace to the token: %s", account.Body.String())
+	}
+
+	rename := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/workspaces/" + owner.workspaceSlug + "/name", body: `{"name":"Renamed by token"}`, bearer: created.Token})
+	expectStatus(t, rename, http.StatusOK)
+
+	_, err = environment.database.Exec(`DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`, owner.workspaceID, owner.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/" + owner.workspaceSlug, bearer: created.Token}), http.StatusNotFound, "not_found")
+}
+{{- end }}

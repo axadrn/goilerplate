@@ -1,0 +1,57 @@
+package db
+
+import (
+	"fmt"
+	"log/slog"
+{{- if eq .Database "sqlite" }}
+	"os"
+	"path/filepath"
+{{- end }}
+	"time"
+
+{{- if eq .Database "postgres" }}
+	_ "github.com/jackc/pgx/v5/stdlib"
+{{- else }}
+	_ "modernc.org/sqlite"
+{{- end }}
+	"github.com/jmoiron/sqlx"
+)
+
+const (
+{{- if eq .Database "postgres" }}
+	databaseDriver  = "pgx"
+	databaseDialect = "postgres"
+{{- else }}
+	databaseDriver  = "sqlite"
+	databaseDialect = "sqlite3"
+{{- end }}
+)
+
+func Init(connection string) (*sqlx.DB, error) {
+{{- if eq .Database "sqlite" }}
+	dir := filepath.Dir(connection)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create data directory: %w", err)
+	}
+{{- end }}
+	database, err := sqlx.Connect(databaseDriver, connection)
+	if err != nil {
+		return nil, fmt.Errorf("connect to database: %w", err)
+	}
+	database.SetMaxOpenConns(25)
+	database.SetMaxIdleConns(5)
+	database.SetConnMaxLifetime(5 * time.Minute)
+	if err := database.Ping(); err != nil {
+		_ = database.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+	slog.Info("database connected", "driver", databaseDriver)
+	return database, nil
+}
+
+func Close(database *sqlx.DB) error {
+	if database != nil {
+		return database.Close()
+	}
+	return nil
+}

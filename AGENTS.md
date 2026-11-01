@@ -2,19 +2,20 @@
 
 ## Scope
 
-This repository contains the public goilerplate CLI and the shared API contract. It never contains the private project template.
+This repository is goilerplate, free and open source: the CLI, the generator with its template, and the website. Everything runs on the user's machine. There is no goilerplate server, account or license.
 
 ## Brand
 
 - Always write the product name as `goilerplate` in lowercase, including at the start of sentences and headings.
-- Keep technical identifiers such as `X-Goilerplate-Version` unchanged.
+- Keep technical identifiers unchanged.
 
 ## Engineering
 
 - Prefer the Go standard library.
 - Keep packages small and concrete. Add interfaces only at real I/O boundaries used by tests.
-- Keep request and response types in `api`. The private service imports this package, never the reverse.
-- Never log or persist GitHub OAuth tokens. Store only goilerplate session tokens, with file mode `0600` inside a `0700` configuration directory where Unix permissions apply.
+- `generator` owns the template, the configuration and `goilerplate.lock`. The CLI uses its types directly.
+- The CLI makes no network call except `changelog` (GitHub releases) and `update`, which downloads a released template from the Go module proxy. No telemetry.
+- Nothing private enters this repository: no secrets, no customer data, no server names or internal plans.
 - Run `go test -race ./...`, `go vet ./...`, `go build ./...`, and `go mod tidy -diff` before pushing.
 
 ## Git

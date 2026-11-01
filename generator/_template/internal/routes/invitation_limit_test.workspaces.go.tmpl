@@ -1,0 +1,31 @@
+package routes
+
+import (
+	"os"
+	"strings"
+	"testing"
+)
+
+// TestInvitationsShareOneLimiter keeps one invitation budget for every way to
+// invite. A limiter per surface would let a manager send the whole budget
+// once per surface.
+func TestInvitationsShareOneLimiter(t *testing.T) {
+	source, err := os.ReadFile("routes.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := strings.Count(string(source), "NewWorkspaceInvitationLimiter()")
+	if count != 1 {
+		t.Fatalf("routes.go creates %d invitation limiters, want 1", count)
+	}
+	for _, use := range []string{
+		"RateLimitWorkspaceInvitations(invitationLimiter)",
+{{- if .MCP }}
+		"Invitations:   invitationLimiter,",
+{{- end }}
+	} {
+		if !strings.Contains(string(source), use) {
+			t.Fatalf("routes.go does not pass the shared limiter: %s", use)
+		}
+	}
+}

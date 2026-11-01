@@ -1,0 +1,247 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/components/badge"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/card"
+	"{{.ModulePath}}/internal/ui/components/empty"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/inputgroup"
+	"{{.ModulePath}}/internal/ui/components/item"
+	"{{.ModulePath}}/internal/ui/components/pagination"
+	"{{.ModulePath}}/internal/ui/components/table"
+	"{{.ModulePath}}/internal/ui/csrf"
+	"{{.ModulePath}}/internal/ui/layouts"
+	"fmt"
+	"net/url"
+	"strconv"
+)
+
+templ AdminDashboard(data *model.AdminDashboard) {
+	@layouts.Admin("Admin") {
+		@AdminDashboardContent(data)
+	}
+}
+
+templ AdminDashboardContent(data *model.AdminDashboard) {
+	{{ currentUser := ctxkeys.User(ctx) }}
+	<div id="admin-content" class="space-y-8">
+		<div>
+			<h1 class="text-3xl font-bold tracking-tight">Admin</h1>
+			<p class="mt-2 text-muted-foreground">Users, subscriptions, sessions, and operator activity.</p>
+		</div>
+		<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+			@adminMetric("Users", data.Metrics.Users, icon.Users)
+			@adminMetric("Verified", data.Metrics.VerifiedUsers, icon.UserCheck)
+			@adminMetric("Accounts", data.Metrics.Workspaces, icon.Users)
+			@adminMetric("Paid", data.Metrics.PaidWorkspaces, icon.CreditCard)
+			@adminMetric("Sessions", data.Metrics.ActiveSessions, icon.Monitor)
+		</div>
+		@card.Card() {
+			@card.Header() {
+				@card.Title() {
+					Users 
+				}
+				@card.Description() {
+					Search accounts, revoke access, or inspect the product as a user. 
+				}
+			}
+			@card.Content() {
+				<form
+					method="GET"
+					action="/admin"
+					class="mb-5 flex gap-2"
+				>
+					@inputgroup.InputGroup(inputgroup.Props{Class: "max-w-md flex-1"}) {
+						@inputgroup.Addon() {
+							@icon.Search()
+						}
+						@inputgroup.Input(inputgroup.InputProps{Name: "q", Value: data.Users.Query, Placeholder: "Search name or email"})
+					}
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline}) {
+						Search 
+					}
+				</form>
+				<div class="rounded-lg border">
+					@table.Table() {
+						@table.Header() {
+							@table.Row() {
+								@table.Head(table.HeadProps{Class: "px-4"}) {
+									User 
+								}
+								@table.Head(table.HeadProps{Class: "px-4"}) {
+									Status 
+								}
+								@table.Head(table.HeadProps{Class: "px-4"}) {
+									Sessions 
+								}
+								@table.Head(table.HeadProps{Class: "px-4 text-right"}) {
+									Actions 
+								}
+							}
+						}
+						@table.Body() {
+							for _, user := range data.Users.Users {
+								@table.Row() {
+									@table.Cell(table.CellProps{Class: "px-4 py-3"}) {
+										<div class="font-medium">{ user.Name }</div>
+										<div class="text-muted-foreground">{ user.Email }</div>
+									}
+									@table.Cell(table.CellProps{Class: "px-4 py-3"}) {
+										<div class="flex flex-wrap gap-1.5">
+											if user.EmailVerifiedAt != nil {
+												@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+													Verified 
+												}
+											} else {
+												@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+													Unverified 
+												}
+											}
+											if user.IsAdmin {
+												@badge.Badge() {
+													Operator 
+												}
+											}
+										</div>
+									}
+									@table.Cell(table.CellProps{Class: "px-4 py-3"}) {
+										{ strconv.Itoa(user.ActiveSessionCount) }
+									}
+									@table.Cell(table.CellProps{Class: "px-4 py-3"}) {
+										<div class="flex justify-end gap-2">
+											if currentUser.ID != user.ID {
+												<form
+													method="POST"
+													action={ templ.SafeURL("/admin/users/" + user.ID + "/sessions/revoke") }
+													data-on:submit={ fmt.Sprintf("confirm('Revoke every active session for this user?') && @post(%q, {contentType: 'form'})", "/admin/users/"+user.ID+"/sessions/revoke") }
+													data-indicator:_admin-action
+													data-attr:inert="$_adminAction"
+													data-attr:aria-busy="$_adminAction"
+												>
+													@csrf.Token()
+													<input type="hidden" name="q" value={ data.Users.Query }/>
+													<input type="hidden" name="page" value={ strconv.Itoa(data.Users.Page) }/>
+													@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
+														Revoke sessions 
+													}
+												</form>
+											}
+											if currentUser.ID != user.ID && !user.IsAdmin {
+												<form
+													method="POST"
+													action={ templ.SafeURL("/admin/users/" + user.ID + "/impersonate") }
+													data-on:submit={ fmt.Sprintf("@post(%q, {contentType: 'form'})", "/admin/users/"+user.ID+"/impersonate") }
+													data-indicator:_admin-action
+													data-attr:inert="$_adminAction"
+													data-attr:aria-busy="$_adminAction"
+												>
+													@csrf.Token()
+													@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+														@icon.Eye(icon.Props{Class: "size-4"})
+														View as user
+													}
+												</form>
+											}
+										</div>
+									}
+								}
+							}
+						}
+					}
+				</div>
+				<div class="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+					<span>{ fmt.Sprintf("%d users", data.Users.TotalUsers) }</span>
+					@pagination.Pagination(pagination.Props{Class: "mx-0 w-auto"}) {
+						@pagination.Content() {
+							@pagination.Item() {
+								@pagination.Previous(pagination.PreviousProps{Href: adminPageURL(data.Users.Query, data.Users.Page-1), Disabled: data.Users.Page <= 1})
+							}
+							@pagination.Item(pagination.ItemProps{Class: "px-2"}) {
+								{ fmt.Sprintf("Page %d of %d", data.Users.Page, data.Users.TotalPages) }
+							}
+							@pagination.Item() {
+								@pagination.Next(pagination.NextProps{Href: adminPageURL(data.Users.Query, data.Users.Page+1), Disabled: data.Users.Page >= data.Users.TotalPages})
+							}
+						}
+					}
+				</div>
+			}
+		}
+		@card.Card() {
+			@card.Header() {
+				@card.Title() {
+					Operator activity 
+				}
+				@card.Description() {
+					Security and subscription events retained for 180 days. 
+				}
+			}
+			@card.Content() {
+				if len(data.Events) == 0 {
+					@empty.Empty() {
+						@empty.Header() {
+							@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+								@icon.Activity()
+							}
+							@empty.Title() {
+								No operator activity yet 
+							}
+							@empty.Description() {
+								Security and administrative events will appear here. 
+							}
+						}
+					}
+				} else {
+					@item.Group(item.GroupProps{Class: "gap-2"}) {
+						for _, event := range data.Events {
+							@item.Item(item.Props{Size: item.SizeSm}) {
+								@item.Content() {
+									@item.Title() {
+										{ model.AdminAuditActionLabel(event.Action) }
+									}
+									@item.Description() {
+										if event.ActorEmail != "" {
+											{ event.ActorEmail }
+										} else {
+											System
+										}
+										<span>· { event.TargetType } { event.TargetID }</span>
+									}
+								}
+								@item.Actions() {
+									<time class="text-sm text-muted-foreground">{ event.CreatedAt.Local().Format("Jan 2, 2006 at 15:04") }</time>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+templ adminMetric(label string, value int, metricIcon func(...icon.Props) templ.Component) {
+	@card.Card() {
+		@card.Content(card.ContentProps{Class: "flex items-center justify-between"}) {
+			<div>
+				<p class="text-sm text-muted-foreground">{ label }</p>
+				<p class="mt-1 text-2xl font-semibold">{ strconv.Itoa(value) }</p>
+			</div>
+			<span class="rounded-lg bg-muted p-2 text-muted-foreground">
+				@metricIcon(icon.Props{Class: "size-5"})
+			</span>
+		}
+	}
+}
+
+func adminPageURL(query string, page int) string {
+	values := url.Values{}
+	if query != "" {
+		values.Set("q", query)
+	}
+	values.Set("page", strconv.Itoa(page))
+	return "/admin?" + values.Encode()
+}

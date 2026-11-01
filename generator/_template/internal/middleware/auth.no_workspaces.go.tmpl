@@ -1,0 +1,114 @@
+package middleware
+
+import (
+	"net/http"
+
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/service"
+)
+
+// AuthMiddleware checks for a database session and adds authentication data to the context.
+func AuthMiddleware(authService *service.AuthService, userService *service.UserService, subscriptionService *service.SubscriptionService) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+{{- if .API }}
+			if hasBearerAuthorization(r) {
+				// A bearer request never falls back to cookies. An invalid token
+				// continues unauthenticated, so CSRFProtection may skip it safely.
+				session, token, err := authenticateBearer(r, authService)
+				if err != nil {
+					next.ServeHTTP(w, r)
+					return
+				}
+				if session.IsImpersonating() {
+					next.ServeHTTP(w, r)
+					return
+				}
+				user, err := userService.ByID(session.UserID)
+				if err != nil {
+					next.ServeHTTP(w, r)
+					return
+				}
+				subscription, err := subscriptionService.Subscription(session.UserID)
+				if err != nil {
+					next.ServeHTTP(w, r)
+					return
+				}
+				user.PasswordSet = user.HasPassword()
+				user.PasswordHash = nil
+				ctx := ctxkeys.WithUser(r.Context(), user)
+				ctx = ctxkeys.WithSubscription(ctx, subscription)
+				ctx = ctxkeys.WithSession(ctx, session)
+				ctx = ctxkeys.WithBearer(ctx, token)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+{{- end }}
+			for _, cookieName := range []string{"impersonation_token", "session_token"} {
+				cookie, err := r.Cookie(cookieName)
+				if err != nil {
+					continue
+				}
+				session, err := authService.AuthenticateSession(cookie.Value)
+				if err != nil {
+					authService.ClearCookie(w, cookieName)
+					continue
+				}
+				if (cookieName == "impersonation_token") != session.IsImpersonating() {
+					authService.ClearCookie(w, cookieName)
+					continue
+				}
+				user, err := userService.ByID(session.UserID)
+				if err != nil {
+					authService.ClearCookie(w, cookieName)
+					continue
+				}
+				subscription, err := subscriptionService.Subscription(session.UserID)
+				if err != nil {
+					authService.ClearCookie(w, cookieName)
+					continue
+				}
+				user.PasswordSet = user.HasPassword()
+				user.PasswordHash = nil
+				ctx := ctxkeys.WithUser(r.Context(), user)
+				ctx = ctxkeys.WithSubscription(ctx, subscription)
+				ctx = ctxkeys.WithSession(ctx, session)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+{{ if .HasHTMLFrontend -}}
+// RequireAuth ensures the user is authenticated and has completed onboarding
+func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := ctxkeys.User(r.Context())
+		if user == nil {
+			redirect(w, r, "/auth", http.StatusSeeOther)
+			return
+		}
+
+		if user.Name == "" && r.URL.Path != "/auth/onboarding" {
+			redirect(w, r, "/auth/onboarding", http.StatusSeeOther)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
+// RequireGuest ensures the user is not authenticated
+func RequireGuest(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := ctxkeys.User(r.Context())
+		if user != nil {
+			redirect(w, r, "/app/dashboard", http.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
+	}
+}
+{{- end }}

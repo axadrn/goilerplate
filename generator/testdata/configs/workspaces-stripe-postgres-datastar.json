@@ -1,0 +1,14 @@
+{
+  "project_name": "Workspaces Datastar",
+  "module_path": "example.com/workspaces-datastar",
+  "framework": "datastar",
+  "database": "postgres",
+  "payment": "stripe",
+  "mail": "smtp",
+  "workspaces": true,
+  "oauth": ["google"],
+  "storage": true,
+  "content": ["blog"],
+  "api": true,
+  "mcp": true
+}

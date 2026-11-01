@@ -1,0 +1,22 @@
+package blocks
+
+import (
+	"{{.ModulePath}}/internal/ui/components/separator"
+	"{{.ModulePath}}/internal/ui/components/sidebar"
+)
+
+templ AppHeader(title string) {
+	<header class="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+		<div class="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+			@sidebar.Trigger(sidebar.TriggerProps{Class: "-ml-1"})
+			@separator.Separator(separator.Props{
+				Orientation: separator.OrientationVertical,
+				Class:       "mx-2 h-4 data-vertical:self-auto",
+			})
+			<h1 class="text-base font-medium">{ title }</h1>
+			<div class="ml-auto flex items-center gap-2">
+				@ThemeSwitcher()
+			</div>
+		</div>
+	</header>
+}

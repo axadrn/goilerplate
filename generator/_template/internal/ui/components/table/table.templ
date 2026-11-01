@@ -1,0 +1,193 @@
+package table
+
+import "{{.ModulePath}}/internal/ui/utils"
+
+type Props struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type HeaderProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type BodyProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type FooterProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type RowProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type HeadProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type CellProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type CaptionProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+templ Table(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div data-slot="table-container" class="relative w-full overflow-x-auto">
+		<table
+			if p.ID != "" {
+				id={ p.ID }
+			}
+			data-slot="table"
+			class={ utils.CN("w-full caption-bottom text-sm", p.Class) }
+			{ p.Attributes... }
+		>
+			{ children... }
+		</table>
+	</div>
+}
+
+templ Header(props ...HeaderProps) {
+	{{ var p HeaderProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<thead
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="table-header"
+		class={ utils.CN("[&_tr]:border-b", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</thead>
+}
+
+templ Body(props ...BodyProps) {
+	{{ var p BodyProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<tbody
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="table-body"
+		class={ utils.CN("[&_tr:last-child]:border-0", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</tbody>
+}
+
+templ Footer(props ...FooterProps) {
+	{{ var p FooterProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<tfoot
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="table-footer"
+		class={ utils.CN("bg-muted/50 border-t font-medium [&>tr]:last:border-b-0", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</tfoot>
+}
+
+templ Row(props ...RowProps) {
+	{{ var p RowProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<tr
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="table-row"
+		class={ utils.CN("hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors has-aria-expanded:bg-muted/50", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</tr>
+}
+
+templ Head(props ...HeadProps) {
+	{{ var p HeadProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	// adds the checkbox padding for our
+	// data-slot=checkbox markup (our checkbox has no role attribute).
+	<th
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="table-head"
+		class={ utils.CN("text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&:has([data-slot=checkbox])]:pr-0", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</th>
+}
+
+templ Cell(props ...CellProps) {
+	{{ var p CellProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	// adds the checkbox padding for our
+	// data-slot=checkbox markup (our checkbox has no role attribute).
+	<td
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="table-cell"
+		class={ utils.CN("p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&:has([data-slot=checkbox])]:pr-0", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</td>
+}
+
+templ Caption(props ...CaptionProps) {
+	{{ var p CaptionProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<caption
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="table-caption"
+		class={ utils.CN("text-muted-foreground mt-4 text-sm", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</caption>
+}

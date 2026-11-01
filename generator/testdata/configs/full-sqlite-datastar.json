@@ -1,0 +1,14 @@
+{
+  "project_name": "Acme Datastar",
+  "module_path": "example.com/acme-datastar",
+  "framework": "datastar",
+  "database": "sqlite",
+  "payment": "stripe",
+  "mail": "smtp",
+  "workspaces": true,
+  "oauth": ["google", "github"],
+  "storage": true,
+  "content": ["blog", "docs"],
+  "api": false,
+  "mcp": false
+}

@@ -1,0 +1,76 @@
+package api
+
+import (
+	"log/slog"
+	"net/http"
+
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/service"
+	"{{.ModulePath}}/internal/validation"
+)
+
+// AuthHandler serves sign-in, onboarding, logout and the account summary.
+type AuthHandler struct {
+	authService *service.AuthService
+	userService *service.UserService
+}
+
+func NewAuthHandler(authService *service.AuthService, userService *service.UserService) *AuthHandler {
+	return &AuthHandler{authService: authService, userService: userService}
+}
+
+// CompleteOnboarding sets the name of a new account.
+func (h *AuthHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	var request nameRequest
+	if !Decode(w, r, &request) {
+		return
+	}
+	err := validation.ValidateName(request.Name)
+	if err != nil {
+		ValidationError(w, map[string]string{"name": FieldMessage(err)})
+		return
+	}
+
+	err = h.authService.CompleteOnboarding(user.ID, request.Name)
+	if err != nil {
+		slog.Error("onboarding failed", "error", err, "user_id", user.ID)
+		ServiceError(w, err)
+		return
+	}
+
+	slog.Info("onboarding completed", "user_id", user.ID)
+	h.writeUser(w, user.ID)
+}
+
+type accountResponse struct {
+	User               User          `json:"user"`
+	OnboardingRequired bool          `json:"onboarding_required"`
+	Subscription       *Subscription `json:"subscription"`
+	Access             *Access       `json:"access"`
+	IsAdmin            bool          `json:"is_admin"`
+{{- if .Storage }}
+	AvatarURL          *string       `json:"avatar_url"`
+{{- end }}
+}
+
+// Account returns the signed-in user, whether onboarding is still open, the
+// subscription with its resolved access, and whether the session belongs to
+// an operator.
+func (h *AuthHandler) Account(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	subscription := ctxkeys.Subscription(r.Context())
+	response := accountResponse{
+		User:               NewUser(user),
+		OnboardingRequired: user.Name == "",
+		Subscription:       NewSubscription(subscription),
+		IsAdmin:            ctxkeys.IsAdmin(r.Context()),
+{{- if .Storage }}
+		AvatarURL:          avatarURL(user),
+{{- end }}
+	}
+	if subscription != nil {
+		response.Access = NewAccess(subscription.Access())
+	}
+	JSON(w, http.StatusOK, response)
+}

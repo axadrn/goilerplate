@@ -1,0 +1,98 @@
+package blocks
+
+import (
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/icons"
+)
+
+templ Footer() {
+	<footer class="border-t bg-background">
+		@FooterContent()
+		@FooterNewsletter()
+		@FooterBottom()
+	</footer>
+}
+
+templ FooterContent() {
+	{{ cfg := ctxkeys.RenderConfig(ctx) }}
+	<div class="container mx-auto px-4 py-12">
+		<div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+			<!-- Company Info -->
+			<div>
+				<h3 class="font-semibold text-foreground mb-4">{ brand.Name }</h3>
+				<p class="text-sm text-muted-foreground mb-2">
+					{ brand.Tagline }
+				</p>
+				<a href={ "mailto:" + cfg.SupportEmail } class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+					{ cfg.SupportEmail }
+				</a>
+				<!-- Social Links -->
+				<div class="flex space-x-4 mt-4">
+					<a href="https://github.com" target="_blank" rel="noopener" class="text-muted-foreground hover:text-foreground transition-colors">
+						@icons.Github(icons.Props{Size: 20})
+					</a>
+					<a href="https://x.com" target="_blank" rel="noopener" class="text-muted-foreground hover:text-foreground transition-colors">
+						@icons.X(icons.Props{Size: 20})
+					</a>
+					<a href="https://discord.com" target="_blank" rel="noopener" class="text-muted-foreground hover:text-foreground transition-colors">
+						@icons.Discord(icons.Props{Size: 20})
+					</a>
+				</div>
+			</div>
+			<!-- Product -->
+			<div>
+				<h3 class="font-semibold text-foreground mb-4">Product</h3>
+				<ul class="space-y-2">
+					<li>
+						<a href="/#features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Features
+						</a>
+					</li>
+					<li>
+						<a href="/#pricing" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Pricing
+						</a>
+					</li>
+					<li>
+						<a href="/#faq" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							FAQ
+						</a>
+					</li>
+					@FooterBlogLink()
+					@FooterDocsLink()
+				</ul>
+			</div>
+			@FooterResources()
+			<!-- Legal -->
+			<div>
+				<h3 class="font-semibold text-foreground mb-4">Legal</h3>
+				<ul class="space-y-2">
+					<li>
+						<a href="/legal/terms" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Terms of Service
+						</a>
+					</li>
+					<li>
+						<a href="/legal/privacy" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Privacy Policy
+						</a>
+					</li>
+					<li>
+						<a href="/legal/cookies" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Cookie Policy
+						</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+}
+
+templ FooterBottom() {
+	<div class="container mx-auto px-4 py-6">
+		<div class="text-center text-sm text-muted-foreground">
+			© 2024 { brand.Name }. All rights reserved.
+		</div>
+	</div>
+}

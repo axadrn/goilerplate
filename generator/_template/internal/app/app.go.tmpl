@@ -1,0 +1,193 @@
+package app
+
+import (
+	"fmt"
+
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/config"
+{{- if .HasHTMLFrontend }}
+	"{{.ModulePath}}/internal/content"
+{{- end }}
+	"{{.ModulePath}}/internal/db"
+	"{{.ModulePath}}/internal/repository"
+	"{{.ModulePath}}/internal/service"
+	"{{.ModulePath}}/internal/service/mailer"
+{{- if .HasBlog }}
+	"{{.ModulePath}}/internal/service/newsletter"
+{{- end }}
+	"{{.ModulePath}}/internal/service/payment"
+{{- if .Storage }}
+	"{{.ModulePath}}/internal/storage"
+{{- end }}
+	"github.com/jmoiron/sqlx"
+)
+
+type App struct {
+	Cfg            *config.Config
+	DB             *sqlx.DB
+	AuthService    *service.AuthService
+	UserService    *service.UserService
+	EmailService   *service.EmailService
+{{- if .HasHTMLFrontend }}
+	LegalService   *service.LegalService
+{{- end }}
+{{- if .HasBlog }}
+	NewsletterService *service.NewsletterService
+	BlogService       *service.BlogService
+{{- end }}
+{{- if .HasDocs }}
+	DocsService *service.DocsService
+{{- end }}
+{{- if .Storage }}
+	FileService *service.FileService
+{{- end }}
+	SubscriptionService *service.SubscriptionService
+	AdminService        *service.AdminService
+	PaymentService      payment.Provider
+{{- if .Workspaces }}
+	WorkspaceService *service.WorkspaceService
+{{- end }}
+{{- if .API }}
+	APITokenService *service.APITokenService
+{{- end }}
+}
+
+func New(cfg *config.Config) (*App, error) {
+	database, err := db.Init(cfg.DBConnection)
+	if err != nil {
+		return nil, fmt.Errorf("initialize database: %w", err)
+	}
+	initialized := false
+	defer func() {
+		if !initialized {
+			_ = database.Close()
+		}
+	}()
+	err = db.RunMigrations(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("run migrations: %w", err)
+	}
+
+	users := repository.NewUserRepository(database)
+	tokens := repository.NewTokenRepository(database)
+	sessions := repository.NewSessionRepository(database)
+{{- if .Storage }}
+	files := repository.NewFileRepository(database)
+{{- end }}
+	subscriptions := repository.NewSubscriptionRepository(database)
+	adminEvents := repository.NewAdminRepository(database)
+{{- if .HasBlog }}
+	newsletterSubscribers := repository.NewNewsletterRepository(database)
+{{- end }}
+{{- if .Workspaces }}
+	workspaces := repository.NewWorkspaceRepository(database)
+	members := repository.NewWorkspaceMemberRepository(database)
+	invitations := repository.NewWorkspaceInvitationRepository(database)
+	workspaceAuditEvents := repository.NewWorkspaceAuditRepository(database)
+{{- end }}
+	mailProvider, err := mailer.NewProvider(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("initialize mail provider: %w", err)
+	}
+	email := service.NewEmailService(mailProvider, cfg.AppURL, brand.Name)
+{{- if .Storage }}
+	fileStorage, err := storage.NewS3Storage(storage.S3Config{
+		Region: cfg.S3Region, Bucket: cfg.S3Bucket,
+		AccessKey: cfg.S3AccessKey, SecretKey: cfg.S3SecretKey, Endpoint: cfg.S3Endpoint,
+		PresignExpiryPublic: cfg.S3PresignExpiryPublic, PresignExpiryPrivate: cfg.S3PresignExpiryPrivate,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initialize storage: %w", err)
+	}
+	fileService := service.NewFileService(files, fileStorage)
+{{- end }}
+{{- if .Workspaces }}
+	subscriptionService := service.NewSubscriptionService(subscriptions, adminEvents)
+{{- else }}
+	subscriptionService := service.NewSubscriptionService(subscriptions)
+{{- end }}
+{{- if .Workspaces }}
+	workspaceService := service.NewWorkspaceService(
+		workspaces, members, invitations, workspaceAuditEvents, users,
+		subscriptionService, email,
+	)
+{{- end }}
+{{- if .HasBlog }}
+	newsletterProvider, err := newsletter.NewProvider(cfg, newsletterSubscribers)
+	if err != nil {
+		return nil, fmt.Errorf("initialize newsletter provider: %w", err)
+	}
+	newsletterService := service.NewNewsletterService(newsletterProvider)
+{{- end }}
+	paymentProvider, err := payment.NewProvider(cfg, subscriptionService)
+	if err != nil {
+		return nil, fmt.Errorf("initialize payment provider: %w", err)
+	}
+{{- if .Workspaces }}
+	auth := service.NewAuthService(
+		users, tokens, sessions, workspaceService, email,
+		cfg.IsProduction(), cfg.SessionExpiry, cfg.TokenEmailVerifyExpiry,
+		cfg.TokenPasswordResetExpiry, cfg.TokenEmailChangeExpiry, cfg.TokenMagicLinkExpiry,
+	)
+	userService := service.NewUserService(users,
+{{- if .Storage }}
+		fileService,
+{{- end }}
+		email, workspaceService,
+	)
+{{- else }}
+	auth := service.NewAuthService(
+		users, tokens, sessions, subscriptionService, email,
+		cfg.IsProduction(), cfg.SessionExpiry, cfg.TokenEmailVerifyExpiry,
+		cfg.TokenPasswordResetExpiry, cfg.TokenEmailChangeExpiry, cfg.TokenMagicLinkExpiry,
+	)
+	userService := service.NewUserService(users,
+{{- if .Storage }}
+		fileService,
+{{- end }}
+		email, subscriptionService,
+	)
+{{- end }}
+{{- if and .API .Workspaces }}
+	apiTokenService := service.NewAPITokenService(repository.NewAPITokenRepository(database), workspaceService)
+	auth.UseAPITokens(apiTokenService)
+{{- else if .API }}
+	apiTokenService := service.NewAPITokenService(repository.NewAPITokenRepository(database))
+	auth.UseAPITokens(apiTokenService)
+{{- end }}
+	application := &App{
+		Cfg: cfg, DB: database, AuthService: auth, UserService: userService,
+		EmailService: email,
+{{- if .HasHTMLFrontend }}
+		LegalService: service.NewLegalService(content.Root),
+{{- end }}
+{{- if .HasBlog }}
+		NewsletterService: newsletterService,
+		BlogService: service.NewBlogService(content.Root),
+{{- end }}
+{{- if .HasDocs }}
+		DocsService: service.NewDocsService(content.Root),
+{{- end }}
+{{- if .Storage }}
+		FileService: fileService,
+{{- end }}
+		SubscriptionService: subscriptionService,
+		AdminService: service.NewAdminService(adminEvents, users, auth, cfg.AdminEmails),
+		PaymentService: paymentProvider,
+{{- if .Workspaces }}
+		WorkspaceService: workspaceService,
+{{- end }}
+{{- if .API }}
+		APITokenService: apiTokenService,
+{{- end }}
+	}
+	initialized = true
+	return application, nil
+}
+
+func (a *App) Close() error {
+	if a.DB != nil {
+		return a.DB.Close()
+	}
+	return nil
+}

@@ -1,0 +1,546 @@
+@font-face {
+  font-family: "Geist";
+  src: url("/assets/fonts/geist/geist-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/geist/geist-mono-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@import "tailwindcss" source(none);
+@import "./tw-animate.css";
+@import "./shadcn-tailwind.css";
+@import "./typeset.css";
+@import "./changelog.css";
+
+/* Only the site's own templates and scripts carry classes. */
+@source "../../ui";
+@source "../js";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --breakpoint-3xl: 1600px;
+  --breakpoint-4xl: 2000px;
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-heading);
+  --font-mono: var(--font-mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-live: var(--live);
+  --color-running: var(--running);
+  --color-failed: var(--failed);
+  --color-idle: var(--idle);
+  --color-terminal: var(--terminal);
+  --color-terminal-foreground: var(--terminal-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-code: var(--code);
+  --color-code-foreground: var(--code-foreground);
+  --color-code-highlight: var(--code-highlight);
+  --color-code-number: var(--code-number);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* ops design tokens. DESIGN.md explains them; the TUI and the CLI use the
+     same brand and status colors (ops/internal/style). */
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  /* Headlines and big numbers: Geist, heavy and tight (.font-display). */
+  --font-heading: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --radius: 0.5rem;
+
+  /* Monochrome: the brand is the ink. Color only carries status. */
+  --brand: oklch(0.16 0 0);
+  --brand-foreground: oklch(0.99 0 0);
+  --live: oklch(0.66 0.17 150);
+  --running: oklch(0.64 0.15 70);
+  --failed: oklch(0.6 0.22 25);
+  --idle: oklch(0.6 0 0);
+  --terminal: oklch(0.16 0 0);
+  --terminal-foreground: oklch(0.9 0 0);
+
+  --background: #f2f2f7;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  --primary: oklch(0.16 0 0);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: #e5e5ea;
+  --secondary-foreground: #000000;
+  --muted: #e5e5ea;
+  --muted-foreground: #6e6e73;
+  --accent: #e5e5ea;
+  --accent-foreground: #000000;
+  --destructive: oklch(0.6 0.22 25);
+  --border: rgb(0 0 0 / 8%);
+  --input: rgb(0 0 0 / 10%);
+  --ring: oklch(0.16 0 0 / 40%);
+  --chart-1: oklch(0.16 0 0);
+  --chart-2: oklch(0.66 0.17 150);
+  --chart-3: oklch(0.76 0.16 75);
+  --chart-4: oklch(0.6 0.22 25);
+  --chart-5: oklch(0.6 0 0);
+  --sidebar: #e9e9ef;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: oklch(0.16 0 0);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: #dcdce2;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: rgb(0 0 0 / 6%);
+  --sidebar-ring: oklch(0.16 0 0 / 40%);
+  --selection: oklch(0.16 0 0);
+  --selection-foreground: oklch(0.99 0 0);
+}
+
+.dark {
+  --brand: oklch(0.97 0 0);
+  --brand-foreground: oklch(0.13 0 0);
+  --live: oklch(0.74 0.17 150);
+  --running: oklch(0.82 0.15 80);
+  --failed: oklch(0.68 0.2 25);
+  --idle: oklch(0.55 0 0);
+  --terminal: oklch(0.11 0 0);
+  --terminal-foreground: oklch(0.88 0 0);
+
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #1c1c1e;
+  --card-foreground: #ffffff;
+  --popover: #1c1c1e;
+  --popover-foreground: #ffffff;
+  --primary: oklch(0.96 0 0);
+  --primary-foreground: oklch(0.13 0 0);
+  --secondary: #2c2c2e;
+  --secondary-foreground: #ffffff;
+  --muted: #2c2c2e;
+  --muted-foreground: #98989f;
+  --accent: #2c2c2e;
+  --accent-foreground: #ffffff;
+  --destructive: oklch(0.68 0.2 25);
+  --border: rgb(255 255 255 / 8%);
+  --input: rgb(255 255 255 / 10%);
+  --ring: oklch(0.97 0 0 / 40%);
+  --chart-1: oklch(0.97 0 0);
+  --chart-2: oklch(0.74 0.17 150);
+  --chart-3: oklch(0.82 0.15 80);
+  --chart-4: oklch(0.68 0.2 25);
+  --chart-5: oklch(0.55 0 0);
+  --sidebar: #121214;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: oklch(0.97 0 0);
+  --sidebar-primary-foreground: oklch(0.13 0 0);
+  --sidebar-accent: #2c2c2e;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 6%);
+  --sidebar-ring: oklch(0.97 0 0 / 40%);
+  --selection: oklch(0.97 0 0);
+  --selection-foreground: oklch(0.13 0 0);
+}
+
+@utility font-display {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  ::selection {
+    @apply bg-selection text-selection-foreground;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+}
+
+@layer components {
+  :is(button.htmx-request, form.htmx-request button[type="submit"]) {
+    position: relative;
+    color: transparent !important;
+    -webkit-text-fill-color: transparent;
+  }
+
+  :is(button.htmx-request, form.htmx-request button[type="submit"]) > * {
+    visibility: hidden;
+  }
+
+  :is(button.htmx-request, form.htmx-request button[type="submit"])::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: 1rem;
+    height: 1rem;
+    content: "";
+    border: 2px solid var(--muted-foreground);
+    border-top-color: var(--foreground);
+    border-radius: 9999px;
+    animation: goilerplate-spin 0.7s linear infinite;
+  }
+}
+
+@keyframes goilerplate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* app */
+@layer components {
+  /* Grouped surfaces: big radius, no border, the system gray of the theme. */
+  .ops-panel {
+    border-radius: 22px;
+    background: var(--card);
+    color: var(--card-foreground);
+  }
+  .ops-panel-title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  /* The running symbol turns (the landing page uses it too). */
+  .ops-turn {
+    animation: goilerplate-spin 1.6s linear infinite;
+    transform-origin: center;
+  }
+
+  /* Status dots: live breathes, running blinks. */
+  .ops-dot-live {
+    animation: ops-breathe 2.4s ease-out infinite;
+  }
+  .ops-dot-run {
+    animation: ops-blink 1.2s ease-in-out infinite;
+  }
+
+  /* Keyboard hints. */
+  .ops-kbd {
+    display: inline-flex;
+    min-width: 1.125rem;
+    height: 1.125rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    padding: 0 0.25rem;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1;
+    color: var(--muted-foreground);
+    background: var(--muted);
+  }
+
+  /* Logs and commands: mono on the surface they sit on. */
+  .ops-term {
+    --tf: var(--card-foreground);
+    color: color-mix(in oklab, var(--tf) 92%, transparent);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.85;
+    font-variant-ligatures: none;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--tf) 18%, transparent) transparent;
+  }
+  .ops-term-lines {
+    counter-reset: line;
+  }
+  .ops-term-line {
+    counter-increment: line;
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    padding-right: 1.25rem;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+  .ops-term-line::before {
+    content: counter(line);
+    padding-right: 1rem;
+    text-align: right;
+    color: color-mix(in oklab, var(--tf) 22%, transparent);
+    user-select: none;
+  }
+  .ops-term-line[data-n]::before {
+    content: attr(data-n);
+  }
+  .ops-term-line:hover {
+    background: color-mix(in oklab, var(--tf) 4%, transparent);
+  }
+  .ops-term-line[data-kind="out"] {
+    color: color-mix(in oklab, var(--tf) 50%, transparent);
+  }
+  .ops-term-line[data-kind="step"] > span::before {
+    content: "→ ";
+    color: color-mix(in oklab, var(--tf) 45%, transparent);
+  }
+  .ops-term-line[data-kind="ok"] {
+    color: var(--live);
+  }
+  .ops-term-line[data-kind="ok"] > span::before {
+    content: "✓ ";
+  }
+  .ops-term-line[data-kind="err"] {
+    color: var(--failed);
+  }
+  .ops-term-line[data-kind="err"] > span::before {
+    content: "✗ ";
+  }
+  .ops-term-dim {
+    color: color-mix(in oklab, var(--tf) 42%, transparent);
+  }
+  @media (max-width: 40rem) {
+    .ops-term-line {
+      grid-template-columns: 2.25rem minmax(0, 1fr);
+      padding-right: 0.75rem;
+    }
+    .ops-term-line::before {
+      padding-right: 0.75rem;
+    }
+  }
+
+  /* Tool output between two steps folds into one line. */
+  .ops-term-fold:not(:has(.ops-term-line)) {
+    display: none;
+  }
+  .ops-term-fold:not([data-open]) > .ops-term-line[data-kind="out"] {
+    display: none;
+  }
+  .ops-term-fold[data-open] {
+    background: color-mix(in oklab, var(--tf) 3%, transparent);
+  }
+  .ops-term-toggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1.25rem 0 2.75rem;
+    font: inherit;
+    font-weight: 500;
+    text-align: left;
+    color: color-mix(in oklab, var(--tf) 52%, transparent);
+    cursor: pointer;
+    outline: none;
+    border-radius: 8px;
+  }
+  .ops-term-toggle:hover {
+    color: var(--tf);
+    background: color-mix(in oklab, var(--tf) 5%, transparent);
+  }
+  .ops-term-toggle:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--ring);
+  }
+  .ops-term-arrow {
+    display: inline-block;
+    transition: rotate 0.12s ease-out;
+  }
+  [data-open] > .ops-term-toggle .ops-term-arrow {
+    rotate: 90deg;
+  }
+  @media (max-width: 40rem) {
+    .ops-term-toggle {
+      padding-left: 2.25rem;
+    }
+  }
+
+  /* Container logs: time, service, message. Phones show the message only. */
+  .ops-term-log {
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+  }
+  @media (min-width: 40rem) {
+    .ops-term-log {
+      grid-template-columns: 2.75rem 4.75rem 5.5rem minmax(0, 1fr);
+    }
+  }
+
+  /* The deploy list shows the newest deploys until asked for all. */
+  #app-detail:not([data-all]) [data-extra],
+  #app-detail[data-all] [data-show-all] {
+    display: none !important;
+  }
+
+  /* Deploy timeline: a node per deploy on a line, separators between rows. */
+  .ops-timeline > li {
+    position: relative;
+  }
+  .ops-timeline > li + li::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0.75rem;
+    left: 3.25rem;
+    height: 1px;
+    background: var(--border);
+  }
+  .ops-timeline > li[data-selected]::after,
+  .ops-timeline > li[data-selected] + li::after {
+    display: none;
+  }
+  .ops-timeline > li::before {
+    content: "";
+    position: absolute;
+    left: calc(1.25rem + 5px);
+    top: 1.75rem;
+    bottom: -0.875rem;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+  .ops-timeline > li:last-child::before,
+  #app-detail:not([data-all]) .ops-timeline > li[data-line-cut]::before {
+    display: none;
+  }
+  .ops-node {
+    position: relative;
+    z-index: 1;
+    width: 12px;
+    height: 12px;
+    border-radius: 9999px;
+    border: 2px solid var(--card);
+    outline: 2px solid color-mix(in oklab, var(--foreground) 25%, transparent);
+    background: var(--card);
+  }
+  [data-selected] .ops-node {
+    border-color: var(--muted);
+  }
+  .ops-node[data-kind="live"] {
+    background: var(--live);
+    outline-color: var(--live);
+  }
+  .ops-node[data-kind="failed"] {
+    background: var(--failed);
+    outline-color: var(--failed);
+  }
+  .ops-node[data-kind="running"] {
+    background: var(--running);
+    outline-color: var(--running);
+    animation: ops-blink 1.2s ease-in-out infinite;
+  }
+  .ops-node[data-kind="done"] {
+    background: var(--muted-foreground);
+    outline-color: var(--muted-foreground);
+  }
+
+  /* Grouped lists: rows with separators that start after the leading part. */
+  .ops-group > li + li {
+    position: relative;
+  }
+  .ops-group > li + li::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 1.25rem;
+    left: var(--ops-inset, 1.25rem);
+    height: 1px;
+    background: var(--border);
+  }
+
+  .ops-select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='m4.5 6.5 3.5 3.5 3.5-3.5'/></svg>");
+    background-size: 14px;
+    background-position: right 0.85rem center;
+    background-repeat: no-repeat;
+  }
+  .ops-select > option {
+    background: var(--popover);
+    color: var(--popover-foreground);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ops-turn,
+    .ops-dot-live,
+    .ops-dot-run,
+    .ops-node[data-kind="running"] {
+      animation: none;
+    }
+  }
+}
+
+@keyframes ops-breathe {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--live) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes ops-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* landing */
+@layer components {
+  /* A live dot breathes. */
+  .lp-pulse {
+    animation: lp-pulse 2.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lp-pulse {
+      animation: none;
+    }
+  }
+}
+
+@keyframes lp-pulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--live) 18%, transparent);
+  }
+}

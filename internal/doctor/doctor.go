@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/axadrn/goilerplate/v3/api"
-	"github.com/axadrn/goilerplate/v3/internal/update"
+	"github.com/axadrn/goilerplate/v4/generator"
+	"github.com/axadrn/goilerplate/v4/internal/update"
 )
 
 type Level int
@@ -154,7 +154,7 @@ func readEnvironment(name string) (map[string]string, error) {
 	return values, nil
 }
 
-func missingEnvironmentKeys(answers api.GenerationAnswers, values map[string]string) []string {
+func missingEnvironmentKeys(answers generator.Config, values map[string]string) []string {
 	required := []string{"APP_ENV", "APP_URL", "DB_CONNECTION", "EMAIL_FROM", "SESSION_EXPIRY"}
 	if answers.Mail == "smtp" {
 		required = append(required, "SMTP_HOST", "SMTP_PORT", "SMTP_TLS")

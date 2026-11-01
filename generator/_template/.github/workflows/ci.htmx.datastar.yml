@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Install Tailwind CSS
+        env:
+          TAILWIND_URL: https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/tailwindcss-linux-x64
+          TAILWIND_SHA256: dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a
+        run: |
+          curl --fail --location --silent --show-error "$TAILWIND_URL" --output "$RUNNER_TEMP/tailwindcss"
+          echo "$TAILWIND_SHA256  $RUNNER_TEMP/tailwindcss" | sha256sum --check -
+          chmod +x "$RUNNER_TEMP/tailwindcss"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Generate templ files
+        run: go tool templ generate
+
+      - name: Build Tailwind CSS
+        run: tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
+
+      - name: Check module declarations
+        run: |
+          cp go.mod "$RUNNER_TEMP/go.mod.before"
+          go mod tidy
+          diff --unified "$RUNNER_TEMP/go.mod.before" go.mod
+          go mod verify
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test with race detector
+        run: go test -race ./...

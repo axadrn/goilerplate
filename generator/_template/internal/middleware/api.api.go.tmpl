@@ -1,0 +1,48 @@
+package middleware
+
+import (
+	"net/http"
+	"strings"
+
+	"{{.ModulePath}}/internal/api"
+	"{{.ModulePath}}/internal/ctxkeys"
+)
+
+// isAPIRequest reports whether a middleware error must be answered with the
+// JSON envelope instead of a page or a toast.
+func isAPIRequest(r *http.Request) bool {
+{{- if .MCP }}
+	return strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/mcp" || hasBearerAuthorization(r)
+{{- else }}
+	return strings.HasPrefix(r.URL.Path, "/api/") || hasBearerAuthorization(r)
+{{- end }}
+}
+
+// RequireAuthAPI answers 401 unauthenticated when the request has no session.
+func RequireAuthAPI(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if ctxkeys.User(r.Context()) == nil {
+			api.Error(w, http.StatusUnauthorized, "unauthenticated", "Sign in to continue.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}
+}
+
+// RequireOnboardedAPI answers 401 unauthenticated without a session and 403
+// onboarding_required while the user has no name, like RequireAuth on the web.
+func RequireOnboardedAPI(next http.HandlerFunc) http.HandlerFunc {
+	return RequireAuthAPI(func(w http.ResponseWriter, r *http.Request) {
+		if ctxkeys.User(r.Context()).Name == "" {
+			api.Error(w, http.StatusForbidden, "onboarding_required", "Complete onboarding before continuing.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// APINotFound answers every unknown path under /api/ so it never reaches the
+// HTML not found page.
+func APINotFound(w http.ResponseWriter, _ *http.Request) {
+	api.Error(w, http.StatusNotFound, "not_found", "The requested API endpoint does not exist.")
+}

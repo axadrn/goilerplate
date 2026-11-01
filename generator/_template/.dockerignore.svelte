@@ -1,0 +1,10 @@
+.git
+.env
+bin
+tmp
+*.db
+*.db-shm
+*.db-wal
+web/node_modules
+web/.svelte-kit
+web/build

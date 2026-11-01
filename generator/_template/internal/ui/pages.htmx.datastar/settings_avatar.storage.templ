@@ -1,0 +1,27 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/components/card"
+)
+
+templ SettingsAvatarSection(user *model.User) {
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Avatar
+			}
+			@card.Description() {
+				Upload a profile picture (Max 5MB, JPG/PNG/WebP)
+			}
+		}
+		@card.Content() {
+			<div class="flex flex-col md:flex-row items-start gap-4 md:gap-6">
+				@SettingsAvatarDisplay(user)
+				<div class="flex-1 w-full space-y-4">
+					@SettingsAvatarForm()
+				</div>
+			</div>
+		}
+	}
+}

@@ -1,0 +1,26 @@
+---
+title: "Publishing"
+description: "Ship the documentation with the application"
+order: 2
+---
+
+## Build with the application
+
+The documentation is part of the same Go application and deployment. There is no separate docs runtime to operate.
+
+Run the normal checks before publishing:
+
+```bash
+go test ./...
+```
+
+## Check the production URLs
+
+After deployment, verify one rendered page and its Markdown equivalent:
+
+```bash
+curl --fail https://example.com/docs
+curl --fail https://example.com/docs.md
+```
+
+Add those URLs to the same uptime and link checks as the rest of the public site.

@@ -1,0 +1,171 @@
+package middleware
+
+import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
+	"log/slog"
+	"net/http"
+	"strings"
+
+	"{{.ModulePath}}/internal/ctxkeys"
+)
+
+const (
+	csrfCookieName = "csrf_token"
+	csrfFormField  = "csrf_token"
+	csrfHeader     = "X-CSRF-Token"
+	csrfTokenLen   = 32
+)
+
+// CSRFProtection validates CSRF tokens on all state-changing requests
+func CSRFProtection(isProduction bool, clientIPs ClientIPResolver) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip CSRF check for safe methods (GET, HEAD, OPTIONS)
+			if r.Method == "GET" || r.Method == "HEAD" || r.Method == "OPTIONS" {
+				token := getOrGenerateCSRFToken(w, r, isProduction)
+				ctx := ctxkeys.WithCSRFToken(r.Context(), token)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
+			// Skip CSRF check for webhooks (external services)
+			if strings.HasPrefix(r.URL.Path, "/webhooks/") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+{{- if .API }}
+
+			// A sign-in with ?session=cookie sets the session cookie, so it always
+			// needs the CSRF token, whatever else the request carries.
+			cookieSignIn := requestsCookieSession(r)
+
+			// Skip CSRF check for requests with an Authorization: Bearer header.
+			// They carry no ambient credential, and AuthMiddleware never falls back
+			// to cookies for them. Other schemes keep the check, because their
+			// cookies still authenticate.
+			if hasBearerAuthorization(r) && !cookieSignIn {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+{{- if .MCP }}
+
+			// Skip CSRF check for the MCP server. It only accepts personal API
+			// tokens and ignores cookies.
+			if r.URL.Path == "/mcp" {
+				next.ServeHTTP(w, r)
+				return
+			}
+{{- end }}
+
+			// Skip CSRF check for API requests without a session cookie. They carry
+			// no ambient credential, and API sign-in returns the token in the body
+			// instead of setting a cookie, unless it asks for a cookie session.
+			if strings.HasPrefix(r.URL.Path, "/api/") && !hasSessionCookie(r) && !cookieSignIn {
+				next.ServeHTTP(w, r)
+				return
+			}
+{{- end }}
+
+			// Validate CSRF token for state-changing methods (POST, PUT, PATCH, DELETE)
+			token := getOrGenerateCSRFToken(w, r, isProduction)
+			ctx := ctxkeys.WithCSRFToken(r.Context(), token)
+
+			// Get submitted token. Try multiple sources in priority order
+			// 1. Frontend request header
+			// 2. Form field (both application/x-www-form-urlencoded and multipart/form-data)
+			// PostFormValue() automatically parses the request based on Content-Type
+			submittedToken := r.Header.Get(csrfHeader)
+			if submittedToken == "" {
+				submittedToken = r.PostFormValue(csrfFormField)
+			}
+
+			// Validate token using constant-time comparison
+			if !validCSRFToken(token, submittedToken) {
+				slog.Warn("csrf validation failed",
+					"path", r.URL.Path,
+					"method", r.Method,
+					"ip", clientIPs.ClientIP(r),
+				)
+{{- if not .HasHTMLFrontend }}
+				renderMiddlewareError(w, r, http.StatusForbidden, "Request expired", "Send the X-CSRF-Token header with cookie requests.")
+{{- else if .API }}
+				description := "Refresh the page and try again."
+				if isAPIRequest(r) {
+					description = "Send the X-CSRF-Token header with cookie requests."
+				}
+				renderMiddlewareError(w, r, http.StatusForbidden, "Request expired", description)
+{{- else }}
+				renderMiddlewareError(w, r, http.StatusForbidden, "Request expired", "Refresh the page and try again.")
+{{- end }}
+				return
+			}
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// getOrGenerateCSRFToken retrieves existing token or generates new one
+func getOrGenerateCSRFToken(w http.ResponseWriter, r *http.Request, isProduction bool) string {
+	cookie, err := r.Cookie(csrfCookieName)
+	if err == nil && cookie.Value != "" && len(cookie.Value) == base64.RawURLEncoding.EncodedLen(csrfTokenLen) {
+		return cookie.Value
+	}
+
+	token := generateCSRFToken()
+
+	// Set cookie with SameSite=Lax for CSRF protection
+	http.SetCookie(w, &http.Cookie{
+		Name:     csrfCookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   isProduction, // Secure flag based on APP_ENV (safer than r.TLS behind load balancers)
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   86400 * 7, // 7 days
+	})
+
+	return token
+}
+
+// generateCSRFToken creates cryptographically secure random token
+func generateCSRFToken() string {
+	bytes := make([]byte, csrfTokenLen)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		panic("failed to generate csrf token: " + err.Error())
+	}
+	return base64.RawURLEncoding.EncodeToString(bytes)
+}
+
+// validCSRFToken performs constant-time comparison of tokens
+func validCSRFToken(expected, actual string) bool {
+	if expected == "" || actual == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(expected), []byte(actual)) == 1
+}
+{{- if .API }}
+
+// hasSessionCookie reports whether the request carries a cookie that
+// AuthMiddleware would authenticate.
+func hasSessionCookie(r *http.Request) bool {
+	for _, name := range []string{"session_token", "impersonation_token"} {
+		cookie, err := r.Cookie(name)
+		if err == nil && cookie.Value != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// requestsCookieSession reports whether an API request asks for its session
+// as a cookie instead of a bearer token in the body.
+func requestsCookieSession(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Query().Get("session") == "cookie"
+}
+{{- end }}

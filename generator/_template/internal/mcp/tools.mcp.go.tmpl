@@ -1,0 +1,396 @@
+package mcp
+
+import (
+	"context"
+{{- if .Workspaces }}
+	"errors"
+{{- end }}
+	"fmt"
+	"strings"
+	"time"
+
+	"{{.ModulePath}}/internal/api"
+{{- if not .Workspaces }}
+	"{{.ModulePath}}/internal/ctxkeys"
+{{- end }}
+{{- if .Workspaces }}
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/repository"
+{{- end }}
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// registerTools registers the built-in tools. Register your own tools here,
+// next to them: wrap the body in Read or Write, call your service, and return
+// a struct the SDK turns into the output schema.
+//
+// Tools are a curated list for agents, not a copy of the JSON API. Keep
+// destructive and money-moving actions out: checkout, billing management,
+// account or workspace deletion, role changes, member removal, admin,
+// passwords and email.
+func registerTools(server *mcpsdk.Server, services Services) {
+	tools := builtinTools{services: services}
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "whoami",
+		Title:       "Who am I",
+{{- if .Workspaces }}
+		Description: "Returns the account this API token acts for: user id, name and email, the token's name, scopes and expiry, and the one workspace the token is bound to with the user's role there. Call it first to learn what the other tools can reach. Needs the read scope.",
+{{- else }}
+		Description: "Returns the account this API token acts for: user id, name and email, and the token's name, scopes and expiry. Call it first to learn what the token may do. Needs the read scope.",
+{{- end }}
+		Annotations: readOnly("Who am I"),
+	}, Read(tools.whoami))
+{{- if .Workspaces }}
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "list_workspaces",
+		Title:       "List workspaces",
+		Description: "Lists the workspaces this token can reach with the user's role in each. A token is bound to one workspace, so the list has at most one entry. Needs the read scope.",
+		Annotations: readOnly("List workspaces"),
+	}, Read(tools.listWorkspaces))
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "get_workspace",
+		Title:       "Get workspace",
+		Description: "Returns a workspace: its name and slug, the user's role and permissions, the members, the pending invitations (only for members who may manage members), and the seats used and allowed by the plan. Needs the read scope.",
+		Annotations: readOnly("Get workspace"),
+	}, Read(tools.getWorkspace))
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "list_activity",
+		Title:       "List workspace activity",
+		Description: "Lists the audit log of a workspace, newest first: who did what and when, such as renames, invitations and role changes. Returns up to limit events (default 50, at most 200) and next_cursor; pass next_cursor as cursor to get the next page, null means there are no more events. Only owners and admins may view activity. Needs the read scope.",
+		Annotations: readOnly("List workspace activity"),
+	}, Read(tools.listActivity))
+{{- end }}
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:  "get_billing",
+		Title: "Get billing",
+{{- if .Workspaces }}
+		Description: "Returns the subscription of a workspace: the plan, the subscription status, the resolved access state (free, trial, paid, grace or blocked) with trial and access end dates, and the plans that can be bought. It never starts a checkout or returns payment links. Only workspace owners may view billing. Needs the read scope.",
+{{- else }}
+		Description: "Returns the user's subscription: the plan, the subscription status, the resolved access state (free, trial, paid, grace or blocked) with trial and access end dates, and the plans that can be bought. It never starts a checkout or returns payment links. Needs the read scope.",
+{{- end }}
+		Annotations: readOnly("Get billing"),
+	}, Read(tools.getBilling))
+{{- if .Workspaces }}
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "invite_member",
+		Title:       "Invite a member",
+		Description: "Invites a person to a workspace by email with the role member or admin. The invitation is emailed to them and shows up in get_workspace until they accept. Fails with seat_limit when the plan has no free seat and already_member for existing members. Only owners and admins may invite. Needs a token with read and write access.",
+		Annotations: &mcpsdk.ToolAnnotations{Title: "Invite a member", DestructiveHint: boolPointer(false), OpenWorldHint: boolPointer(true)},
+	}, Write(tools.inviteMember))
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "rename_workspace",
+		Title:       "Rename a workspace",
+		Description: "Changes the display name of a workspace (2 to 80 characters). The slug and every link stay the same. Only owners and admins may rename. Needs a token with read and write access.",
+		Annotations: &mcpsdk.ToolAnnotations{Title: "Rename a workspace", DestructiveHint: boolPointer(false), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
+	}, Write(tools.renameWorkspace))
+{{- end }}
+}
+
+func readOnly(title string) *mcpsdk.ToolAnnotations {
+	return &mcpsdk.ToolAnnotations{Title: title, ReadOnlyHint: true, OpenWorldHint: boolPointer(false)}
+}
+
+func boolPointer(value bool) *bool {
+	return &value
+}
+
+type builtinTools struct {
+	services Services
+}
+
+// NoInput is the input of tools without arguments.
+type NoInput struct{}
+
+// TokenInfo describes the personal API token of the caller.
+type TokenInfo struct {
+	Name      string     `json:"name" jsonschema:"the label the user gave the token"`
+	Scopes    []string   `json:"scopes" jsonschema:"read, or read and write"`
+	ExpiresAt *time.Time `json:"expires_at" jsonschema:"when the token stops working, null for never"`
+}
+
+// WhoAmI is the output of whoami.
+type WhoAmI struct {
+	User  api.User  `json:"user"`
+	Token TokenInfo `json:"token"`
+{{- if .Workspaces }}
+	Workspace *api.Membership `json:"workspace" jsonschema:"the one workspace this token can reach, with the user's role; null when the user is no longer a member"`
+{{- end }}
+}
+
+func (w WhoAmI) Summary() string {
+	summary := fmt.Sprintf("Signed in as %s (%s) with the token %q and the scopes %s.", w.User.Name, w.User.Email, w.Token.Name, strings.Join(w.Token.Scopes, " and "))
+{{- if .Workspaces }}
+	if w.Workspace == nil {
+		return summary + " The user is no longer a member of the token's workspace, so workspace tools find nothing."
+	}
+	summary += fmt.Sprintf(" The token is bound to the workspace %s (slug %s), role %s.", w.Workspace.Workspace.Name, w.Workspace.Workspace.Slug, w.Workspace.Role)
+{{- end }}
+	return summary
+}
+
+func (t builtinTools) whoami(_ context.Context, caller Caller, _ NoInput) (WhoAmI, error) {
+	output := WhoAmI{
+		User: api.NewUser(caller.User),
+		Token: TokenInfo{
+			Name:      caller.Token.Name,
+			Scopes:    caller.Token.ScopeList(),
+			ExpiresAt: caller.Token.ExpiresAt,
+		},
+	}
+{{- if .Workspaces }}
+	membership, err := t.boundMembership(caller)
+	if errors.Is(err, repository.ErrWorkspaceNotFound) {
+		return output, nil
+	}
+	if err != nil {
+		return WhoAmI{}, err
+	}
+	output.Workspace = &membership
+{{- end }}
+	return output, nil
+}
+{{- if .Workspaces }}
+
+// WorkspaceInput names a workspace. Empty means the workspace the token is
+// bound to.
+type WorkspaceInput struct {
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+}
+
+// WorkspaceList is the output of list_workspaces.
+type WorkspaceList struct {
+	Items []api.Membership `json:"items"`
+}
+
+func (l WorkspaceList) Summary() string {
+	if len(l.Items) == 0 {
+		return "This token reaches no workspace."
+	}
+	names := make([]string, 0, len(l.Items))
+	for _, item := range l.Items {
+		names = append(names, fmt.Sprintf("%s (slug %s, role %s)", item.Workspace.Name, item.Workspace.Slug, item.Role))
+	}
+	return "Workspaces: " + strings.Join(names, ", ") + "."
+}
+
+func (t builtinTools) listWorkspaces(_ context.Context, caller Caller, _ NoInput) (WorkspaceList, error) {
+	membership, err := t.boundMembership(caller)
+	if errors.Is(err, repository.ErrWorkspaceNotFound) {
+		return WorkspaceList{Items: []api.Membership{}}, nil
+	}
+	if err != nil {
+		return WorkspaceList{}, err
+	}
+	return WorkspaceList{Items: []api.Membership{membership}}, nil
+}
+
+// WorkspaceDetail is the output of get_workspace.
+type WorkspaceDetail struct {
+	api.WorkspaceDetail
+}
+
+func (d WorkspaceDetail) Summary() string {
+	seats := fmt.Sprintf("%d seats used, no seat limit", d.Seats.Used)
+	if d.Seats.Limit != nil {
+		seats = fmt.Sprintf("%d of %d seats used", d.Seats.Used, *d.Seats.Limit)
+	}
+	return fmt.Sprintf("%s (slug %s): %s, %d pending invitations, your role is %s.", d.Workspace.Name, d.Workspace.Slug, seats, len(d.Invitations), d.Role)
+}
+
+func (t builtinTools) getWorkspace(_ context.Context, caller Caller, input WorkspaceInput) (WorkspaceDetail, error) {
+	workspace, member, err := t.workspace(caller, input.Workspace)
+	if err != nil {
+		return WorkspaceDetail{}, err
+	}
+	subscription, err := t.services.Subscriptions.EnsureSubscription(workspace.ID)
+	if err != nil {
+		return WorkspaceDetail{}, err
+	}
+	detail, err := api.NewWorkspaceDetail(t.services.Workspaces, workspace, member, subscription)
+	if err != nil {
+		return WorkspaceDetail{}, err
+	}
+	return WorkspaceDetail{WorkspaceDetail: detail}, nil
+}
+
+// ActivityInput selects a page of workspace activity.
+type ActivityInput struct {
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Limit     int    `json:"limit,omitempty" jsonschema:"number of events, 1 to 200; default 50"`
+	Cursor    string `json:"cursor,omitempty" jsonschema:"next_cursor of the previous page; leave empty for the newest events"`
+}
+
+// Activity is the output of list_activity.
+type Activity struct {
+	api.ActivityPage
+}
+
+func (a Activity) Summary() string {
+	if a.NextCursor == nil {
+		return fmt.Sprintf("%d events, newest first. This is the last page.", len(a.Items))
+	}
+	return fmt.Sprintf("%d events, newest first. Pass next_cursor as cursor for older events.", len(a.Items))
+}
+
+func (t builtinTools) listActivity(_ context.Context, caller Caller, input ActivityInput) (Activity, error) {
+	limit := input.Limit
+	if limit == 0 {
+		limit = api.DefaultActivityLimit
+	}
+	if limit < 1 || limit > api.MaxActivityLimit {
+		return Activity{}, InvalidField("limit", api.ActivityLimitMessage)
+	}
+	_, member, err := t.workspace(caller, input.Workspace)
+	if err != nil {
+		return Activity{}, err
+	}
+	page, err := api.NewActivityPage(t.services.Workspaces, member, input.Cursor, limit)
+	if err != nil {
+		return Activity{}, err
+	}
+	return Activity{ActivityPage: page}, nil
+}
+{{- end }}
+
+// Billing is the output of get_billing.
+type Billing struct {
+	api.Billing
+}
+
+func (b Billing) Summary() string {
+	if b.Access == nil {
+		return "No subscription yet."
+	}
+	return fmt.Sprintf("Plan %s, access state %s.", b.Access.PlanID, b.Access.State)
+}
+{{- if .Workspaces }}
+
+func (t builtinTools) getBilling(_ context.Context, caller Caller, input WorkspaceInput) (Billing, error) {
+	workspace, member, err := t.workspace(caller, input.Workspace)
+	if err != nil {
+		return Billing{}, err
+	}
+	subscription, err := t.services.Subscriptions.EnsureSubscription(workspace.ID)
+	if err != nil {
+		return Billing{}, err
+	}
+	billing, err := api.NewWorkspaceBilling(member, subscription)
+	if err != nil {
+		return Billing{}, err
+	}
+	return Billing{Billing: billing}, nil
+}
+{{- else }}
+
+func (t builtinTools) getBilling(ctx context.Context, _ Caller, _ NoInput) (Billing, error) {
+	return Billing{Billing: api.NewBilling(ctxkeys.Subscription(ctx))}, nil
+}
+{{- end }}
+{{- if .Workspaces }}
+
+// InviteInput is the input of invite_member.
+type InviteInput struct {
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Email     string `json:"email" jsonschema:"email address of the person to invite"`
+	Role      string `json:"role" jsonschema:"member or admin"`
+}
+
+// Invitation is the output of invite_member.
+type Invitation struct {
+	Workspace api.Workspace `json:"workspace"`
+	Email     string        `json:"email"`
+	Role      string        `json:"role"`
+}
+
+func (i Invitation) Summary() string {
+	return fmt.Sprintf("Invited %s to %s as %s. The invitation email is on its way.", i.Email, i.Workspace.Name, i.Role)
+}
+
+func (t builtinTools) inviteMember(_ context.Context, caller Caller, input InviteInput) (Invitation, error) {
+	workspace, member, err := t.workspace(caller, input.Workspace)
+	if err != nil {
+		return Invitation{}, err
+	}
+	// Invitations send email, so they share the limit of the web and JSON
+	// API: 30 an hour per member and workspace.
+	if member.Can(model.WorkspacePermissionManageMembers) && !t.services.Invitations.Allow(member.WorkspaceID+":"+member.UserID) {
+		return Invitation{}, &ToolError{Code: "rate_limited", Message: "Too many invitations. Try again in an hour."}
+	}
+	err = t.services.Workspaces.Invite(member, workspace, input.Email, input.Role)
+	if err != nil {
+		return Invitation{}, err
+	}
+	return Invitation{Workspace: api.NewWorkspace(workspace), Email: strings.ToLower(strings.TrimSpace(input.Email)), Role: input.Role}, nil
+}
+
+// RenameInput is the input of rename_workspace.
+type RenameInput struct {
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Name      string `json:"name" jsonschema:"the new name, 2 to 80 characters"`
+}
+
+// RenamedWorkspace is the output of rename_workspace.
+type RenamedWorkspace struct {
+	Workspace api.Workspace `json:"workspace"`
+}
+
+func (r RenamedWorkspace) Summary() string {
+	return fmt.Sprintf("Renamed the workspace to %s. The slug stays %s.", r.Workspace.Name, r.Workspace.Slug)
+}
+
+func (t builtinTools) renameWorkspace(_ context.Context, caller Caller, input RenameInput) (RenamedWorkspace, error) {
+	workspace, member, err := t.workspace(caller, input.Workspace)
+	if err != nil {
+		return RenamedWorkspace{}, err
+	}
+	err = t.services.Workspaces.UpdateName(member, workspace, input.Name)
+	if err != nil {
+		return RenamedWorkspace{}, err
+	}
+	updated, _, err := t.services.Workspaces.BySlugForUser(workspace.Slug, caller.User.ID)
+	if err != nil {
+		return RenamedWorkspace{}, err
+	}
+	return RenamedWorkspace{Workspace: api.NewWorkspace(updated)}, nil
+}
+
+// boundMembership returns the workspace the token is bound to with the
+// user's role. A user who left it gets ErrWorkspaceNotFound.
+func (t builtinTools) boundMembership(caller Caller) (api.Membership, error) {
+	memberships, err := t.services.Workspaces.ListForUser(caller.User.ID)
+	if err != nil {
+		return api.Membership{}, err
+	}
+	for _, membership := range api.NewMemberships(memberships) {
+		if membership.Workspace.ID == caller.Token.WorkspaceID {
+			return membership, nil
+		}
+	}
+	return api.Membership{}, repository.ErrWorkspaceNotFound
+}
+
+// workspace returns the workspace a tool works on and the caller's
+// membership: the workspace named by slug, or the bound workspace when slug
+// is empty. Every workspace except the bound one is not found, like on the
+// JSON API.
+func (t builtinTools) workspace(caller Caller, slug string) (*model.Workspace, *model.WorkspaceMember, error) {
+	if slug == "" {
+		membership, err := t.boundMembership(caller)
+		if err != nil {
+			return nil, nil, err
+		}
+		slug = membership.Workspace.Slug
+	}
+	workspace, member, err := t.services.Workspaces.BySlugForUser(slug, caller.User.ID)
+	if errors.Is(err, repository.ErrWorkspaceMemberNotFound) {
+		return nil, nil, repository.ErrWorkspaceNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if workspace.ID != caller.Token.WorkspaceID {
+		return nil, nil, repository.ErrWorkspaceNotFound
+	}
+	return workspace, member, nil
+}
+{{- end }}

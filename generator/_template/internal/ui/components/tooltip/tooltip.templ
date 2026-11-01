@@ -1,0 +1,149 @@
+package tooltip
+
+import (
+	"context"
+	"strconv"
+
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+type Side string
+
+const (
+	SideTop    Side = "top"
+	SideRight  Side = "right"
+	SideBottom Side = "bottom"
+	SideLeft   Side = "left"
+)
+
+type ctxKey string
+
+const stateKey ctxKey = "tooltipState"
+
+type ctxState struct {
+	id          string
+	open        *bool
+	defaultOpen bool
+}
+
+func state(ctx context.Context) ctxState {
+	if s, ok := ctx.Value(stateKey).(ctxState); ok {
+		return s
+	}
+	return ctxState{}
+}
+
+// Trigger returns the attributes that turn any element into the tooltip
+// trigger — the asChild equivalent: no wrapper element. Spread them onto your
+// own element:
+//
+//	@button.Button(button.Props{Attributes: tooltip.Trigger(ctx)}) { ... }
+//
+// data-base-ui-tooltip-trigger is the identifier Base UI's TooltipTrigger
+// renders, shadcn's slot comes with it like for every trigger part.
+func Trigger(ctx context.Context) templ.Attributes {
+	return templ.Attributes{
+		"data-slot":                    "tooltip-trigger",
+		"data-base-ui-tooltip-trigger": true,
+		"data-templ-tooltip-trigger":   state(ctx).id,
+	}
+}
+
+// DisableTrigger turns trigger attributes into a disabled trigger, Base UI's
+// TooltipTrigger disabled prop: no identifier, data-trigger-disabled instead.
+func DisableTrigger(attrs templ.Attributes) {
+	delete(attrs, "data-base-ui-tooltip-trigger")
+	attrs["data-trigger-disabled"] = true
+}
+
+type Props struct {
+	ID          string
+	Open        *bool
+	DefaultOpen bool
+}
+
+type ContentProps struct {
+	Class      string
+	Attributes templ.Attributes
+	// Side of the trigger the tooltip shows on. Defaults to top; flips
+	// automatically when there is no room.
+	Side Side
+	// SideOffset is the gap to the trigger in px. Defaults to 4 (Base UI).
+	SideOffset int
+}
+
+// Tooltip renders no element: it only generates the id that links Trigger and
+// Content (via ctx), so the trigger stays a direct child of its layout.
+templ Tooltip(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.ID == "" {
+		{{ p.ID = utils.RandomID() }}
+	}
+	{{ ctx = context.WithValue(ctx, stateKey, ctxState{id: p.ID, open: p.Open, defaultOpen: p.DefaultOpen}) }}
+	{ children... }
+}
+
+templ Content(props ...ContentProps) {
+	{{ var p ContentProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.Side == "" {
+		{{ p.Side = SideTop }}
+	}
+	if p.SideOffset == 0 {
+		{{ p.SideOffset = 4 }}
+	}
+	{{ s := state(ctx) }}
+	// Hidden until the script portals it to <body> on open. The wrapper
+	// carries no data-slot, so sibling rules such as the button group's
+	// rounding ignore it. Inside it Base UI's positioner, which carries the
+	// position, around the popup.
+	<div data-templ-portal hidden>
+		<div data-base-ui-portal hidden>
+		<div
+			data-templ-side={ string(p.Side) }
+			data-templ-side-offset={ strconv.Itoa(p.SideOffset) }
+			data-closed
+			hidden
+			role="presentation"
+			class="isolate z-50"
+			{ utils.DirectionAttributes(ctx)... }
+		>
+			<div
+				id={ s.id }
+				data-slot="tooltip-content"
+				if s.open != nil {
+					data-templ-open={ strconv.FormatBool(*s.open) }
+				}
+				data-templ-default-open?={ s.open == nil && s.defaultOpen }
+				data-closed
+				tabindex="-1"
+				data-base-ui-focusable
+				class={
+					utils.CN(
+						// 1:1 base/ui/tooltip.tsx TooltipContent, the look comes from
+						// and Base UI's standard transform-origin variable.
+						"data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs has-data-[slot=kbd]:pr-1.5 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[side=inline-start]:slide-in-from-right-2 data-[side=inline-end]:slide-in-from-left-2 z-50 w-fit max-w-xs origin-(--transform-origin) bg-foreground text-background",
+						// The popup stays mounted after animate-out until it unmounts.
+						"data-closed:fill-mode-forwards",
+						p.Class,
+					),
+				}
+				{ p.Attributes... }
+			>
+				{ children... }
+				// TooltipArrow: the position comes inline like Base UI's.
+				<div
+					aria-hidden="true"
+					data-closed
+					class="size-2.5 translate-y-[calc(-50%-2px)] rotate-45 rounded-[2px] data-[side=inline-end]:top-1/2! data-[side=inline-end]:-left-1 data-[side=inline-end]:-translate-y-1/2 data-[side=inline-start]:top-1/2! data-[side=inline-start]:-right-1 data-[side=inline-start]:-translate-y-1/2 z-50 bg-foreground fill-foreground data-[side=bottom]:top-1 data-[side=left]:top-1/2! data-[side=left]:-right-1 data-[side=left]:-translate-y-1/2 data-[side=right]:top-1/2! data-[side=right]:-left-1 data-[side=right]:-translate-y-1/2 data-[side=top]:-bottom-2.5"
+				></div>
+			</div>
+		</div>
+		</div>
+	</div>
+}

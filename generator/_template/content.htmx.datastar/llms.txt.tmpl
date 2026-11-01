@@ -1,0 +1,13 @@
+# {{.ProjectName}}
+
+> {{.ProjectName}} is a server-rendered product built with Go, templ, {{if eq .Framework "datastar"}}Datastar 1.0{{else}}htmx 4.0{{end}}, Tailwind CSS, and {{if eq .Database "postgres"}}PostgreSQL{{else}}SQLite{{end}}{{ if .MCP }}, with a JSON API and an MCP server for AI agents{{ else if .API }}, with a JSON API{{ end }}.
+
+## Public pages
+
+- [Home](/): Product overview and primary actions.
+- [Sign in](/auth): Account access.
+{{- if .HasBlog }}
+- [Blog](/blog): Product articles and updates.
+{{- end }}
+- [Privacy](/legal/privacy): Privacy policy.
+- [Terms](/legal/terms): Terms of service.

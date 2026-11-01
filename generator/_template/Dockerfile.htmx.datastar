@@ -1,0 +1,58 @@
+# Build stage:
+# Install tools, compile CSS, generate templ code, and build the final binary.
+FROM golang:1.26 AS build
+WORKDIR /app
+
+# Copy Go dependency files first so Docker can cache module downloads.
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the rest of the project.
+COPY . .
+
+# Install build-time dependencies.
+RUN apt-get update && apt-get install -y wget ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Download the pinned Tailwind standalone binary for the current CPU architecture.
+RUN arch="$(dpkg --print-architecture)" && \
+    case "$arch" in \
+      amd64) tailwind_arch="x64"; tailwind_sha256="dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a" ;; \
+      arm64) tailwind_arch="arm64"; tailwind_sha256="55fd0b241214eff3de1e8ee4f22796662f2d2e7a49bcfca7477cfd0bac398195" ;; \
+      *) echo "unsupported architecture: $arch" && exit 1 ;; \
+    esac && \
+    wget -qO /usr/local/bin/tailwindcss "https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/tailwindcss-linux-${tailwind_arch}" && \
+    echo "${tailwind_sha256}  /usr/local/bin/tailwindcss" | sha256sum --check - && \
+    chmod +x /usr/local/bin/tailwindcss
+
+# Compile Tailwind CSS.
+RUN tailwindcss -i ./assets/css/globals.css -o ./assets/css/output.css --minify
+
+# Generate Go files from .templ files.
+RUN go tool templ generate
+
+# Build the application as a static binary.
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server/main.go
+
+# Deploy-Stage
+FROM alpine:3.24
+WORKDIR /app
+
+# Install ca-certificates and sqlite for backups/debugging
+RUN apk add --no-cache ca-certificates sqlite
+
+# Set environment variable for runtime
+ENV APP_ENV=production
+ENV GO_ENV=production
+
+# Copy the binary, CSS output, and content directory
+COPY --from=build /app/main .
+COPY --from=build /app/assets/css/output.css ./assets/css/output.css
+COPY --from=build /app/content ./content
+
+# Expose the port
+EXPOSE 8090
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -qO- http://127.0.0.1:8090/healthz >/dev/null || exit 1
+
+# Command to run
+CMD ["./main"]

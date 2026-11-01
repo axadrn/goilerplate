@@ -1,0 +1,1 @@
+{"project_name":"Stripe Blog","module_path":"example.com/stripe-blog","framework":"htmx","database":"sqlite","payment":"stripe","mail":"smtp","workspaces":true,"oauth":["github"],"storage":false,"content":["blog"],"api":false,"mcp":false}

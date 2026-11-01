@@ -1,0 +1,145 @@
+# {{.ProjectName}}
+
+{{ if .IsHeadless -}}
+A production-ready Go SaaS backend with a JSON API and no native frontend.
+{{- else if .IsSvelte -}}
+A production-ready Go SaaS with a SvelteKit app on the JSON API, served by the Go binary.
+{{- else if eq .Framework "datastar" -}}
+A production-ready Go SaaS built with templ, Datastar 1.0, and Tailwind CSS.
+{{- else -}}
+A production-ready Go SaaS built with templ, htmx 4.0, and Tailwind CSS.
+{{- end }}
+
+## Documentation
+
+Visit [goilerplate.com/docs](https://goilerplate.com/docs).
+
+## Configuration
+
+Copy `.env.example` to `.env`. The generated example is the complete Env contract for this project's selected features.
+
+Brand identity lives in `internal/brand`. The framework, database, mailer, payment provider, and included modules live in generated Go source. Env contains only deployment coordinates, external IDs, operator switches, and secrets.
+{{- if .API }}
+
+## JSON API
+
+The API lives under `/api/v1`. Its OpenAPI 3.1 document is `internal/api/openapi.yaml`, served at `/api/v1/openapi.yaml`. Sign in with an `/api/v1/auth` endpoint and send the token as `Authorization: Bearer <token>`. Set `CORS_ALLOWED_ORIGINS` to the browser origins that may call the API.
+
+Users create personal API tokens {{ if .IsHeadless }}with `POST /api/v1/account/tokens`{{ else }}under Settings, Security, or with `POST /api/v1/account/tokens`{{ end }}. A token is shown once, has the `read` scope or `read` and `write`{{ if .Workspaces }}, is bound to one workspace{{ end }}, and works only on the operations whose `openapi.yaml` entry lists `apiTokenAuth`.
+{{- if .IsSvelte }}
+
+The SvelteKit app uses the same API on the same origin. It signs in with `?session=cookie`, so the session lives in an HttpOnly cookie and the app never stores a token. `APP_URL` is the URL of this server, and emails link to the app's pages under `APP_URL/auth/...`.
+{{- else if not .HasHTMLFrontend }}
+
+`APP_URL` is the URL of your frontend. Emails link to `APP_URL/auth/...`, and your frontend calls the matching `/api/v1/auth/.../verify` endpoint with the token from the link.
+{{- if .OAuth }}
+
+OAuth sign-in starts at `API_URL/auth/{provider}`, returns to `API_URL/auth/{provider}/callback`, and ends at `APP_URL/app` with a session cookie for the `API_URL` host. `API_URL` defaults to `APP_URL`. When they differ, both must share a site, for example `app.example.com` and `api.example.com`.
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if .IsSvelte }}
+
+## SvelteKit app
+
+The app lives in `web/`: SvelteKit with Svelte 5, TypeScript, Tailwind CSS 4 and shadcn-svelte, built as a static single-page app. The Go binary embeds the build and serves it next to the API, so production is one binary and one origin, with no Node.js at runtime.
+
+You need Go, [Task](https://taskfile.dev), Node.js 22.17 or newer (24 LTS recommended) and pnpm 12.9.1 (`corepack enable` or `npm install --global pnpm@12.9.1`).
+
+```bash
+task dev    # Go server and Vite dev server with hot reload; open the Vite URL
+task check  # svelte-check, zero errors and warnings
+task build  # pnpm build, then bin/server with the app embedded
+```
+
+Without a build, `go build` still works and pages answer "The web app is not built. Run task build or task dev." The Dockerfile builds the app in a Node.js stage and copies only the binary into the runtime image.
+{{- end }}
+{{- if .MCP }}
+
+## MCP server
+
+Your users connect their AI agents to `/mcp` on this server, for example `https://example.com/mcp`. It speaks MCP over Streamable HTTP and accepts only personal API tokens as `Authorization: Bearer pat_...`. A `read` token can call the read tools; changes need a token with `read` and `write`.
+
+Tools: `whoami`{{ if .Workspaces }}, `list_workspaces`, `get_workspace`, `list_activity` and `get_billing` (read), `invite_member` and `rename_workspace` (write). A token is bound to one workspace, and the workspace tools stay inside it{{ else }} and `get_billing`{{ end }}. Checkout, billing management, deletions, role changes, member removal, admin, passwords and email are never tools.
+
+Claude Code:
+
+```bash
+claude mcp add --transport http app https://example.com/mcp --header "Authorization: Bearer pat_..."
+```
+
+Claude Desktop and claude.ai: open Customize, Connectors, Add custom connector. Enter the `/mcp` URL, choose "No sign in" under Authentication, and add the request header `Authorization` with the value `Bearer pat_...`. Claude connects from Anthropic's cloud, so the URL must be reachable from the internet. Request headers on custom connectors are in beta and not available to every organization yet. For a server on your machine, or when your organization has no Request headers field, add the local `mcp-remote` bridge to `claude_desktop_config.json` instead:
+
+```json
+{
+  "mcpServers": {
+    "app": {
+      "command": "npx",
+      "args": ["mcp-remote", "http://localhost:8090/mcp", "--header", "Authorization:${AUTH_HEADER}"],
+      "env": {"AUTH_HEADER": "Bearer pat_..."}
+    }
+  }
+}
+```
+
+Cursor, in `.cursor/mcp.json` with the token in the `API_TOKEN` environment variable:
+
+```json
+{
+  "mcpServers": {
+    "app": {
+      "url": "https://example.com/mcp",
+      "headers": {"Authorization": "Bearer ${env:API_TOKEN}"}
+    }
+  }
+}
+```
+
+VS Code, in `.vscode/mcp.json`. VS Code asks for the token once and stores it:
+
+```json
+{
+  "inputs": [
+    {"type": "promptString", "id": "api-token", "description": "Personal API token", "password": true}
+  ],
+  "servers": {
+    "app": {
+      "type": "http",
+      "url": "https://example.com/mcp",
+      "headers": {"Authorization": "Bearer ${input:api-token}"}
+    }
+  }
+}
+```
+
+Add your own tool next to its service. The services a tool may call are listed in `mcp.Services` in `internal/mcp/server.go` and passed in `internal/routes/routes.go`. This example is tested in `internal/mcp/example_test.go`; inside `internal/mcp`, drop the `mcp.` prefixes and call it from `registerTools` in `internal/mcp/tools.go`:
+
+```go
+type nameInput struct {
+	Name string `json:"name" jsonschema:"the new display name"`
+}
+
+func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "set_display_name",
+		Description: "Changes the display name of the user this token acts for. Needs a token with read and write access.",
+	}, mcp.Write(func(ctx context.Context, caller mcp.Caller, input nameInput) (api.UserResponse, error) {
+		err := validation.ValidateName(input.Name)
+		if err != nil {
+			return api.UserResponse{}, mcp.InvalidField("name", api.FieldMessage(err))
+		}
+		user, err := services.Users.UpdateName(caller.User.ID, input.Name)
+		if err != nil {
+			return api.UserResponse{}, err
+		}
+		return api.UserResponse{User: api.NewUser(user)}, nil
+	}))
+}
+```
+
+`mcp.Write` checks the `write` scope before the body runs, and errors come back with the JSON API codes.
+{{- end }}
+
+## License
+
+This project is yours. goilerplate generated it under the 0BSD license, so no notice or attribution is required. Add the license you want for your own code.

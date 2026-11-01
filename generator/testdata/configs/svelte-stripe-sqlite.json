@@ -1,0 +1,16 @@
+{
+  "project_name": "SvelteKit Stripe",
+  "module_path": "example.com/svelte-stripe",
+  "framework": "svelte",
+  "database": "sqlite",
+  "payment": "stripe",
+  "mail": "smtp",
+  "workspaces": false,
+  "oauth": [
+    "github"
+  ],
+  "storage": true,
+  "content": [],
+  "api": true,
+  "mcp": true
+}

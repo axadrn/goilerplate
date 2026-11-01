@@ -1,0 +1,15 @@
+package blocks
+
+templ FooterNewsletterForm(errorMsg string) {
+	@FooterNewsletterSection() {
+		<form
+			class="mt-6 flex flex-col sm:flex-row gap-3 items-start"
+			hx-post="/newsletter/subscribe"
+			hx-target="#newsletter-section"
+			hx-swap="outerHTML"
+			hx-disable="find button[type='submit']"
+		>
+			@FooterNewsletterFields(errorMsg)
+		</form>
+	}
+}

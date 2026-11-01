@@ -1,0 +1,360 @@
+package mcp_test
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"slices"
+	"strings"
+	"testing"
+{{- if .Workspaces }}
+	"time"
+{{- end }}
+
+	"{{.ModulePath}}/internal/api"
+	"{{.ModulePath}}/internal/mcp"
+{{- if .Workspaces }}
+	"{{.ModulePath}}/internal/model"
+{{- end }}
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+func TestToolsMatchTheSelection(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "lister")
+	token, _ := createToken(t, env, owner)
+	session := connectMemory(t, env.server, owner, token)
+
+	result, err := session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(result.Tools))
+	for _, tool := range result.Tools {
+		names = append(names, tool.Name)
+		if tool.OutputSchema == nil || tool.InputSchema == nil {
+			t.Errorf("%s has no input or output schema", tool.Name)
+		}
+		if !strings.Contains(tool.Description, "Needs the read scope.") && !strings.Contains(tool.Description, "Needs a token with read and write access.") {
+			t.Errorf("%s description does not state its scope: %s", tool.Name, tool.Description)
+		}
+		write := strings.Contains(tool.Description, "read and write access")
+		if tool.Annotations == nil || tool.Annotations.ReadOnlyHint == write {
+			t.Errorf("%s read-only hint does not match its scope", tool.Name)
+		}
+	}
+	slices.Sort(names)
+{{- if .Workspaces }}
+	want := []string{"get_billing", "get_workspace", "invite_member", "list_activity", "list_workspaces", "rename_workspace", "whoami"}
+{{- else }}
+	want := []string{"get_billing", "whoami"}
+{{- end }}
+	if !slices.Equal(names, want) {
+		t.Fatalf("tools = %v, want %v", names, want)
+	}
+}
+
+func TestWhoAmIReturnsTheTokenUser(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "ada")
+	seedOwner(t, env, "other")
+	_, raw := createToken(t, env, owner)
+	session := connectHTTP(t, env, raw)
+
+	result := call(t, session, "whoami", nil)
+	whoami := output[mcp.WhoAmI](t, result)
+	if whoami.User.ID != owner.user.ID || whoami.User.Email != "ada@example.com" || whoami.Token.Name != "Agent" || strings.Join(whoami.Token.Scopes, ",") != "read" {
+		t.Fatalf("whoami = %#v", whoami)
+	}
+{{- if .Workspaces }}
+	if whoami.Workspace == nil || whoami.Workspace.Workspace.ID != owner.workspace.ID || whoami.Workspace.Role != "owner" {
+		t.Fatalf("workspace = %#v", whoami.Workspace)
+	}
+{{- end }}
+	if !strings.HasPrefix(text(result), "Signed in as Ada (ada@example.com)") || !strings.Contains(text(result), `"email":"ada@example.com"`) {
+		t.Fatalf("text = %q", text(result))
+	}
+}
+
+func TestMCPRequiresAPersonalAPIToken(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "guest")
+	token, raw := createToken(t, env, owner)
+	err := env.tokens.Revoke(owner.user.ID, token.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
+	for name, authorization := range map[string]string{
+		"no header":     "",
+		"unknown token": "Bearer pat_unknown",
+		"revoked token": "Bearer " + raw,
+		"non-token bearer": "Bearer " + strings.Repeat("s", 43),
+	} {
+		request := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Accept", "application/json, text/event-stream")
+		if authorization != "" {
+			request.Header.Set("Authorization", authorization)
+		}
+		recorder := httptest.NewRecorder()
+		env.handler.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusUnauthorized || !strings.HasPrefix(recorder.Header().Get("WWW-Authenticate"), "Bearer") {
+			t.Fatalf("%s: status = %d, headers %v, body %s", name, recorder.Code, recorder.Header(), recorder.Body.String())
+		}
+		var envelope api.ErrorBody
+		err := json.Unmarshal(recorder.Body.Bytes(), &envelope)
+		if err != nil || envelope.Error.Code != "unauthenticated" {
+			t.Fatalf("%s: body = %s", name, recorder.Body.String())
+		}
+	}
+}
+
+func TestMCPIsStateless(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "stateless")
+	_, raw := createToken(t, env, owner)
+	request := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+	request.Header.Set("Authorization", "Bearer "+raw)
+	recorder := httptest.NewRecorder()
+	env.handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusMethodNotAllowed || recorder.Header().Get("Allow") != http.MethodPost {
+		t.Fatalf("GET status = %d, Allow %q", recorder.Code, recorder.Header().Get("Allow"))
+	}
+
+	session := connectHTTP(t, env, raw)
+	if session.ID() != "" {
+		t.Fatalf("session id = %q, want none", session.ID())
+	}
+	for range 2 {
+		output[mcp.WhoAmI](t, call(t, session, "whoami", nil))
+	}
+}
+
+func TestUnknownToolIsAProtocolError(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "unknown")
+	_, raw := createToken(t, env, owner)
+	session := connectHTTP(t, env, raw)
+	_, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "delete_account"})
+	if err == nil || !strings.Contains(err.Error(), "unknown tool") {
+		t.Fatalf("CallTool(delete_account) error = %v", err)
+	}
+}
+{{- if not .Workspaces }}
+
+func TestGetBillingReturnsThePlanWithoutLinks(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "payer")
+	_, raw := createToken(t, env, owner)
+	session := connectHTTP(t, env, raw)
+
+	result := call(t, session, "get_billing", nil)
+	billing := output[mcp.Billing](t, result)
+	if billing.Access == nil || billing.Access.PlanID != owner.subscription.PlanID || len(billing.Plans) == 0 {
+		t.Fatalf("billing = %#v", billing)
+	}
+	if strings.Contains(text(result), "http") {
+		t.Fatalf("billing text contains a link: %s", text(result))
+	}
+}
+{{- end }}
+{{- if .Workspaces }}
+
+// addMember adds userID to the owner's workspace with role and returns a
+// token of that member bound to the workspace.
+func addMember(t *testing.T, env *environment, owner owner, id, role string, scopes ...string) string {
+	t.Helper()
+	member := seedOwner(t, env, id)
+	_, err := env.database.Exec(`
+		INSERT INTO workspace_members (id, workspace_id, user_id, role, created_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`, "extra-"+id, owner.workspace.ID, member.user.ID, role, time.Now())
+	if err != nil {
+		t.Fatalf("add %s: %v", id, err)
+	}
+	member.workspace = owner.workspace
+	_, raw := createToken(t, env, member, scopes...)
+	return raw
+}
+
+func upgrade(t *testing.T, env *environment, owner owner) {
+	t.Helper()
+	_, err := env.database.Exec(`UPDATE subscriptions SET plan_id = $1 WHERE workspace_id = $2`, model.SubscriptionPlanEnterprise, owner.workspace.ID)
+	if err != nil {
+		t.Fatalf("upgrade workspace: %v", err)
+	}
+}
+
+func TestWorkspaceToolsStayInTheBoundWorkspace(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "bound")
+	stranger := seedOwner(t, env, "stranger")
+	second, err := env.services.Workspaces.Create(owner.user.ID, "Second Workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, raw := createToken(t, env, owner)
+	session := connectHTTP(t, env, raw)
+
+	list := output[mcp.WorkspaceList](t, call(t, session, "list_workspaces", nil))
+	if len(list.Items) != 1 || list.Items[0].Workspace.ID != owner.workspace.ID || list.Items[0].Role != model.WorkspaceRoleOwner {
+		t.Fatalf("list_workspaces = %#v", list)
+	}
+	for _, arguments := range []map[string]any{nil, {"workspace": owner.workspace.Slug}} {
+		detail := output[mcp.WorkspaceDetail](t, call(t, session, "get_workspace", arguments))
+		if detail.Workspace.ID != owner.workspace.ID || detail.Role != model.WorkspaceRoleOwner || len(detail.Members) != 1 || detail.Seats.Used != 1 || !detail.Permissions.ManageMembers {
+			t.Fatalf("get_workspace(%v) = %#v", arguments, detail)
+		}
+	}
+	for _, slug := range []string{second.Slug, stranger.workspace.Slug, "missing"} {
+		for _, tool := range []string{"get_workspace", "list_activity", "get_billing"} {
+			toolError(t, call(t, session, tool, map[string]any{"workspace": slug}), "not_found")
+		}
+	}
+}
+
+func TestWriteToolsNeedTheWriteScope(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "writer")
+	upgrade(t, env, owner)
+	_, readOnly := createToken(t, env, owner)
+	_, readWrite := createToken(t, env, owner, "read", "write")
+
+	reader := connectHTTP(t, env, readOnly)
+	for tool, arguments := range map[string]map[string]any{
+		"rename_workspace": {"name": "Renamed"},
+		"invite_member":    {"email": "new@example.com", "role": "member"},
+	} {
+		detail := toolError(t, call(t, reader, tool, arguments), "insufficient_scope")
+		if !strings.Contains(detail.Message, "write scope") {
+			t.Fatalf("%s message = %q", tool, detail.Message)
+		}
+	}
+	if len(env.mailer.Messages()) != 0 {
+		t.Fatal("a read-only token sent an invitation")
+	}
+
+	writer := connectHTTP(t, env, readWrite)
+	renamed := output[mcp.RenamedWorkspace](t, call(t, writer, "rename_workspace", map[string]any{"name": "  Renamed Team  "}))
+	if renamed.Workspace.Name != "Renamed Team" || renamed.Workspace.Slug != owner.workspace.Slug {
+		t.Fatalf("rename_workspace = %#v", renamed)
+	}
+	fields := toolError(t, call(t, writer, "rename_workspace", map[string]any{"name": "x"}), "validation_failed").Fields
+	if fields["name"] == "" {
+		t.Fatalf("fields = %v", fields)
+	}
+
+	invited := output[mcp.Invitation](t, call(t, writer, "invite_member", map[string]any{"email": " New@Example.com ", "role": "admin"}))
+	if invited.Email != "new@example.com" || invited.Role != "admin" || invited.Workspace.ID != owner.workspace.ID {
+		t.Fatalf("invite_member = %#v", invited)
+	}
+	if len(env.mailer.Messages()) != 1 {
+		t.Fatalf("emails = %d, want 1", len(env.mailer.Messages()))
+	}
+	detail := output[mcp.WorkspaceDetail](t, call(t, writer, "get_workspace", nil))
+	if len(detail.Invitations) != 1 || detail.Invitations[0].Email != "new@example.com" {
+		t.Fatalf("invitations = %#v", detail.Invitations)
+	}
+	fields = toolError(t, call(t, writer, "invite_member", map[string]any{"email": "boss@example.com", "role": "owner"}), "validation_failed").Fields
+	if fields["role"] == "" {
+		t.Fatalf("fields = %v", fields)
+	}
+	toolError(t, call(t, writer, "invite_member", map[string]any{"email": "writer@example.com", "role": "member"}), "already_member")
+}
+
+func TestInviteMemberSharesTheInvitationLimit(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "inviter")
+	upgrade(t, env, owner)
+	_, raw := createToken(t, env, owner, "read", "write")
+	for range 30 {
+		env.services.Invitations.Allow(owner.workspace.ID + ":" + owner.user.ID)
+	}
+
+	toolError(t, call(t, connectHTTP(t, env, raw), "invite_member", map[string]any{"email": "new@example.com", "role": "member"}), "rate_limited")
+	if len(env.mailer.Messages()) != 0 {
+		t.Fatalf("emails = %d, want 0", len(env.mailer.Messages()))
+	}
+}
+
+func TestRolesStillApplyToTokens(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "boss")
+	upgrade(t, env, owner)
+	member := connectHTTP(t, env, addMember(t, env, owner, "worker", model.WorkspaceRoleMember, "read", "write"))
+	admin := connectHTTP(t, env, addMember(t, env, owner, "helper", model.WorkspaceRoleAdmin))
+
+	toolError(t, call(t, member, "rename_workspace", map[string]any{"name": "Taken Over"}), "forbidden")
+	toolError(t, call(t, member, "invite_member", map[string]any{"email": "friend@example.com", "role": "member"}), "forbidden")
+	toolError(t, call(t, member, "list_activity", nil), "forbidden")
+	toolError(t, call(t, member, "get_billing", nil), "forbidden")
+	toolError(t, call(t, admin, "get_billing", nil), "forbidden")
+	detail := output[mcp.WorkspaceDetail](t, call(t, member, "get_workspace", nil))
+	if detail.Role != model.WorkspaceRoleMember || len(detail.Invitations) != 0 || len(detail.Members) != 3 {
+		t.Fatalf("member view = %#v", detail)
+	}
+	output[mcp.Activity](t, call(t, admin, "list_activity", nil))
+}
+
+func TestListActivityPagesWithTheCursor(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "auditor")
+	_, raw := createToken(t, env, owner, "read", "write")
+	session := connectHTTP(t, env, raw)
+	for _, name := range []string{"First Name", "Second Name", "Third Name"} {
+		output[mcp.RenamedWorkspace](t, call(t, session, "rename_workspace", map[string]any{"name": name}))
+	}
+
+	first := output[mcp.Activity](t, call(t, session, "list_activity", map[string]any{"limit": 2}))
+	if len(first.Items) != 2 || first.NextCursor == nil || first.Items[0].Action != "workspace.updated" || !strings.Contains(first.Items[0].Metadata, "Third Name") {
+		t.Fatalf("first page = %#v", first)
+	}
+	second := output[mcp.Activity](t, call(t, session, "list_activity", map[string]any{"limit": 2, "cursor": *first.NextCursor}))
+	if len(second.Items) == 0 || second.Items[0].ID == first.Items[1].ID {
+		t.Fatalf("second page = %#v", second)
+	}
+	fields := toolError(t, call(t, session, "list_activity", map[string]any{"limit": 500}), "validation_failed").Fields
+	if fields["limit"] != api.ActivityLimitMessage {
+		t.Fatalf("fields = %v", fields)
+	}
+	toolError(t, call(t, session, "list_activity", map[string]any{"cursor": "not a cursor"}), "invalid_cursor")
+}
+
+func TestGetBillingReturnsThePlanWithoutLinks(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "payer")
+	_, raw := createToken(t, env, owner)
+	session := connectHTTP(t, env, raw)
+
+	result := call(t, session, "get_billing", nil)
+	billing := output[mcp.Billing](t, result)
+	if billing.Access == nil || billing.Access.PlanID != model.SubscriptionPlanFree || len(billing.Plans) == 0 {
+		t.Fatalf("billing = %#v", billing)
+	}
+	if strings.Contains(text(result), "http") {
+		t.Fatalf("billing text contains a link: %s", text(result))
+	}
+}
+
+func TestTokenOfAFormerMemberReachesNothing(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "keeper")
+	raw := addMember(t, env, owner, "leaver", model.WorkspaceRoleMember)
+	_, err := env.database.Exec(`DELETE FROM workspace_members WHERE id = $1`, "extra-leaver")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := connectHTTP(t, env, raw)
+	whoami := output[mcp.WhoAmI](t, call(t, session, "whoami", nil))
+	if whoami.User.Email != "leaver@example.com" || whoami.Workspace != nil {
+		t.Fatalf("whoami = %#v", whoami)
+	}
+	toolError(t, call(t, session, "get_workspace", nil), "not_found")
+	list := output[mcp.WorkspaceList](t, call(t, session, "list_workspaces", nil))
+	if len(list.Items) != 0 {
+		t.Fatalf("list_workspaces = %#v", list)
+	}
+}
+{{- end }}

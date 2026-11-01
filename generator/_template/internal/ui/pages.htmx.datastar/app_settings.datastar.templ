@@ -1,0 +1,510 @@
+package pages
+
+import (
+	"fmt"
+
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/components/badge"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/card"
+	"{{.ModulePath}}/internal/ui/components/dialog"
+	field "{{.ModulePath}}/internal/ui/components/field"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/input"
+	"{{.ModulePath}}/internal/ui/components/tabs"
+	"{{.ModulePath}}/internal/ui/components/toast"
+	"{{.ModulePath}}/internal/ui/csrf"
+	"{{.ModulePath}}/internal/ui/layouts"
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+// Settings is the account settings page. securitySections are extra cards for
+// the Security tab, shown after the sessions.
+templ Settings(sessions []model.Session, currentSessionID, activeTab string, passwordRemoved bool, securitySections ...templ.Component) {
+	{{ user := ctxkeys.User(ctx) }}
+	@layouts.App("Settings") {
+		if passwordRemoved {
+			@toast.Toast(toast.Props{
+				Title:       "Password Removed",
+				Description: "For security, your password was removed. Set a new one below if you'd like.",
+				Type:        toast.TypeInfo,
+				Timeout:     8000,
+			})
+		}
+		<div class="container max-w-4xl px-6 py-8">
+			<div class="mb-8">
+				<h1 class="text-3xl font-bold">Settings</h1>
+				<p class="text-muted-foreground mt-2">Manage your account settings</p>
+			</div>
+			@tabs.Tabs(tabs.Props{DefaultValue: activeTab}) {
+				@tabs.List() {
+					@tabs.Trigger(tabs.TriggerProps{Value: "profile"}) {
+						@icon.User(icon.Props{Class: "size-4"})
+						Profile
+					}
+					@tabs.Trigger(tabs.TriggerProps{Value: "security"}) {
+						@icon.Shield(icon.Props{Class: "size-4"})
+						Security
+					}
+				}
+				@tabs.Content(tabs.ContentProps{Value: "profile"}) {
+					<div class="space-y-6 mt-6">
+						@SettingsNameSection(user)
+						@SettingsAvatarSection(user)
+					</div>
+				}
+				@tabs.Content(tabs.ContentProps{Value: "security"}) {
+					<div class="space-y-6 mt-6">
+						@SettingsEmailSection(user)
+						@SettingsPasswordSection()
+						@SettingsSessionsSection(sessions, currentSessionID)
+						for _, section := range securitySections {
+							@section
+						}
+						@SettingsDangerZoneSection()
+					</div>
+				}
+			}
+		</div>
+	}
+}
+
+templ SettingsSessionsSection(sessions []model.Session, currentSessionID string) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@card.Card(card.Props{ID: "settings-sessions"}) {
+		@card.Header() {
+			@card.Title() {
+				Active Sessions
+			}
+			@card.Description() {
+				Review the browsers and devices currently signed in to your account
+			}
+		}
+		@card.Content() {
+			<div class="divide-y rounded-lg border">
+				for _, session := range sessions {
+					<div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+						<div class="flex min-w-0 items-start gap-3">
+							<div class="mt-0.5 rounded-md bg-muted p-2">
+								@icon.Monitor(icon.Props{Class: "size-4"})
+							</div>
+							<div class="min-w-0 space-y-1">
+								<div class="flex flex-wrap items-center gap-2">
+									<p class="font-medium">{ session.DisplayName() }</p>
+									if session.ID == currentSessionID {
+										@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+											Current
+										}
+									}
+								</div>
+								<p class="text-xs text-muted-foreground">
+									Last active { session.LastSeenAt.Local().Format("Jan 2, 2006 at 15:04") }
+								</p>
+							</div>
+						</div>
+						@button.Button(button.Props{
+							Type:       "button",
+							Variant:    button.VariantOutline,
+							Class:      "w-full sm:w-auto",
+							Attributes: templ.Attributes{
+								"data-on:click":      fmt.Sprintf("@delete(%q, {headers: {'X-CSRF-Token': %q}})", basePath+"/settings/sessions/"+session.ID, ctxkeys.CSRFToken(ctx)),
+								"data-indicator":     "_sessions",
+								"data-attr:disabled": "$_sessions",
+								"data-attr:aria-busy": "$_sessions",
+							},
+						}) {
+							if session.ID == currentSessionID {
+								Sign Out
+							} else {
+								Revoke
+							}
+						}
+					</div>
+				}
+			</div>
+			<div class="mt-4 flex justify-end">
+				@button.Button(button.Props{
+					Type:       "button",
+					Variant:    button.VariantOutline,
+					Attributes: templ.Attributes{
+						"data-on:click":      fmt.Sprintf("confirm('Sign out of every session, including this one?') && @delete(%q, {headers: {'X-CSRF-Token': %q}})", basePath+"/settings/sessions", ctxkeys.CSRFToken(ctx)),
+						"data-indicator:_all-sessions": true,
+						"data-attr:disabled": "$_allSessions",
+						"data-attr:aria-busy": "$_allSessions",
+					},
+				}) {
+					@icon.LogOut(icon.Props{Class: "mr-2 size-4"})
+					Sign Out Everywhere
+				}
+			</div>
+		}
+	}
+}
+
+templ SettingsNameSection(user *model.User) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Name
+			}
+			@card.Description() {
+				Update your display name
+			}
+		}
+		@card.Content() {
+			<form
+				class="space-y-4"
+				data-on:submit={ fmt.Sprintf("@patch(%q, {contentType: 'form'})", basePath+"/profile/name") }
+				data-indicator:_profile-name
+				data-attr:inert="$_profileName"
+				data-attr:aria-busy="$_profileName"
+			>
+				@csrf.Token()
+				<div class="space-y-2">
+					@field.Label(field.LabelProps{For: "name"}) {
+						Name
+					}
+					@input.Input(input.Props{
+						Type:        "text",
+						ID:          "name",
+						Name:        "name",
+						Value:       user.Name,
+						Placeholder: "Your name",
+					})
+				</div>
+				<div class="flex justify-end">
+					@button.Button(button.Props{
+						Type: "submit",
+					}) {
+						Save Name
+					}
+				</div>
+			</form>
+		}
+	}
+}
+
+templ SettingsEmailSection(user *model.User) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Email Address
+			}
+			@card.Description() {
+				Update your email address
+			}
+		}
+		@card.Content() {
+			<form
+				class="space-y-4"
+				data-on:submit={ fmt.Sprintf("@patch(%q, {contentType: 'form'})", basePath+"/account/email") }
+				data-indicator:_account-email
+				data-attr:inert="$_accountEmail"
+				data-attr:aria-busy="$_accountEmail"
+			>
+				@csrf.Token()
+				<div class="space-y-2">
+					@field.Label(field.LabelProps{For: "email"}) {
+						Email
+					}
+					@input.Input(input.Props{
+						Type:        "email",
+						ID:          "email",
+						Name:        "email",
+						Value:       user.Email,
+						Placeholder: "your@email.com",
+					})
+				</div>
+				<div class="flex justify-end">
+					@button.Button(button.Props{
+						Type: "submit",
+					}) {
+						Update Email
+					}
+				</div>
+			</form>
+		}
+	}
+}
+
+templ SettingsPasswordSection() {
+	{{ user := ctxkeys.User(ctx) }}
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Password
+			}
+			if user.HasPassword() {
+				@card.Description() {
+					You can sign in with your password or magic links
+				}
+			} else {
+				@card.Description() {
+					You're using passwordless login (magic links only)
+				}
+			}
+		}
+		@card.Content() {
+			@templ.Fragment("settings-password-form") {
+				<div id="password-form" class="space-y-4">
+					if user.HasPassword() {
+						<!-- Change Password Form -->
+						<form
+							class="space-y-4"
+							data-on:submit={ fmt.Sprintf("@post(%q, {contentType: 'form'})", basePath+"/account/password") }
+							data-indicator:_password
+							data-attr:inert="$_password"
+							data-attr:aria-busy="$_password"
+						>
+							@csrf.Token()
+							<div class="space-y-2">
+								@field.Label(field.LabelProps{For: "current_password"}) {
+									Current Password
+								}
+								@input.Input(input.Props{
+									Type:        "password",
+									ID:          "current_password",
+									Name:        "current_password",
+									Placeholder: "Enter current password",
+								})
+							</div>
+							<div class="space-y-2">
+								@field.Label(field.LabelProps{For: "new_password"}) {
+									New Password
+								}
+								@input.Input(input.Props{
+									Type:        "password",
+									ID:          "new_password",
+									Name:        "new_password",
+									Placeholder: "Enter new password",
+								})
+								<p class="text-sm text-muted-foreground">
+									Must be at least 12 characters long
+								</p>
+							</div>
+							<div class="space-y-2">
+								@field.Label(field.LabelProps{For: "confirm_password"}) {
+									Confirm New Password
+								}
+								@input.Input(input.Props{
+									Type:        "password",
+									ID:          "confirm_password",
+									Name:        "confirm_password",
+									Placeholder: "Confirm new password",
+								})
+							</div>
+							<div class="flex justify-between items-center">
+								@dialog.Dialog(dialog.Props{ID: "remove-password-dialog"}) {
+									@button.Button(button.Props{
+										Type:       "button",
+										Variant:    button.VariantOutline,
+										Attributes: dialog.Trigger(ctx),
+									}) {
+										Remove Password
+									}
+									@dialog.Content() {
+										@dialog.Header() {
+											@dialog.Title() {
+												Remove Password
+											}
+											@dialog.Description() {
+												Are you sure? You'll only be able to sign in with magic links.
+											}
+										}
+										@dialog.Footer() {
+											@button.Button(button.Props{
+												Variant:    button.VariantOutline,
+												Attributes: dialog.Close(ctx),
+											}) {
+												Cancel
+											}
+											@button.Button(button.Props{
+												Attributes: utils.MergeAttributes(
+													dialog.Close(ctx),
+											templ.Attributes{
+												"data-on:click":      fmt.Sprintf("@delete(%q, {headers: {'X-CSRF-Token': %q}})", basePath+"/account/password", ctxkeys.CSRFToken(ctx)),
+												"data-indicator:_remove-password": true,
+												"data-attr:disabled": "$_removePassword",
+												"data-attr:aria-busy": "$_removePassword",
+											},
+												),
+											}) {
+												Remove Password
+											}
+										}
+									}
+								}
+								@button.Button(button.Props{
+									Type: "submit",
+								}) {
+									Update Password
+								}
+							</div>
+						</form>
+					} else {
+						<!-- Set Password Form -->
+						<div class="space-y-4">
+							<div class="rounded-lg border bg-muted/50 p-4">
+								<p class="text-sm text-muted-foreground">
+									Set a password to enable password-based sign in. You can still use magic links anytime.
+								</p>
+							</div>
+							<form
+								class="space-y-4"
+								data-on:submit={ fmt.Sprintf("@post(%q, {contentType: 'form'})", basePath+"/account/password/set") }
+								data-indicator:_set-password
+								data-attr:inert="$_setPassword"
+								data-attr:aria-busy="$_setPassword"
+							>
+								@csrf.Token()
+								<div class="space-y-2">
+									@field.Label(field.LabelProps{For: "new_password"}) {
+										New Password
+									}
+									@input.Input(input.Props{
+										Type:        "password",
+										ID:          "new_password",
+										Name:        "new_password",
+										Placeholder: "Enter new password",
+									})
+									<p class="text-sm text-muted-foreground">
+										Must be at least 12 characters long
+									</p>
+								</div>
+								<div class="space-y-2">
+									@field.Label(field.LabelProps{For: "confirm_password"}) {
+										Confirm Password
+									}
+									@input.Input(input.Props{
+										Type:        "password",
+										ID:          "confirm_password",
+										Name:        "confirm_password",
+										Placeholder: "Confirm new password",
+									})
+								</div>
+								<div class="flex justify-end">
+									@button.Button(button.Props{
+										Type: "submit",
+									}) {
+										Set Password
+									}
+								</div>
+							</form>
+						</div>
+					}
+				</div>
+			}
+		}
+	}
+}
+
+templ SettingsDangerZoneSection() {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Danger Zone
+			}
+			@card.Description() {
+				Permanently delete your account and all associated data
+			}
+		}
+		@card.Content() {
+			<div class="space-y-4">
+				<div class="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+					<h3 class="font-semibold text-destructive mb-2">Delete Account</h3>
+					<p class="text-sm text-muted-foreground mb-4">
+						Once you delete your account, there is no going back. Please be certain.
+					</p>
+					@dialog.Dialog(dialog.Props{ID: "delete-account-dialog"}) {
+						@button.Button(button.Props{
+							Type:       "button",
+							Variant:    button.VariantDestructive,
+							Attributes: dialog.Trigger(ctx),
+						}) {
+							@icon.Trash2(icon.Props{Class: "mr-2 size-4"})
+							Delete Account
+						}
+						@dialog.Content() {
+							@dialog.Header() {
+								@dialog.Title() {
+									Delete Account
+								}
+								@dialog.Description() {
+									@SettingsDangerDescription()
+								}
+							}
+							<form
+								id="delete-account-form"
+								data-on:submit={ fmt.Sprintf("@delete(%q, {contentType: 'form'})", basePath+"/account") }
+								data-indicator:_delete-account
+								data-attr:inert="$_deleteAccount"
+								data-attr:aria-busy="$_deleteAccount"
+							>
+								@csrf.Token()
+								<div class="px-6 py-4 space-y-2">
+									@field.Label(field.LabelProps{For: "delete-confirmation"}) {
+										Type <span class="font-mono font-semibold">DELETE</span> to confirm
+									}
+									@input.Input(input.Props{
+										Type:        "text",
+										ID:          "delete-confirmation",
+										Name:        "delete_confirmation",
+										Placeholder: "DELETE",
+										Attributes: templ.Attributes{
+											"autocomplete": "off",
+										},
+									})
+								</div>
+								@dialog.Footer() {
+									@button.Button(button.Props{
+										Type:       "button",
+										Variant:    button.VariantOutline,
+										Attributes: dialog.Close(ctx),
+									}) {
+										Cancel
+									}
+									@button.Button(button.Props{
+										Type:     "submit",
+										Disabled: true,
+										Attributes: utils.MergeAttributes(
+											dialog.Close(ctx),
+											templ.Attributes{"data-delete-submit": ""},
+										),
+									}) {
+										Yes, Delete My Account
+									}
+								}
+							</form>
+							<script nonce={ templ.GetNonce(ctx) }>
+								(function() {
+									const form = document.getElementById("delete-account-form");
+									const input = document.getElementById("delete-confirmation");
+									const button = document.querySelector("[data-delete-submit]");
+									const dialogContent = button.closest("[data-slot=dialog-content]");
+
+									if (!form || !input || !button || !dialogContent) return;
+
+									// Enable button when "DELETE" is typed
+									input.addEventListener("input", function() {
+										button.disabled = this.value !== "DELETE";
+									});
+
+									// Reset the form once the dialog has closed and its exit animation finished.
+									dialogContent.addEventListener("dialog-close", function() {
+										form.reset();
+										button.disabled = true;
+									});
+								})();
+							</script>
+						}
+					}
+				</div>
+			</div>
+		}
+	}
+}

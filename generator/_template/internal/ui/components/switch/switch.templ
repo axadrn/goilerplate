@@ -1,0 +1,129 @@
+package switchcomp
+
+import "{{.ModulePath}}/internal/ui/utils"
+
+type Size string
+
+const (
+	SizeDefault Size = "default"
+	SizeSm      Size = "sm"
+)
+
+type Props struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	Name       string
+	Value      string
+	Disabled   bool
+	// Checked is the controlled checked state. Use DefaultChecked when the
+	// browser should own the state after the initial render.
+	Checked        *bool
+	DefaultChecked bool
+	ReadOnly       bool
+	Required       bool
+	Form           string
+	// Size of the switch. Options: 'default', 'sm'.
+	Size Size
+}
+
+func initialChecked(p Props) bool {
+	if p.Checked != nil {
+		return *p.Checked
+	}
+	return p.DefaultChecked
+}
+
+// Switch is the vanilla port of Base UI's Switch.Root
+// (switch/root/SwitchRoot.tsx): a span root carries role="switch",
+// aria-checked and the data-checked/data-unchecked/data-disabled state
+// attributes the style CSS keys on, the thumb is a real element like
+// Switch.Thumb, and a visually hidden native checkbox rendered beside the
+// root carries id/name/value/form for label association and form submission.
+// switch.js ports the runtime behavior.
+templ Switch(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.ID == "" {
+		{{ p.ID = utils.RandomID() }}
+	}
+	if p.Size == "" {
+		{{ p.Size = SizeDefault }}
+	}
+	{{ checked := initialChecked(p) }}
+	<span
+		data-slot="switch"
+		data-size={ string(p.Size) }
+		role="switch"
+		if checked {
+			aria-checked="true"
+			data-checked
+		} else {
+			aria-checked="false"
+			data-unchecked
+		}
+		if p.Disabled {
+			data-disabled
+			aria-disabled="true"
+			tabindex="-1"
+		} else {
+			tabindex="0"
+		}
+		aria-readonly?={ p.ReadOnly }
+		aria-required?={ p.Required }
+		data-templ-checked?={ p.Checked != nil }
+		class={
+			utils.CN(
+				// 1:1 base/ui/switch.tsx: structure lives here, the look comes from
+				// the active style-*.css via.
+				"data-checked:bg-primary data-unchecked:bg-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 dark:data-unchecked:bg-input/80 shrink-0 rounded-full border border-transparent focus-visible:ring-3 aria-invalid:ring-3 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:border-transparent data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] peer group/switch relative inline-flex items-center transition-all outline-none after:absolute after:-inset-x-3 after:-inset-y-2 data-disabled:cursor-not-allowed data-disabled:opacity-50",
+				p.Class,
+			),
+		}
+		{ p.Attributes... }
+	>
+		// Base UI mirrors data-checked/data-unchecked and data-disabled onto
+		// the thumb via the stateAttributesMapping; switch.js keeps them in sync.
+		<span
+			data-slot="switch-thumb"
+			if checked {
+				data-checked
+			} else {
+				data-unchecked
+			}
+			data-disabled?={ p.Disabled }
+			class="bg-background dark:data-unchecked:bg-foreground dark:data-checked:bg-primary-foreground rounded-full group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 group-data-[size=default]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=sm]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=default]/switch:data-unchecked:translate-x-0 group-data-[size=sm]/switch:data-unchecked:translate-x-0 pointer-events-none block ring-0 transition-transform"
+		></span>
+	</span>
+	// Base UI renders the hidden input beside the root. It owns the id, so
+	// native <label for> association keeps working; the inline styles are the
+	// visuallyHiddenInput/visuallyHidden pendants from
+	// @base-ui/utils/visuallyHidden.ts (named inputs stay absolute so native
+	// validation popups anchor near the control).
+	<input
+		type="checkbox"
+		aria-hidden="true"
+		tabindex="-1"
+		id={ p.ID }
+		checked?={ checked }
+		disabled?={ p.Disabled }
+		readonly?={ p.ReadOnly }
+		required?={ p.Required }
+		if p.Name != "" {
+			name={ p.Name }
+		}
+		if p.Value != "" {
+			value={ p.Value }
+		}
+		if p.Form != "" {
+			form={ p.Form }
+		}
+		if p.Name != "" {
+			style="clip-path:inset(50%);overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;position:absolute"
+		} else {
+			style="clip-path:inset(50%);overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;position:fixed;top:0;left:0"
+		}
+	/>
+}

@@ -1,0 +1,9 @@
+package layouts
+
+import "{{.ModulePath}}/internal/model"
+
+templ WorkspaceIdentity(current *model.Workspace, workspaces []model.WorkspaceMembership) {
+	<div id="sidebar-workspace" class="contents" hx-swap-oob="true">
+		@WorkspaceSwitcher(current, workspaces)
+	</div>
+}

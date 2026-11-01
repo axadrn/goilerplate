@@ -1,0 +1,22 @@
+---
+title: "LLM Discovery"
+description: "Expose public documentation in machine-readable formats"
+order: 1
+---
+
+## What ships
+
+`/llms.txt` is a compact map of the public product documentation. Every documentation page is also available as raw Markdown by appending `.md` to its URL.
+
+```text
+/docs
+/docs.md
+/docs/guides/workflow
+/docs/guides/workflow.md
+```
+
+This gives people, coding tools, and documentation crawlers the same public source material without duplicating the content.
+
+## Keep private context private
+
+Only publish information that already belongs in public documentation. Repository-specific instructions stay in `AGENTS.md` and are not linked from `/llms.txt`.

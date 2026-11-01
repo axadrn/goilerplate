@@ -1,0 +1,247 @@
+# AGENTS.md
+
+## Custom rules
+
+Add project-specific rules here. Keep generated defaults below this section easy to merge with future goilerplate releases.
+
+## Stack
+
+- Go 1.26 with the standard library `net/http` router.
+{{- if .IsHeadless }}
+- Headless: no native frontend. The project serves the JSON API under `/api/v1` to your own frontend or apps.
+{{- else if .IsSvelte }}
+- SvelteKit: a static single-page app in `web/` that the Go binary embeds and serves on the same origin as the JSON API under `/api/v1`.
+{{- else if eq .Framework "datastar" }}
+- templ, Datastar 1.0, vanilla JavaScript, and Tailwind CSS.
+{{- else }}
+- templ, htmx 4.0, vanilla JavaScript, and Tailwind CSS.
+{{- end }}
+{{- if eq .Database "postgres" }}
+- sqlx with raw SQL and PostgreSQL.
+{{- else }}
+- sqlx with raw SQL and SQLite.
+{{- end }}
+{{- if eq .Mail "resend" }}
+- Resend for transactional email.
+{{- else }}
+- SMTP for transactional email.
+{{- end }}
+{{- if eq .Payment "polar" }}
+- Polar for subscription billing.
+{{- else }}
+- Stripe for subscription billing.
+{{- end }}
+{{- if .Storage }}
+- S3-compatible object storage.
+{{- end }}
+
+## House rules
+
+- Keep handlers thin. Put business rules in services and SQL in repositories.
+- Keep product access provider-agnostic. Stripe or Polar updates local subscription state. `internal/access` decides what that state unlocks.
+{{- if .HasHTMLFrontend }}
+- Templates may mirror access for presentation. Services must enforce every protected operation with explicit early returns.
+{{- else }}
+- Clients may mirror access for presentation. Services must enforce every protected operation with explicit early returns.
+{{- end }}
+- Enforce resource, seat, and quota increments in the same database transaction as the protected write.
+- Use `$1, $2` SQL placeholders. sqlx rebinds them for the selected database.
+- Prefer explicit constructor injection and direct control flow.
+- Add dependencies only when the standard library does not solve the problem well.
+{{- if .HasHTMLFrontend }}
+- Keep secrets out of templates. Request context contains only `config.RenderConfig`, the small public value templates need.
+{{- end }}
+- Keep brand identity in `internal/brand` and architecture choices in Go source. Env is only for deployment coordinates, external IDs, operator switches, and secrets.
+{{- if .HasHTMLFrontend }}
+- Never edit generated `*_templ.go` files. Edit `.templ` files and let `task dev` regenerate them.
+{{- end }}
+{{- if .IsSvelte }}
+- Never commit `web/build`, `web/node_modules` or `web/.svelte-kit`. `task build` and the Dockerfile build the app before the Go binary embeds it.
+{{- end }}
+
+## Architecture
+
+```text
+HTTP request
+  -> Handler
+  -> Service
+  -> Repository
+  -> Database
+```
+
+Application wiring lives in `internal/app/app.go`. Route registration and middleware order live in `internal/routes/routes.go`.
+Full configuration stays in startup wiring. Do not put secrets, database settings, operator allowlists, or trusted proxy ranges in request context.
+{{- if .Workspaces }}
+Tenant-owned data is scoped by `workspace_id`. Load workspace context with `middleware.WithWorkspace` and enforce capabilities with `WorkspaceMember.Can`.
+{{- end }}
+{{- if .API }}
+
+## JSON API
+
+- JSON handlers live in `internal/api` and call the same services{{ if .HasHTMLFrontend }} as the HTML handlers{{ end }}. Never duplicate a rule or a permission check there.
+- Every route under `/api/v1` is listed once in `api.Routes` in `internal/api/routes.go`. `internal/api/openapi.yaml` documents each one and is served at `GET /api/v1/openapi.yaml`. `internal/api/openapi_test.go` fails when the two drift.
+- Clients sign in with an `/api/v1/auth` endpoint and send the returned token as `Authorization: Bearer <token>`. Cookie requests that change state send `X-CSRF-Token` with the token from `GET /api/v1/csrf`.
+{{- if .IsSvelte }}
+- The SvelteKit app signs in with `?session=cookie`: the server sets the HttpOnly `session_token` cookie and answers without a token. The app never sees or stores a session token.
+{{- end }}
+- Personal API tokens (`pat_...`) let scripts and agents act for a user. Each route in `api.Routes` declares `TokenRead`, `TokenWrite` or the default `TokenDenied`. Open a new route to tokens only when an agent should reach it, and update its `apiTokenAuth` entry in `openapi.yaml`.{{ if .Workspaces }} A token is bound to one workspace; `WithWorkspaceAPI` answers 404 for every other workspace.{{ end }}
+- Every non-2xx answer is the envelope `{"error":{"code","message","fields"}}`. Codes are stable lowercase snake case. `fields` appears only for `validation_failed`.
+- `CORS_ALLOWED_ORIGINS` lists the browser origins that may call `/api/` with credentials. Origins match exactly, without wildcards.
+{{- if .IsSvelte }}
+- Magic link, password reset, and email change emails link to the SvelteKit pages under `APP_URL/auth/...`{{ if .Workspaces }}, invitations to `APP_URL/workspaces/invitations/...`{{ end }}. `APP_URL` is this server. Each page reads the token from the URL and calls the matching `/api/v1/...` endpoint once.
+{{- if .OAuth }}
+- OAuth stays a browser redirect flow on the same origin. `/auth/{provider}` and its callback are Go routes; a successful sign-in sets the `session_token` cookie and redirects to `/app`, a failed one redirects to `/auth?error=oauth_failed`. Links to them carry `data-sveltekit-reload` so the browser leaves the app.
+{{- end }}
+- `GET /healthz` reports health and unknown paths under `/api/` answer the JSON `not_found` envelope. Every other `GET` serves the app: files from `web/build`, `index.html` for page paths, 404 for missing files. The app's `+error.svelte` shows unknown pages.
+{{- else if not .HasHTMLFrontend }}
+- Magic link, password reset, and email change emails link to `APP_URL/auth/...`. `APP_URL` is your frontend. Its page reads the token from the URL and calls the matching `/api/v1/auth/.../verify` endpoint.
+{{- if .OAuth }}
+- OAuth stays a browser redirect flow. `/auth/{provider}` and its callback live on this server at `API_URL`, which defaults to `APP_URL`. A successful sign-in sets the `session_token` cookie and redirects to `APP_URL/app`; a failed one redirects to `APP_URL/auth?error=oauth_failed`. The cookie belongs to the `API_URL` host, so the frontend and the API must share a site, for example `app.example.com` and `api.example.com`.
+{{- end }}
+- `GET /` answers the project name and the API path, `GET /healthz` reports health, and every other unknown path answers the JSON `not_found` envelope.
+{{- else }}
+- Magic link, password reset, and email change emails link to the HTML routes under `APP_URL/auth/...`. An API client that receives the token another way calls the matching `/api/v1/auth/.../verify` endpoint.
+{{- end }}
+{{- end }}
+{{- if .IsSvelte }}
+
+## SvelteKit app
+
+- `web/` is a SvelteKit app built as a static single-page app with `adapter-static` (`ssr = false`). `web/embed.go` embeds `web/build`, and `internal/routes/spa.go` serves it with a strict Content Security Policy. Inline scripts are hashed at startup; put scripts in files under `web/static` or `web/src`.
+- The app uses Svelte 5 runes, TypeScript and Tailwind CSS 4. `web/src/app.css` holds the theme tokens. Kit options live in `web/vite.config.ts`, and imports use `#lib/...`.
+- UI primitives are shadcn-svelte components in `web/src/lib/components/ui`. Add one with `pnpm dlx shadcn-svelte@1.7.0 add <component>` in `web/` and compose it from pages and `web/src/lib/components/app` through its props. Keep product behavior out of `components/ui`.
+- Every request goes through `web/src/lib/api.ts`: same-origin cookies, the CSRF header, JSON or `FormData`, and the error envelope as `ApiError`. Never call `fetch` elsewhere. Never keep a token or account data in `localStorage` or `sessionStorage`.
+- `web/src/lib/types.ts` mirrors the responses the app reads from `internal/api/openapi.yaml`. Change both when a response changes. `web/src/lib/config.ts` holds the brand name and the module flags of this project.
+- Routes live in `web/src/routes`: `(auth)` for sign-in and onboarding{{ if .Workspaces }}, invitations and new workspaces{{ end }}, `(app)` for the signed-in app, `admin` for operators. `(app)/+layout.ts` loads the account and sends signed-out visitors to `/auth`.
+- Forms set `aria-busy` while a request runs, mark invalid fields with `aria-invalid`, and move focus to the field with the error.
+- `pnpm check` must report zero errors and zero warnings.
+{{- end }}
+{{- if .MCP }}
+
+## MCP server
+
+- `internal/mcp` serves an MCP server at `/mcp`: Streamable HTTP, stateless, `POST` only. It is a third transport next to {{ if .HasHTMLFrontend }}the HTML handlers and {{ end }}the JSON API. Tools call the same services and never repeat a rule or a permission check.
+- Agents authenticate with a personal API token as `Authorization: Bearer pat_...`. `/mcp` answers 401 `unauthenticated` to sessions, cookies, and unknown, revoked or expired tokens.
+- Built-in tools: `whoami`{{ if .Workspaces }}, `list_workspaces`, `get_workspace`, `list_activity`, `get_billing`, `invite_member`, `rename_workspace`{{ else }}, `get_billing`{{ end }}. `registerTools` in `internal/mcp/tools.go` registers them in one place.
+- Wrap a tool body in `mcp.Read` when it only reads and in `mcp.Write` when it changes data. A read-only token gets `insufficient_scope` from a `Write` tool.{{ if .Workspaces }} Workspace tools take an optional `workspace` slug, default to the token's workspace, and answer `not_found` for every other workspace.{{ end }}
+- Failed calls return the JSON API error envelope as the tool result. Return service errors unchanged; `api.ErrorFor` maps them to the same codes as the API. Use `mcp.InvalidField` for a `validation_failed` field.
+- Tools are a curated list for agents, not a copy of the JSON API. Never add tools for checkout, billing management, account or workspace deletion, role changes, member removal, admin, impersonation, passwords, or email.
+- `mcp.Services` in `internal/mcp/server.go` lists the services tools may call. Add your service there and pass it where `internal/routes/routes.go` calls `mcp.NewServer`.
+- Raise `mcp.Version` when the tool list or a tool's schema changes.
+
+Add a tool next to its service. This example is tested in `internal/mcp/example_test.go`. Inside `internal/mcp`, drop the `mcp.` prefixes and call it from `registerTools`:
+
+```go
+type nameInput struct {
+	Name string `json:"name" jsonschema:"the new display name"`
+}
+
+func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "set_display_name",
+		Description: "Changes the display name of the user this token acts for. Needs a token with read and write access.",
+	}, mcp.Write(func(ctx context.Context, caller mcp.Caller, input nameInput) (api.UserResponse, error) {
+		err := validation.ValidateName(input.Name)
+		if err != nil {
+			return api.UserResponse{}, mcp.InvalidField("name", api.FieldMessage(err))
+		}
+		user, err := services.Users.UpdateName(caller.User.ID, input.Name)
+		if err != nil {
+			return api.UserResponse{}, err
+		}
+		return api.UserResponse{User: api.NewUser(user)}, nil
+	}))
+}
+```
+
+The description tells the agent what the tool returns or changes and which scope it needs. Add a test with the in-memory transport like `TestAddedToolRunsWithTheTokenScopes`.
+
+Client setup, with a token from {{ if .IsHeadless }}`POST /api/v1/account/tokens`{{ else }}Settings, Security{{ end }} and the public URL of this server:
+
+- Claude Code: `claude mcp add --transport http app https://example.com/mcp --header "Authorization: Bearer pat_..."`
+- Claude Desktop and claude.ai: Customize, Connectors, Add custom connector, the `/mcp` URL, Authentication "No sign in", and the request header `Authorization: Bearer pat_...`. Claude connects from Anthropic's cloud, so the URL must be public. Request headers on custom connectors are in beta and not available to every organization yet. For a local server, or when your organization has no Request headers field, use the local `mcp-remote` bridge: run `npx mcp-remote http://localhost:8090/mcp --header Authorization:${AUTH_HEADER}` from `claude_desktop_config.json` with `AUTH_HEADER` set to `Bearer pat_...`.
+- Cursor: `.cursor/mcp.json` with `"mcpServers": {"app": {"url": "https://example.com/mcp", "headers": {"Authorization": "Bearer ${env:API_TOKEN}"}}}`.
+- VS Code: `.vscode/mcp.json` with `"servers": {"app": {"type": "http", "url": "https://example.com/mcp", "headers": {"Authorization": "Bearer ${input:api-token}"}}}` and a `promptString` input `api-token` with `"password": true`.
+{{- end }}
+
+## Commands
+{{ if .IsSvelte }}
+- `task dev` installs the web dependencies when needed, then runs the Go server and the Vite dev server on available ports. Open the Vite URL; it forwards `/api`, `/mcp`, `/webhooks`, `/healthz` and the OAuth routes to Go, and emails link to it. Pass `APP_PORT` or `DEV_PORT` to choose the ports. Restart it after Go changes.
+- `task build` builds the app with pnpm and then `bin/server` with the app embedded.
+- `task check` runs `svelte-check` on the app.
+{{- else if not .HasHTMLFrontend }}
+- `task dev` runs the API server on an available port. Pass `APP_PORT` to choose one. Restart it after code changes.
+{{- else }}
+- `task dev` runs templ, the application, and Tailwind watchers.
+- `task dev` selects available app and templ proxy ports automatically. Pass `APP_PORT`, `DEV_PORT`, or `OPEN_BROWSER=true` to override its development defaults.
+{{- end }}
+{{- if eq .Database "postgres" }}
+- `task db` starts the local PostgreSQL container and waits until it is healthy.
+{{- end }}
+{{- if .HasHTMLFrontend }}
+- `go run github.com/axadrn/shadcn-templ/v2/cmd/shadcn-templ@v2.0.0 add <component>` adds a UI component and rebuilds the minified `assets/js/shadcn-templ-*.js` and `internal/ui/components/scripts_bundle.go`; commit both.
+{{- end }}
+- `go test ./...` runs the test suite.
+- `go test -race ./...` checks concurrency behavior.
+- `go vet ./...` and `go build ./...` run static and build checks.
+
+## Code map
+
+- `cmd/server` contains application startup and graceful shutdown.
+- `internal/config` owns typed environment configuration.
+{{- if .HasHTMLFrontend }}
+- `internal/handler` parses requests and renders responses.
+- `internal/handler/{{if eq .Framework "datastar"}}datastar{{else}}htmx{{end}}.go` contains the selected frontend's native response behavior.
+{{- end }}
+{{- if .API }}
+- `internal/api` parses JSON requests and writes JSON responses.
+{{- end }}
+{{- if .MCP }}
+- `internal/mcp` serves the MCP tools for agents.
+{{- end }}
+- `internal/service` owns business rules.
+- `internal/repository` owns raw SQL.
+{{- if .HasHTMLFrontend }}
+- `internal/ui` contains templ layouts, pages, blocks, and components.
+{{- end }}
+{{- if .IsSvelte }}
+- `web/src/routes` contains the SvelteKit pages, `web/src/lib` the API client, session, types and components, `web/static` the fonts, favicon and `theme.js`.
+- `internal/routes/spa.go` serves the built app.
+{{- end }}
+- `internal/db/migrations` contains the Goose schema.
+- `internal/service/payment` contains the selected billing adapter.
+- `internal/access` contains signup policy, plans, features, limits, quotas, and lifecycle rules.
+- `internal/service/mailer` contains the selected mail adapter.
+{{- if .Workspaces }}
+- `internal/service/workspace.go` owns workspaces, roles, invitations, seats, and tenant audit history.
+{{- end }}
+{{- if .Storage }}
+- `internal/storage` and `internal/service/file.go` own file storage.
+{{- end }}
+{{- if .HasBlog }}
+- `content/blog` and `internal/service/blog.go` contain the Blog module.
+{{- end }}
+{{- if .HasDocs }}
+- `content/docs` and `internal/service/docs.go` contain the Docs module.
+{{- end }}
+
+## Included product surface
+{{- if .IsSvelte }}
+This project includes a SvelteKit app on a JSON API with authentication by email links and passwords, email verification, password recovery, revocable database sessions, account settings with personal API tokens, security headers, structured logging, subscription billing, provider-agnostic product access, and operator Admin pages.
+{{- else if not .HasHTMLFrontend }}
+This project includes a JSON API with authentication by email links and passwords, email verification, password recovery, revocable database sessions, account settings, security headers, structured logging, subscription billing, provider-agnostic product access, and operator Admin endpoints.
+{{- else }}
+This project includes authentication with email links and passwords, email verification, password recovery, revocable database sessions, account settings, legal pages, SEO basics, security headers, structured logging, subscription billing, provider-agnostic product access, and a global operator Admin panel.
+{{- end }}
+{{- if .OAuth }}
+{{- if and .HasGoogleOAuth .HasGitHubOAuth }}
+OAuth providers: Google and GitHub.
+{{- else if .HasGoogleOAuth }}
+OAuth provider: Google.
+{{- else }}
+OAuth provider: GitHub.
+{{- end }}
+{{- end }}
+{{- if .Workspaces }}
+It also includes workspaces with Owner, Admin, and Member roles, invitations, seat limits, workspace billing, and tenant audit history.
+{{- end }}

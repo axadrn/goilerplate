@@ -1,0 +1,101 @@
+package handler
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"{{.ModulePath}}/internal/service"
+)
+
+type SEOHandler struct {
+	sitemapService *service.SitemapService
+{{- if .HasDocs }}
+	docsService *service.DocsService
+{{- end }}
+	baseURL  string
+	llmsPath string
+	robotsNoIndex bool
+}
+
+func NewSEOHandler(
+{{- if .HasBlog }}
+	blogService *service.BlogService,
+{{- end }}
+{{- if .HasDocs }}
+	docsService *service.DocsService,
+{{- end }}
+	baseURL string,
+	contentPath string,
+	robotsNoIndex bool,
+) *SEOHandler {
+	return &SEOHandler{
+{{- if and .HasBlog .HasDocs }}
+		sitemapService: service.NewSitemapService(blogService, docsService, baseURL),
+{{- else if .HasBlog }}
+		sitemapService: service.NewSitemapService(blogService, baseURL),
+{{- else if .HasDocs }}
+		sitemapService: service.NewSitemapService(docsService, baseURL),
+{{- else }}
+		sitemapService: service.NewSitemapService(baseURL),
+{{- end }}
+{{- if .HasDocs }}
+		docsService: docsService,
+{{- end }}
+		baseURL: strings.TrimSuffix(baseURL, "/"),
+		llmsPath: filepath.Join(contentPath, "llms.txt"),
+		robotsNoIndex: robotsNoIndex,
+	}
+}
+
+func (h *SEOHandler) Robots(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if h.robotsNoIndex {
+		_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
+		return
+	}
+	fmt.Fprintf(w, "User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", h.baseURL)
+}
+
+func (h *SEOHandler) LLMs(w http.ResponseWriter, r *http.Request) {
+	content, err := os.ReadFile(h.llmsPath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+{{- if .HasDocs }}
+	if _, err := h.docsService.DocsTree(); err != nil {
+		http.Error(w, "Failed to load documentation", http.StatusInternalServerError)
+		return
+	}
+{{- end }}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = fmt.Fprint(w, strings.TrimRight(string(content), "\n"))
+{{- if .HasDocs }}
+	_, _ = fmt.Fprint(w, "\n\n## Documentation\n\n")
+	for _, page := range h.docsService.FlatDocsList() {
+		path := "/docs/" + page.Slug + ".md"
+		if page.Slug == "introduction" {
+			path = "/docs.md"
+		}
+		description := strings.TrimSpace(page.Description)
+		if description == "" {
+			description = "Product documentation"
+		}
+		_, _ = fmt.Fprintf(w, "- [%s](%s%s): %s\n", page.Title, h.baseURL, path, description)
+	}
+{{- else }}
+	_, _ = fmt.Fprintln(w)
+{{- end }}
+}
+
+func (h *SEOHandler) Sitemap(w http.ResponseWriter, _ *http.Request) {
+	content, err := h.sitemapService.GenerateSitemap()
+	if err != nil {
+		http.Error(w, "Failed to generate sitemap", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	_, _ = w.Write(content)
+}

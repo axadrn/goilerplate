@@ -1,0 +1,32 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/empty"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/layouts"
+)
+
+templ NotFound() {
+	@layouts.Base() {
+		@empty.Empty(empty.Props{Class: "min-h-svh rounded-none border-0"}) {
+			@empty.Header() {
+				@empty.Media() {
+					<span class="text-8xl font-bold tracking-tighter text-muted-foreground/25">404</span>
+				}
+				@empty.Title(empty.TitleProps{Class: "text-xl"}) {
+					Page not found 
+				}
+				@empty.Description() {
+					The page you are looking for does not exist or has moved. 
+				}
+			}
+			@empty.Content() {
+				@button.Button(button.Props{Href: "/"}) {
+					@icon.ArrowLeft(icon.Props{Class: "size-4"})
+					Back to home
+				}
+			}
+		}
+	}
+}

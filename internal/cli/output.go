@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"strings"
 
 	"charm.land/lipgloss/v2"
 )
@@ -107,19 +106,4 @@ func RenderError(err error, styled bool) string {
 	}
 	theme := newOutputTheme(true)
 	return theme.danger.Render("✕") + " " + theme.value.Render(err.Error())
-}
-
-func renderColumns(theme outputTheme, styled bool, values ...string) string {
-	if !styled {
-		return "  " + strings.Join(values, "  ")
-	}
-	styledValues := make([]string, 0, len(values))
-	for index, value := range values {
-		style := theme.value
-		if index > 0 {
-			style = theme.muted
-		}
-		styledValues = append(styledValues, style.Render(value))
-	}
-	return "  " + strings.Join(styledValues, theme.muted.Render("  "))
 }

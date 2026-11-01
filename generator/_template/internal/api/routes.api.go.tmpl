@@ -1,0 +1,123 @@
+package api
+
+import "net/http"
+
+// Route is one endpoint of the JSON API: a ServeMux pattern, its handler with
+// every middleware applied, and what a personal API token may do there.
+type Route struct {
+	Pattern string
+	Handler http.HandlerFunc
+	// Tokens is TokenRead or TokenWrite for routes open to personal API
+	// tokens. The zero value denies tokens.
+	Tokens TokenAccess
+}
+
+// Wrap adds one middleware to a route handler.
+type Wrap func(http.HandlerFunc) http.HandlerFunc
+
+// Handlers are the API handlers the routes call.
+type Handlers struct {
+	Meta     *MetaHandler
+	Auth     *AuthHandler
+	Account  *AccountHandler
+	Sessions *SessionsHandler
+	Tokens   *APITokensHandler
+	Billing *BillingHandler
+	Admin   *AdminHandler
+{{- if .Workspaces }}
+	Workspaces  *WorkspaceHandler
+	Invitations *WorkspaceInvitationHandler
+{{- end }}
+}
+
+// Middleware are the route middleware from internal/middleware. They are
+// passed in because internal/middleware imports this package.
+type Middleware struct {
+	// RequireAuth answers 401 without a session.
+	RequireAuth Wrap
+	// RequireOnboarded also answers 403 onboarding_required without a name.
+	RequireOnboarded Wrap
+	// RateLimitAuth limits sign-in attempts per client IP.
+	RateLimitAuth Wrap
+	// RateLimitAuthEmail limits emails per client IP and recipient.
+	RateLimitAuthEmail Wrap
+	// RateLimitEmailChanges limits email change requests per user and
+	// recipient.
+	RateLimitEmailChanges Wrap
+	// RequireAdmin answers 403 forbidden for users who are not admins.
+	RequireAdmin Wrap
+{{- if .Workspaces }}
+	// Workspace requires onboarding and scopes the route to the workspace
+	// in its path.
+	Workspace Wrap
+	// RateLimitInvitations limits workspace invitation emails.
+	RateLimitInvitations Wrap
+{{- end }}
+}
+
+// Routes lists every endpoint under /api/v1. The router registers exactly
+// these routes, and openapi_test.go checks them against openapi.yaml. Every
+// handler is wrapped by the token gate of its route: GET routes open to tokens
+// need the read scope, routes that change data need the write scope, and
+// everything else answers 403 to tokens.
+func Routes(h Handlers, m Middleware) []Route {
+	routes := []Route{
+		{"GET /api/v1/openapi.yaml", OpenAPI, TokenRead},
+		{"GET /api/v1/csrf", CSRFToken, TokenRead},
+		{"GET /api/v1/meta", h.Meta.Meta, TokenRead},
+		{"POST /api/v1/auth/password", m.RateLimitAuth(h.Auth.PasswordAuth), TokenDenied},
+		{"POST /api/v1/auth/magic-link", m.RateLimitAuthEmail(h.Auth.SendMagicLink), TokenDenied},
+		{"POST /api/v1/auth/magic-link/verify", h.Auth.VerifyMagicLink, TokenDenied},
+		{"POST /api/v1/auth/forgot-password", m.RateLimitAuthEmail(h.Auth.ForgotPassword), TokenDenied},
+		{"POST /api/v1/auth/forgot-password/verify", h.Auth.VerifyForgotPassword, TokenDenied},
+		{"POST /api/v1/auth/email-change/verify", h.Auth.VerifyEmailChange, TokenDenied},
+		{"POST /api/v1/auth/onboarding", m.RequireAuth(h.Auth.CompleteOnboarding), TokenDenied},
+		{"POST /api/v1/auth/logout", m.RequireAuth(h.Auth.Logout), TokenDenied},
+		{"GET /api/v1/account", m.RequireAuth(h.Auth.Account), TokenRead},
+		{"PATCH /api/v1/account/name", m.RequireOnboarded(h.Account.UpdateName), TokenWrite},
+		{"PATCH /api/v1/account/email", m.RequireOnboarded(m.RateLimitEmailChanges(h.Account.ChangeEmail)), TokenDenied},
+		{"POST /api/v1/account/password", m.RequireOnboarded(h.Account.ChangePassword), TokenDenied},
+		{"POST /api/v1/account/password/set", m.RequireOnboarded(h.Account.SetPassword), TokenDenied},
+		{"DELETE /api/v1/account/password", m.RequireOnboarded(h.Account.RemovePassword), TokenDenied},
+		{"DELETE /api/v1/account", m.RequireOnboarded(h.Account.DeleteAccount), TokenDenied},
+		{"GET /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.List), TokenDenied},
+		{"DELETE /api/v1/account/sessions/{id}", m.RequireOnboarded(h.Sessions.Revoke), TokenDenied},
+		{"DELETE /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.RevokeOthers), TokenDenied},
+		{"GET /api/v1/account/tokens", m.RequireOnboarded(h.Tokens.List), TokenDenied},
+		{"POST /api/v1/account/tokens", m.RequireOnboarded(h.Tokens.Create), TokenDenied},
+		{"DELETE /api/v1/account/tokens/{id}", m.RequireOnboarded(h.Tokens.Revoke), TokenDenied},
+{{- if .Storage }}
+		{"POST /api/v1/account/avatar", m.RequireOnboarded(h.Account.UploadAvatar), TokenWrite},
+		{"DELETE /api/v1/account/avatar", m.RequireOnboarded(h.Account.DeleteAvatar), TokenWrite},
+{{- end }}
+{{- if .Workspaces }}
+		{"GET /api/v1/workspaces", m.RequireOnboarded(h.Workspaces.List), TokenRead},
+		{"POST /api/v1/workspaces", m.RequireOnboarded(h.Workspaces.Create), TokenDenied},
+		{"GET /api/v1/workspaces/{workspaceSlug}", m.Workspace(h.Workspaces.Show), TokenRead},
+		{"DELETE /api/v1/workspaces/{workspaceSlug}", m.Workspace(h.Workspaces.Delete), TokenDenied},
+		{"PATCH /api/v1/workspaces/{workspaceSlug}/name", m.Workspace(h.Workspaces.UpdateName), TokenWrite},
+		{"POST /api/v1/workspaces/{workspaceSlug}/invitations", m.Workspace(m.RateLimitInvitations(h.Workspaces.Invite)), TokenWrite},
+		{"POST /api/v1/workspaces/{workspaceSlug}/invitations/{invitationID}/resend", m.Workspace(m.RateLimitInvitations(h.Workspaces.ResendInvitation)), TokenWrite},
+		{"DELETE /api/v1/workspaces/{workspaceSlug}/invitations/{invitationID}", m.Workspace(h.Workspaces.RevokeInvitation), TokenWrite},
+		{"PATCH /api/v1/workspaces/{workspaceSlug}/members/{memberID}/role", m.Workspace(h.Workspaces.ChangeRole), TokenDenied},
+		{"DELETE /api/v1/workspaces/{workspaceSlug}/members/{memberID}", m.Workspace(h.Workspaces.RemoveMember), TokenDenied},
+		{"POST /api/v1/workspaces/{workspaceSlug}/leave", m.Workspace(h.Workspaces.Leave), TokenDenied},
+		{"GET /api/v1/workspaces/{workspaceSlug}/activity", m.Workspace(h.Workspaces.Activity), TokenRead},
+		{"GET /api/v1/invitations/{token}", h.Invitations.Show, TokenRead},
+		{"POST /api/v1/invitations/{token}/accept", m.RequireOnboarded(h.Invitations.Accept), TokenDenied},
+		{"GET /api/v1/workspaces/{workspaceSlug}/billing", m.Workspace(h.Billing.Billing), TokenRead},
+		{"POST /api/v1/workspaces/{workspaceSlug}/billing/checkout", m.Workspace(h.Billing.CreateCheckout), TokenDenied},
+		{"GET /api/v1/workspaces/{workspaceSlug}/billing/manage", m.Workspace(h.Billing.BillingManagement), TokenDenied},
+{{- else }}
+		{"GET /api/v1/billing", m.RequireOnboarded(h.Billing.Billing), TokenRead},
+		{"POST /api/v1/billing/checkout", m.RequireOnboarded(h.Billing.CreateCheckout), TokenDenied},
+		{"GET /api/v1/billing/portal", m.RequireOnboarded(h.Billing.CustomerPortal), TokenDenied},
+{{- end }}
+		{"GET /api/v1/admin/users", m.RequireOnboarded(m.RequireAdmin(h.Admin.Users)), TokenDenied},
+		{"POST /api/v1/admin/users/{userID}/sessions/revoke", m.RequireOnboarded(m.RequireAdmin(h.Admin.RevokeUserSessions)), TokenDenied},
+	}
+	for index := range routes {
+		routes[index].Handler = routes[index].Tokens.wrap(routes[index].Handler)
+	}
+	return routes
+}

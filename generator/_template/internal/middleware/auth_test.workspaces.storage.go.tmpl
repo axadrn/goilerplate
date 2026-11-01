@@ -1,0 +1,374 @@
+package middleware
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/repository"
+	"{{.ModulePath}}/internal/service"
+	"{{.ModulePath}}/internal/testutil"
+)
+
+func TestAuthMiddlewareLoadsAuthenticatedContext(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	fixture := testutil.SeedUser(t, database, testutil.UserOptions{
+		ID:       "authenticated-user",
+		Name:     "Authenticated User",
+		Password: "correct horse battery staple",
+		Verified: true,
+	})
+	authService, userService, _ := authenticationServices(database)
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(http.MethodGet, "/auth", nil)
+	session, err := authService.StartSession(loginRecorder, loginRequest, fixture.User.ID)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	sessionCookie := loginRecorder.Result().Cookies()[0]
+
+	var contextChecked bool
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := ctxkeys.User(r.Context())
+		currentSession := ctxkeys.Session(r.Context())
+		if user == nil || user.ID != fixture.User.ID {
+			t.Fatalf("context user = %#v", user)
+		}
+		if user.PasswordHash != nil || !user.PasswordSet {
+			t.Fatalf("context exposed password hash or lost password state: %#v", user)
+		}
+		if user.Name != fixture.User.Name {
+			t.Fatalf("context user name = %q", user.Name)
+		}
+		if ctxkeys.Subscription(r.Context()) != nil {
+			t.Fatal("global authentication middleware loaded a workspace subscription")
+		}
+		if currentSession == nil || currentSession.ID != session.ID {
+			t.Fatalf("context session = %#v", currentSession)
+		}
+		contextChecked = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/app/authenticated-workspace/dashboard", nil)
+	request.AddCookie(sessionCookie)
+	recorder := httptest.NewRecorder()
+	AuthMiddleware(authService, userService)(next).ServeHTTP(recorder, request)
+
+	if !contextChecked || recorder.Code != http.StatusNoContent {
+		t.Fatalf("contextChecked = %t, status = %d", contextChecked, recorder.Code)
+	}
+}
+
+func TestAuthMiddlewareClearsInvalidSessionAndContinuesAsGuest(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	authService, userService, _ := authenticationServices(database)
+	var authenticated bool
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authenticated = ctxkeys.User(r.Context()) != nil
+		w.WriteHeader(http.StatusNoContent)
+	})
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.AddCookie(&http.Cookie{Name: "session_token", Value: "invalid-token"})
+	recorder := httptest.NewRecorder()
+
+	AuthMiddleware(authService, userService)(next).ServeHTTP(recorder, request)
+
+	if authenticated {
+		t.Fatal("invalid session authenticated the request")
+	}
+	cookies := recorder.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "session_token" || cookies[0].MaxAge != -1 {
+		t.Fatalf("cleared cookies = %#v", cookies)
+	}
+}
+
+func TestAuthMiddlewarePrefersImpersonationAndFallsBackToOperator(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "middleware-operator", Email: "operator@example.com", Name: "Operator", Verified: true})
+	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "middleware-target", Email: "target@example.com", Name: "Target"})
+	authService, userService, _ := authenticationServices(database)
+
+	operatorRecorder := httptest.NewRecorder()
+	operatorRequest := httptest.NewRequest(http.MethodGet, "/auth", nil)
+	operatorSession, err := authService.StartSession(operatorRecorder, operatorRequest, operator.User.ID)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	operatorCookie := operatorRecorder.Result().Cookies()[0]
+	impersonationRecorder := httptest.NewRecorder()
+	impersonationRequest := httptest.NewRequest(http.MethodPost, "/admin/users/target/impersonate", nil)
+	impersonationRequest.AddCookie(operatorCookie)
+	if _, err := authService.StartImpersonation(impersonationRecorder, impersonationRequest, operator.User.ID, target.User.ID); err != nil {
+		t.Fatalf("StartImpersonation() error = %v", err)
+	}
+	impersonationCookie := impersonationRecorder.Result().Cookies()[0]
+
+	assertUser := func(wantUserID string) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if user := ctxkeys.User(r.Context()); user == nil || user.ID != wantUserID {
+				t.Fatalf("context user = %#v, want %s", user, wantUserID)
+			}
+			w.WriteHeader(http.StatusNoContent)
+		})
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/app", nil)
+	request.AddCookie(operatorCookie)
+	request.AddCookie(impersonationCookie)
+	recorder := httptest.NewRecorder()
+	AuthMiddleware(authService, userService)(assertUser(target.User.ID)).ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("impersonated status = %d", recorder.Code)
+	}
+
+	fallbackRequest := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	fallbackRequest.AddCookie(operatorCookie)
+	fallbackRequest.AddCookie(&http.Cookie{Name: "impersonation_token", Value: "invalid"})
+	fallbackRecorder := httptest.NewRecorder()
+	AuthMiddleware(authService, userService)(assertUser(operator.User.ID)).ServeHTTP(fallbackRecorder, fallbackRequest)
+	if fallbackRecorder.Code != http.StatusNoContent {
+		t.Fatalf("fallback status = %d", fallbackRecorder.Code)
+	}
+	cookies := fallbackRecorder.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "impersonation_token" || cookies[0].MaxAge != -1 {
+		t.Fatalf("fallback cleared cookies = %#v", cookies)
+	}
+
+	adminService := service.NewAdminService(repository.NewAdminRepository(database), repository.NewUserRepository(database), authService, []string{"operator@example.com"})
+	adminRequest := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	ctx := ctxkeys.WithUser(adminRequest.Context(), operator.User)
+	ctx = ctxkeys.WithSession(ctx, operatorSession)
+	adminRequest = adminRequest.WithContext(ctx)
+	adminRecorder := httptest.NewRecorder()
+	AdminContext(adminService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		RequireAdmin(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })(w, r)
+	})).ServeHTTP(adminRecorder, adminRequest)
+	if adminRecorder.Code != http.StatusNoContent {
+		t.Fatalf("operator admin status = %d", adminRecorder.Code)
+	}
+	ordinaryRecorder := httptest.NewRecorder()
+	RequireAdmin(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})(ordinaryRecorder, httptest.NewRequest(http.MethodGet, "/admin", nil))
+	if ordinaryRecorder.Code != http.StatusNotFound {
+		t.Fatalf("ordinary admin status = %d, want 404", ordinaryRecorder.Code)
+	}
+}
+
+func TestBlockImpersonatedWrites(t *testing.T) {
+	operatorID := "operator"
+	impersonation := &model.Session{ImpersonatorUserID: &operatorID}
+
+	for _, test := range []struct {
+		method     string
+		path       string
+		wantStatus int
+		wantCalled bool
+	}{
+		{http.MethodGet, "/app/workspace/settings", http.StatusNoContent, true},
+		{http.MethodGet, "/app/workspace/billing/manage", http.StatusForbidden, false},
+		{http.MethodHead, "/app/workspace/billing/manage", http.StatusForbidden, false},
+		{http.MethodGet, "/auth/google/callback", http.StatusForbidden, false},
+		{http.MethodGet, "/auth/magic-link/token", http.StatusForbidden, false},
+		{http.MethodGet, "/assets/app.css", http.StatusNoContent, true},
+		{http.MethodGet, "/llms.txt", http.StatusNoContent, true},
+		{http.MethodPost, "/app/workspace/workspace/delete", http.StatusForbidden, false},
+		{http.MethodPost, "/admin/impersonation/stop", http.StatusNoContent, true},
+		{http.MethodPost, "/auth/logout", http.StatusNoContent, true},
+	} {
+		t.Run(test.method+" "+test.path, func(t *testing.T) {
+			request := httptest.NewRequest(test.method, test.path, nil)
+			request = request.WithContext(ctxkeys.WithSession(request.Context(), impersonation))
+			called := false
+			recorder := httptest.NewRecorder()
+			BlockImpersonatedWrites(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusNoContent)
+			})).ServeHTTP(recorder, request)
+			if recorder.Code != test.wantStatus || called != test.wantCalled {
+				t.Fatalf("status = %d, called = %t", recorder.Code, called)
+			}
+		})
+	}
+}
+
+{{ if .HasHTMLFrontend -}}
+func TestRequireAuthRedirectsGuestsAndIncompleteProfiles(t *testing.T) {
+	tests := []struct {
+		name         string
+		context      func(*http.Request) *http.Request
+		wantLocation string
+		wantCalled   bool
+	}{
+		{name: "guest", wantLocation: "/auth"},
+		{
+			name: "incomplete profile",
+			context: func(request *http.Request) *http.Request {
+				return request.WithContext(ctxkeys.WithUser(request.Context(), &model.User{ID: "user-1"}))
+			},
+			wantLocation: "/auth/onboarding",
+		},
+		{
+			name: "authenticated",
+			context: func(request *http.Request) *http.Request {
+				return request.WithContext(ctxkeys.WithUser(request.Context(), &model.User{ID: "user-1", Name: "User"}))
+			},
+			wantCalled: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			called := false
+			handler := RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusNoContent)
+			})
+			request := httptest.NewRequest(http.MethodGet, "/app/example/dashboard", nil)
+			if test.context != nil {
+				request = test.context(request)
+			}
+			recorder := httptest.NewRecorder()
+
+			handler(recorder, request)
+
+			if called != test.wantCalled {
+				t.Fatalf("handler called = %t, want %t", called, test.wantCalled)
+			}
+			if test.wantCalled {
+				if recorder.Code != http.StatusNoContent {
+					t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+				}
+				return
+			}
+			if got := recorder.Header().Get("Location"); got != test.wantLocation {
+				t.Fatalf("Location = %q, want %q", got, test.wantLocation)
+			}
+		})
+	}
+}
+
+{{ end -}}
+func TestWithWorkspaceLoadsWorkspaceAndRejectsCrossTenantAccess(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	alice := testutil.SeedUser(t, database, testutil.UserOptions{ID: "scope-alice", Name: "Alice"})
+	bob := testutil.SeedUser(t, database, testutil.UserOptions{ID: "scope-bob", Name: "Bob"})
+	users := repository.NewUserRepository(database)
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	workspaces := service.NewWorkspaceService(
+		repository.NewWorkspaceRepository(database),
+		repository.NewWorkspaceMemberRepository(database),
+		repository.NewWorkspaceInvitationRepository(database),
+		repository.NewWorkspaceAuditRepository(database),
+		users,
+		subscriptions,
+		service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App"),
+	)
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ctxkeys.Workspace(r.Context()).ID != alice.Workspace.ID {
+			t.Fatalf("workspace context = %#v", ctxkeys.Workspace(r.Context()))
+		}
+		if ctxkeys.WorkspaceMember(r.Context()).UserID != alice.User.ID {
+			t.Fatalf("member context = %#v", ctxkeys.WorkspaceMember(r.Context()))
+		}
+		if ctxkeys.Subscription(r.Context()).WorkspaceID != alice.Workspace.ID {
+			t.Fatalf("subscription context = %#v", ctxkeys.Subscription(r.Context()))
+		}
+		if len(ctxkeys.Workspaces(r.Context())) != 1 {
+			t.Fatalf("workspace switcher entries = %#v", ctxkeys.Workspaces(r.Context()))
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/app/"+alice.Workspace.Slug+"/dashboard", nil)
+	request.SetPathValue("workspaceSlug", alice.Workspace.Slug)
+	request = request.WithContext(ctxkeys.WithUser(request.Context(), alice.User))
+	recorder := httptest.NewRecorder()
+	WithWorkspace(workspaces, subscriptions)(next).ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("member status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+
+	crossTenant := httptest.NewRequest(http.MethodGet, "/app/"+bob.Workspace.Slug+"/dashboard", nil)
+	crossTenant.SetPathValue("workspaceSlug", bob.Workspace.Slug)
+	crossTenant = crossTenant.WithContext(ctxkeys.WithUser(crossTenant.Context(), alice.User))
+	crossTenantRecorder := httptest.NewRecorder()
+	WithWorkspace(workspaces, subscriptions)(next).ServeHTTP(crossTenantRecorder, crossTenant)
+	if crossTenantRecorder.Code != http.StatusNotFound {
+		t.Fatalf("cross-tenant status = %d, want %d", crossTenantRecorder.Code, http.StatusNotFound)
+	}
+}
+
+func TestWithWorkspaceRestoresMissingFreeSubscription(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "missing-subscription-user"})
+	if _, err := database.Exec(`DELETE FROM subscriptions WHERE workspace_id = $1`, fixture.Workspace.ID); err != nil {
+		t.Fatalf("delete fixture subscription: %v", err)
+	}
+	users := repository.NewUserRepository(database)
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	workspaces := service.NewWorkspaceService(
+		repository.NewWorkspaceRepository(database),
+		repository.NewWorkspaceMemberRepository(database),
+		repository.NewWorkspaceInvitationRepository(database),
+		repository.NewWorkspaceAuditRepository(database),
+		users,
+		subscriptions,
+		service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App"),
+	)
+
+	request := httptest.NewRequest(http.MethodGet, "/app/"+fixture.Workspace.Slug+"/dashboard", nil)
+	request.SetPathValue("workspaceSlug", fixture.Workspace.Slug)
+	request = request.WithContext(ctxkeys.WithUser(request.Context(), fixture.User))
+	recorder := httptest.NewRecorder()
+	WithWorkspace(workspaces, subscriptions)(func(w http.ResponseWriter, r *http.Request) {
+		subscription := ctxkeys.Subscription(r.Context())
+		if subscription.PlanID != model.SubscriptionPlanFree || subscription.Status != model.SubscriptionStatusActive {
+			t.Fatalf("subscription context = %#v", subscription)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+}
+
+func authenticationServices(database *sqlx.DB) (*service.AuthService, *service.UserService, *service.SubscriptionService) {
+	userRepository := repository.NewUserRepository(database)
+	subscriptionRepository := repository.NewSubscriptionRepository(database)
+	fileService := service.NewFileService(repository.NewFileRepository(database), testutil.NewMemoryStorage())
+	subscriptionService := service.NewSubscriptionService(subscriptionRepository, repository.NewAdminRepository(database))
+	emailService := service.NewEmailService(testutil.NewMemoryMailer(), "http://localhost:8090", "Test App")
+	workspaceService := service.NewWorkspaceService(
+		repository.NewWorkspaceRepository(database),
+		repository.NewWorkspaceMemberRepository(database),
+		repository.NewWorkspaceInvitationRepository(database),
+		repository.NewWorkspaceAuditRepository(database),
+		userRepository,
+		subscriptionService,
+		emailService,
+	)
+	authService := service.NewAuthService(
+		userRepository,
+		repository.NewTokenRepository(database),
+		repository.NewSessionRepository(database),
+		workspaceService,
+		emailService,
+		false,
+		7*24*time.Hour,
+		24*time.Hour,
+		time.Hour,
+		24*time.Hour,
+		10*time.Minute,
+	)
+	userService := service.NewUserService(userRepository, fileService, nil, workspaceService)
+	return authService, userService, subscriptionService
+}

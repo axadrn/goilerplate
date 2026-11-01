@@ -1,0 +1,16 @@
+package blocks
+
+import (
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/sheet"
+)
+
+templ NavbarPricingDesktop() {
+	@button.Button(button.Props{Href: "/#pricing", Variant: button.VariantGhost, Size: button.SizeSm}) {
+		Pricing
+	}
+}
+
+templ NavbarPricingMobile() {
+	<a href="/#pricing" class="flex items-center px-3 py-2 rounded-md hover:bg-accent text-foreground w-full text-left" { sheet.CloseFor("mobile-nav")... }>Pricing</a>
+}

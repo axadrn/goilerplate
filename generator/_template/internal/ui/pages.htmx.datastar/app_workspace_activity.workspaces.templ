@@ -1,0 +1,64 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/components/card"
+	"{{.ModulePath}}/internal/ui/components/empty"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/item"
+	"{{.ModulePath}}/internal/ui/layouts"
+)
+
+templ WorkspaceActivity(events []model.WorkspaceAuditEvent) {
+	{{ workspace := ctxkeys.Workspace(ctx) }}
+	@layouts.App("Activity") {
+		<div class="container max-w-5xl space-y-6 px-6 py-8">
+			<div>
+				<h1 class="text-3xl font-bold">Activity</h1>
+				<p class="mt-2 text-muted-foreground">Security and member changes for { workspace.Name }.</p>
+			</div>
+			@card.Card() {
+				@card.Content() {
+					if len(events) == 0 {
+						@empty.Empty() {
+							@empty.Header() {
+								@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+									@icon.Activity()
+								}
+								@empty.Title() {
+									No activity yet 
+								}
+								@empty.Description() {
+									Security and member changes will appear here. 
+								}
+							}
+						}
+					} else {
+						@item.Group(item.GroupProps{Class: "gap-2"}) {
+							for _, event := range events {
+								@item.Item(item.Props{Size: item.SizeSm}) {
+									@item.Content() {
+										@item.Title() {
+											{ model.WorkspaceAuditActionLabel(event.Action) }
+										}
+										@item.Description() {
+											if event.ActorEmail != "" {
+												{ event.ActorEmail }
+											} else {
+												System
+											}
+										}
+									}
+									@item.Actions() {
+										<time class="text-sm text-muted-foreground">{ event.CreatedAt.Local().Format("Jan 2, 2006 at 15:04") }</time>
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}

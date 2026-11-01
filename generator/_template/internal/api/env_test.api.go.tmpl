@@ -1,0 +1,297 @@
+package api_test
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	"{{.ModulePath}}/internal/api"
+	"{{.ModulePath}}/internal/middleware"
+	"{{.ModulePath}}/internal/repository"
+	"{{.ModulePath}}/internal/service"
+	"{{.ModulePath}}/internal/testutil"
+)
+
+const testPassword = "correct horse battery staple"
+
+// testSupportEmail is the support address GET /api/v1/meta answers.
+const testSupportEmail = "support@example.com"
+
+// testCSRFToken has the length of a real CSRF token, so cookie requests can
+// send it as cookie and header.
+var testCSRFToken = strings.Repeat("c", 43)
+
+// apiEnvironment runs API requests through the same middleware the router
+// uses, against a fresh database.
+type apiEnvironment struct {
+	database *sqlx.DB
+	mailer   *testutil.MemoryMailer
+	auth     *service.AuthService
+	users    *service.UserService
+{{- if .Workspaces }}
+	workspaces *service.WorkspaceService
+{{- end }}
+	tokens *service.APITokenService
+{{- if .Storage }}
+	files   *service.FileService
+	storage *testutil.MemoryStorage
+{{- end }}
+	admin    *service.AdminService
+	payments *paymentStub
+	routes  []api.Route
+	handler http.Handler
+}
+
+// testAdminEmail is the operator address of the API test environment.
+const testAdminEmail = "operator@example.com"
+
+func newAPIEnvironment(t *testing.T) *apiEnvironment {
+	t.Helper()
+	database := testutil.NewDatabase(t)
+	userRepository := repository.NewUserRepository(database)
+	mailer := testutil.NewMemoryMailer()
+	email := service.NewEmailService(mailer, "https://app.example.com", "Test App")
+	environment := &apiEnvironment{database: database, mailer: mailer}
+{{- if .Workspaces }}
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database), repository.NewAdminRepository(database))
+	environment.workspaces = service.NewWorkspaceService(
+		repository.NewWorkspaceRepository(database),
+		repository.NewWorkspaceMemberRepository(database),
+		repository.NewWorkspaceInvitationRepository(database),
+		repository.NewWorkspaceAuditRepository(database),
+		userRepository,
+		subscriptions,
+		email,
+	)
+	environment.auth = service.NewAuthService(
+		userRepository,
+		repository.NewTokenRepository(database),
+		repository.NewSessionRepository(database),
+		environment.workspaces,
+		email,
+		false,
+		7*24*time.Hour,
+		24*time.Hour,
+		time.Hour,
+		24*time.Hour,
+		10*time.Minute,
+	)
+{{- if .Storage }}
+	environment.storage = testutil.NewMemoryStorage()
+	files := service.NewFileService(repository.NewFileRepository(database), environment.storage)
+	environment.files = files
+	environment.users = service.NewUserService(userRepository, files, email, environment.workspaces)
+{{- else }}
+	environment.users = service.NewUserService(userRepository, email, environment.workspaces)
+{{- end }}
+	authenticate := middleware.AuthMiddleware(environment.auth, environment.users)
+{{- if .IsSvelte }}
+	invitationCookie := api.NewInvitationCookie(false)
+	authHandler := api.NewAuthHandler(environment.auth, environment.users, environment.workspaces, invitationCookie)
+{{- else }}
+	authHandler := api.NewAuthHandler(environment.auth, environment.users, environment.workspaces)
+{{- end }}
+	environment.payments = &paymentStub{name: "{{.Payment}}", checkoutURL: "https://checkout.example.com/session", managementURL: "https://billing.example.com/portal"}
+	billingHandler := api.NewBillingHandler(environment.payments, environment.workspaces)
+{{- else }}
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database))
+	environment.auth = service.NewAuthService(
+		userRepository,
+		repository.NewTokenRepository(database),
+		repository.NewSessionRepository(database),
+		subscriptions,
+		email,
+		false,
+		7*24*time.Hour,
+		24*time.Hour,
+		time.Hour,
+		24*time.Hour,
+		10*time.Minute,
+	)
+{{- if .Storage }}
+	environment.storage = testutil.NewMemoryStorage()
+	files := service.NewFileService(repository.NewFileRepository(database), environment.storage)
+	environment.files = files
+	environment.users = service.NewUserService(userRepository, files, email, subscriptions)
+{{- else }}
+	environment.users = service.NewUserService(userRepository, email, subscriptions)
+{{- end }}
+	authenticate := middleware.AuthMiddleware(environment.auth, environment.users, subscriptions)
+	authHandler := api.NewAuthHandler(environment.auth, environment.users)
+	environment.payments = &paymentStub{name: "{{.Payment}}", checkoutURL: "https://checkout.example.com/session", managementURL: "https://billing.example.com/portal"}
+	billingHandler := api.NewBillingHandler(environment.payments)
+{{- end }}
+
+{{- if .Storage }}
+	accountHandler := api.NewAccountHandler(environment.auth, environment.users, environment.files)
+{{- else }}
+	accountHandler := api.NewAccountHandler(environment.auth, environment.users)
+{{- end }}
+	sessionsHandler := api.NewSessionsHandler(environment.auth)
+{{- if .Workspaces }}
+	environment.tokens = service.NewAPITokenService(repository.NewAPITokenRepository(database), environment.workspaces)
+	tokenAuth := middleware.APITokenAuth(environment.tokens, environment.users)
+{{- else }}
+	environment.tokens = service.NewAPITokenService(repository.NewAPITokenRepository(database))
+	tokenAuth := middleware.APITokenAuth(environment.tokens, environment.users, subscriptions)
+{{- end }}
+	environment.auth.UseAPITokens(environment.tokens)
+	environment.admin = service.NewAdminService(repository.NewAdminRepository(database), userRepository, environment.auth, []string{testAdminEmail})
+	adminHandler := api.NewAdminHandler(environment.admin)
+
+	clientIPs := middleware.NewClientIPResolver(nil)
+	handlers := api.Handlers{
+		Meta:     api.NewMetaHandler(testSupportEmail),
+		Auth:     authHandler,
+		Account:  accountHandler,
+		Sessions: sessionsHandler,
+		Tokens:   api.NewAPITokensHandler(environment.tokens),
+		Billing: billingHandler,
+		Admin:   adminHandler,
+{{- if .Workspaces }}
+		Workspaces:  api.NewWorkspaceHandler(environment.workspaces),
+{{- if .IsSvelte }}
+		Invitations: api.NewWorkspaceInvitationHandler(environment.workspaces, invitationCookie),
+{{- else }}
+		Invitations: api.NewWorkspaceInvitationHandler(environment.workspaces),
+{{- end }}
+{{- end }}
+	}
+	routeMiddleware := api.Middleware{
+		RequireAuth:           middleware.RequireAuthAPI,
+		RequireOnboarded:      middleware.RequireOnboardedAPI,
+		RateLimitAuth:         middleware.RateLimitAuth(clientIPs),
+		RateLimitAuthEmail:    middleware.RateLimitAuthEmail(clientIPs),
+		RateLimitEmailChanges: middleware.RateLimitUserEmailChanges(),
+		RequireAdmin: middleware.RequireAdminAPI,
+{{- if .Workspaces }}
+		Workspace: func(next http.HandlerFunc) http.HandlerFunc {
+			return middleware.RequireOnboardedAPI(middleware.WithWorkspaceAPI(environment.workspaces, subscriptions)(next))
+		},
+		RateLimitInvitations: middleware.RateLimitWorkspaceInvitations(middleware.NewWorkspaceInvitationLimiter()),
+{{- end }}
+	}
+	environment.routes = api.Routes(handlers, routeMiddleware)
+	mux := http.NewServeMux()
+	for _, route := range environment.routes {
+		mux.HandleFunc(route.Pattern, route.Handler)
+	}
+	mux.HandleFunc("/api/", middleware.APINotFound)
+
+	environment.handler = middleware.Chain(
+		mux,
+		middleware.CSRFProtection(false, clientIPs),
+		authenticate,
+		tokenAuth,
+		middleware.BlockImpersonatedWrites,
+		middleware.AdminContext(environment.admin),
+	)
+	return environment
+}
+
+// apiRequest describes one call. Bearer sends an Authorization header,
+// Cookie sends a session cookie together with a valid CSRF token.
+type apiRequest struct {
+	method string
+	path   string
+	body   string
+	bearer string
+	cookie string
+	// cookies are sent as they are, for example an impersonation cookie.
+	cookies []*http.Cookie
+}
+
+func (e *apiEnvironment) send(t *testing.T, request apiRequest) *httptest.ResponseRecorder {
+	t.Helper()
+	var httpRequest *http.Request
+	if request.body == "" {
+		httpRequest = httptest.NewRequest(request.method, request.path, nil)
+	} else {
+		httpRequest = httptest.NewRequest(request.method, request.path, strings.NewReader(request.body))
+		httpRequest.Header.Set("Content-Type", "application/json")
+	}
+	httpRequest.Header.Set("User-Agent", "goilerplate-test/1.0")
+	if request.bearer != "" {
+		httpRequest.Header.Set("Authorization", "Bearer "+request.bearer)
+	}
+	if request.cookie != "" {
+		httpRequest.AddCookie(&http.Cookie{Name: "session_token", Value: request.cookie})
+		httpRequest.AddCookie(&http.Cookie{Name: "csrf_token", Value: testCSRFToken})
+		httpRequest.Header.Set("X-CSRF-Token", testCSRFToken)
+	}
+	for _, cookie := range request.cookies {
+		httpRequest.AddCookie(cookie)
+	}
+	recorder := httptest.NewRecorder()
+	e.handler.ServeHTTP(recorder, httpRequest)
+	return recorder
+}
+
+// sendWithCookieOnly sends a session cookie without the CSRF header.
+func (e *apiEnvironment) sendWithCookieOnly(t *testing.T, request apiRequest, sessionToken string) *httptest.ResponseRecorder {
+	t.Helper()
+	httpRequest := httptest.NewRequest(request.method, request.path, strings.NewReader(request.body))
+	httpRequest.AddCookie(&http.Cookie{Name: "session_token", Value: sessionToken})
+	httpRequest.AddCookie(&http.Cookie{Name: "csrf_token", Value: testCSRFToken})
+	recorder := httptest.NewRecorder()
+	e.handler.ServeHTTP(recorder, httpRequest)
+	return recorder
+}
+
+// signIn creates a session for userID and returns its raw token.
+func (e *apiEnvironment) signIn(t *testing.T, userID string) string {
+	t.Helper()
+	_, token, err := e.auth.CreateSession(httptest.NewRequest(http.MethodPost, "/api/v1/auth/password", nil), userID)
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	return token
+}
+
+// mailedToken returns the token of the last email whose link contains path.
+func (e *apiEnvironment) mailedToken(t *testing.T, path string) string {
+	t.Helper()
+	pattern := regexp.MustCompile(regexp.QuoteMeta(path) + `([0-9a-f]{64})`)
+	messages := e.mailer.Messages()
+	for index := len(messages) - 1; index >= 0; index-- {
+		match := pattern.FindStringSubmatch(messages[index].Text)
+		if match != nil {
+			return match[1]
+		}
+	}
+	t.Fatalf("no email contains %s", path)
+	return ""
+}
+
+func expectStatus(t *testing.T, recorder *httptest.ResponseRecorder, status int) {
+	t.Helper()
+	if recorder.Code != status {
+		t.Fatalf("status = %d, want %d, body %s", recorder.Code, status, recorder.Body.String())
+	}
+}
+
+func decodeBody[T any](t *testing.T, recorder *httptest.ResponseRecorder) T {
+	t.Helper()
+	var value T
+	err := json.Unmarshal(recorder.Body.Bytes(), &value)
+	if err != nil {
+		t.Fatalf("decode %q: %v", recorder.Body.String(), err)
+	}
+	return value
+}
+
+// expectError checks status and code of an error envelope and returns it.
+func expectError(t *testing.T, recorder *httptest.ResponseRecorder, status int, code string) api.ErrorDetail {
+	t.Helper()
+	expectStatus(t, recorder, status)
+	detail := decodeBody[api.ErrorBody](t, recorder).Error
+	if detail.Code != code {
+		t.Fatalf("code = %q, want %q, body %s", detail.Code, code, recorder.Body.String())
+	}
+	return detail
+}

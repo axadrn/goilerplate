@@ -1,0 +1,128 @@
+package handler
+
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/repository"
+	"{{.ModulePath}}/internal/service"
+	"{{.ModulePath}}/internal/ui/components/toast"
+	"{{.ModulePath}}/internal/ui/pages"
+)
+
+type SettingsHandler struct {
+	authService *service.AuthService
+{{- if .API }}
+	apiTokens *service.APITokenService
+{{- end }}
+}
+
+{{ if .API -}}
+func NewSettingsHandler(authService *service.AuthService, apiTokens *service.APITokenService) *SettingsHandler {
+	return &SettingsHandler{authService: authService, apiTokens: apiTokens}
+}
+{{- else -}}
+func NewSettingsHandler(authService *service.AuthService) *SettingsHandler {
+	return &SettingsHandler{authService: authService}
+}
+{{- end }}
+
+func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	sessions, err := h.authService.Sessions(user.ID)
+	if err != nil {
+		slog.Error("failed to list sessions", "error", err, "user_id", user.ID)
+		w.WriteHeader(http.StatusInternalServerError)
+		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
+		return
+	}
+
+	activeTab := r.URL.Query().Get("tab")
+	if activeTab != "security" {
+		activeTab = "profile"
+	}
+	currentSession := ctxkeys.Session(r.Context())
+	currentSessionID := ""
+	if currentSession != nil {
+		currentSessionID = currentSession.ID
+	}
+{{ if .API }}
+	tokens, err := apiTokensView(r, h.apiTokens, newAPITokenForm(r))
+	if err != nil {
+		slog.Error("failed to list api tokens", "error", err, "user_id", user.ID)
+		w.WriteHeader(http.StatusInternalServerError)
+		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
+		return
+	}
+	render(w, r, pages.Settings(sessions, currentSessionID, activeTab, r.URL.Query().Get("password_removed") == "1", pages.SettingsAPITokensSection(tokens)))
+{{- else }}
+	render(w, r, pages.Settings(sessions, currentSessionID, activeTab, r.URL.Query().Get("password_removed") == "1"))
+{{- end }}
+}
+
+func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	session := ctxkeys.Session(r.Context())
+	sessionID := r.PathValue("id")
+
+	if err := h.authService.RevokeSession(user.ID, sessionID); err != nil {
+		if errors.Is(err, repository.ErrSessionNotFound) {
+			if isAction(r) {
+				appendElement(w, r, toast.Toast(toast.Props{Title: "Session not found", Description: "That session has already ended.", Type: toast.TypeError}), "#toast-container")
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+				render(w, r, pages.ErrorPage(http.StatusNotFound, "Session not found", "That session has already ended."))
+			}
+			return
+		}
+		slog.Error("failed to revoke session", "error", err, "user_id", user.ID, "session_id", sessionID)
+		if isAction(r) {
+			appendElement(w, r, toast.Toast(toast.Props{Title: "Session could not be revoked", Description: "Please try again.", Type: toast.TypeError}), "#toast-container")
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Session could not be revoked", "Please try again."))
+		}
+		return
+	}
+
+	if session != nil && session.ID == sessionID {
+		h.authService.ClearSessionCookie(w)
+		redirect(w, r, "/auth", http.StatusSeeOther)
+		return
+	}
+	if !isAction(r) {
+		redirect(w, r, "/app/settings?tab=security", http.StatusSeeOther)
+		return
+	}
+	sessions, err := h.authService.Sessions(user.ID)
+	if err != nil {
+		slog.Error("failed to list sessions", "error", err, "user_id", user.ID)
+		appendElement(w, r, toast.Toast(toast.Props{Title: "Sessions could not be refreshed", Description: "Please try again.", Type: toast.TypeError}), "#toast-container")
+		return
+	}
+	appendElement(w, r, toast.Toast(toast.Props{Title: "Session revoked", Description: "The session has been signed out.", Type: toast.TypeSuccess}), "#toast-container")
+	currentSessionID := ""
+	if session != nil {
+		currentSessionID = session.ID
+	}
+	render(w, r, pages.SettingsSessionsSection(sessions, currentSessionID))
+}
+
+func (h *SettingsHandler) RevokeAllSessions(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	if err := h.authService.RevokeAllSessions(user.ID); err != nil {
+		slog.Error("failed to revoke all sessions", "error", err, "user_id", user.ID)
+		if isAction(r) {
+			appendElement(w, r, toast.Toast(toast.Props{Title: "Sessions could not be revoked", Description: "Please try again.", Type: toast.TypeError}), "#toast-container")
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Sessions could not be revoked", "Please try again."))
+		}
+		return
+	}
+
+	h.authService.ClearSessionCookie(w)
+	redirect(w, r, "/auth", http.StatusSeeOther)
+}

@@ -1,0 +1,33 @@
+---
+title: "Building on a Solid SaaS Foundation"
+date: "2026-08-16"
+author: {{.YAMLProjectTeamName}}
+description: "A practical way to separate product work from the infrastructure every SaaS application needs."
+tags: ["engineering", "saas", "product"]
+hero_image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&h=500&fit=crop"
+---
+
+The best product work starts when the common infrastructure stops demanding attention. Authentication, billing, storage, email, and security are essential, but they are rarely what makes a product unique.
+
+## Keep the Architecture Direct
+
+This application uses a small set of layers with clear responsibilities:
+
+- Handlers translate HTTP requests and responses
+- Services own business rules
+- Repositories own SQL and persistence
+- templ components render the interface
+
+The separation makes product changes easier to understand without hiding behavior behind a framework.
+
+## Treat Providers as Replaceable
+
+Payments and storage sit behind narrow interfaces because they are real integration boundaries. Product services can rely on capabilities instead of vendor SDKs.
+
+## Keep Security in the Foundation
+
+CSRF protection, CSP nonces, security headers, token expiry, webhook signature validation, and a narrow render configuration with no secrets should exist before customer data arrives.
+
+## Build the Product Layer Next
+
+Once the foundation is stable, add the workflows that customers actually pay for. The existing structure is there to support those features, not constrain them.

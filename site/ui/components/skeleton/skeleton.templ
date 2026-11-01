@@ -1,0 +1,24 @@
+package skeleton
+
+import "github.com/axadrn/goilerplate/v4/site/ui/utils"
+
+type Props struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+templ Skeleton(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="skeleton"
+		class={ utils.CN("bg-muted rounded-md animate-pulse", p.Class) }
+		{ p.Attributes... }
+	></div>
+}

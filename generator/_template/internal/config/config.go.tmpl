@@ -1,0 +1,530 @@
+package config
+
+import (
+	"errors"
+	"fmt"
+	"net/mail"
+	"net/netip"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type Environment string
+
+const (
+	EnvironmentDevelopment Environment = "development"
+	EnvironmentProduction  Environment = "production"
+	GoogleOAuthEnabled                  = {{.HasGoogleOAuth}}
+	GitHubOAuthEnabled                  = {{.HasGitHubOAuth}}
+)
+
+{{- if eq .Mail "smtp" }}
+const (
+	SMTPTLSStartTLS = "starttls"
+	SMTPTLSImplicit = "tls"
+	SMTPTLSNone     = "none"
+)
+{{- end }}
+
+type Config struct {
+	// Application
+	AppEnv       Environment
+	AppURL       string
+	Port         string
+	SupportEmail string
+	AdminEmails  []string
+	RobotsNoIndex bool
+
+	// Database
+	DBConnection string
+
+	// Security
+	SessionExpiry            time.Duration
+	TokenEmailVerifyExpiry   time.Duration
+	TokenPasswordResetExpiry time.Duration
+	TokenEmailChangeExpiry   time.Duration
+	TokenMagicLinkExpiry     time.Duration
+	TrustedProxyCIDRs        []netip.Prefix
+
+	// OAuth
+{{- if .OAuth }}
+	APIURL string
+{{- end }}
+{{- if .HasGoogleOAuth }}
+	GoogleClientID     string
+	GoogleClientSecret string
+{{- end }}
+{{- if .HasGitHubOAuth }}
+	GitHubClientID     string
+	GitHubClientSecret string
+{{- end }}
+
+	// Email
+	EmailFrom string
+{{- if eq .Mail "resend" }}
+	ResendAPIKey     string
+	ResendAudienceID string
+{{- else }}
+	SMTPHost         string
+	SMTPPort         int
+	SMTPUsername     string
+	SMTPPassword     string
+	SMTPTLS          string
+{{- end }}
+
+{{- if eq .Payment "polar" }}
+	// Payment, Polar
+	PolarAPIKey                     string
+	PolarWebhookSecret              string
+	PolarSandboxMode                bool
+	PolarProductIDProMonthly        string
+	PolarProductIDProYearly         string
+	PolarProductIDEnterpriseMonthly string
+	PolarProductIDEnterpriseYearly  string
+{{- else if eq .Payment "stripe" }}
+	// Payment, Stripe
+	StripeSecretKey                string
+	StripeWebhookSecret            string
+	StripePriceIDProMonthly        string
+	StripePriceIDProYearly         string
+	StripePriceIDEnterpriseMonthly string
+	StripePriceIDEnterpriseYearly  string
+{{- end }}
+	// Analytics
+	UmamiWebsiteID    string
+	UmamiHost         string
+	PlausibleDomain   string
+	PlausibleHost     string
+	GoogleAnalyticsID string
+
+	// Logging
+	LogHTTP bool
+{{- if .API }}
+
+	// JSON API
+	CORSAllowedOrigins []string
+{{- end }}
+
+	// Storage
+{{- if .Storage }}
+	S3Region               string
+	S3Bucket               string
+	S3AccessKey            string
+	S3SecretKey            string
+	S3Endpoint             string
+	S3PresignExpiryPublic  time.Duration
+	S3PresignExpiryPrivate time.Duration
+{{- end }}
+}
+
+type RenderConfig struct {
+	AppEnv            Environment
+	AppURL            string
+	SupportEmail      string
+	RobotsNoIndex     bool
+	UmamiWebsiteID    string
+	UmamiHost         string
+	PlausibleDomain   string
+	PlausibleHost     string
+	GoogleAnalyticsID string
+}
+
+func Load() (*Config, error) {
+	r := envReader{}
+	appEnv := Environment(r.string("APP_ENV", ""))
+{{- if eq .Mail "smtp" }}
+	smtpPort := 587
+	smtpPort = r.integer("SMTP_PORT", smtpPort)
+{{- end }}
+{{- if eq .Payment "polar" }}
+	polarSandboxMode := appEnv == EnvironmentDevelopment
+	polarSandboxMode = r.boolean("POLAR_SANDBOX_MODE", polarSandboxMode)
+{{- end }}
+{{- if .Storage }}
+	s3PresignExpiryPublic := 168 * time.Hour
+	s3PresignExpiryPrivate := time.Hour
+	s3PresignExpiryPublic = r.duration("S3_PRESIGN_EXPIRY_PUBLIC", s3PresignExpiryPublic)
+	s3PresignExpiryPrivate = r.duration("S3_PRESIGN_EXPIRY_PRIVATE", s3PresignExpiryPrivate)
+{{- end }}
+
+	cfg := &Config{
+		AppEnv:       appEnv,
+		AppURL:       r.string("APP_URL", ""),
+		Port:         r.string("PORT", "8090"),
+		SupportEmail: r.string("SUPPORT_EMAIL", "hello@example.com"),
+		AdminEmails:  r.emails("ADMIN_EMAILS"),
+		RobotsNoIndex: r.boolean("ROBOTS_NOINDEX", false),
+
+{{- if eq .Database "postgres" }}
+		DBConnection: r.string("DB_CONNECTION", "postgres://goilerplate:dev_password@localhost:5432/goilerplate_dev?sslmode=disable"),
+{{- else }}
+		DBConnection: r.string("DB_CONNECTION", "./data/acme.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"),
+{{- end }}
+
+		SessionExpiry:            r.duration("SESSION_EXPIRY", 168*time.Hour),
+		TokenEmailVerifyExpiry:   r.duration("TOKEN_EMAIL_VERIFY_EXPIRY", 24*time.Hour),
+		TokenPasswordResetExpiry: r.duration("TOKEN_PASSWORD_RESET_EXPIRY", time.Hour),
+		TokenEmailChangeExpiry:   r.duration("TOKEN_EMAIL_CHANGE_EXPIRY", 24*time.Hour),
+		TokenMagicLinkExpiry:     r.duration("TOKEN_MAGIC_LINK_EXPIRY", 10*time.Minute),
+		TrustedProxyCIDRs: r.prefixes("TRUSTED_PROXY_CIDRS", []netip.Prefix{
+			netip.MustParsePrefix("127.0.0.0/8"),
+			netip.MustParsePrefix("::1/128"),
+		}),
+
+		EmailFrom: r.string("EMAIL_FROM", "noreply@example.com"),
+{{- if eq .Mail "resend" }}
+		ResendAPIKey:     r.string("RESEND_API_KEY", ""),
+		ResendAudienceID: r.string("RESEND_AUDIENCE_ID", ""),
+{{- else }}
+		SMTPHost:         r.string("SMTP_HOST", ""),
+		SMTPPort:         smtpPort,
+		SMTPUsername:     r.string("SMTP_USERNAME", ""),
+		SMTPPassword:     r.string("SMTP_PASSWORD", ""),
+		SMTPTLS:          r.string("SMTP_TLS", SMTPTLSStartTLS),
+{{- end }}
+
+{{- if eq .Payment "polar" }}
+		PolarAPIKey:                            r.string("POLAR_API_KEY", ""),
+		PolarWebhookSecret:                     r.string("POLAR_WEBHOOK_SECRET", ""),
+		PolarSandboxMode:                       polarSandboxMode,
+		PolarProductIDProMonthly:               r.string("POLAR_PRODUCT_ID_PRO_MONTHLY", ""),
+		PolarProductIDProYearly:                r.string("POLAR_PRODUCT_ID_PRO_YEARLY", ""),
+		PolarProductIDEnterpriseMonthly:        r.string("POLAR_PRODUCT_ID_ENTERPRISE_MONTHLY", ""),
+		PolarProductIDEnterpriseYearly:         r.string("POLAR_PRODUCT_ID_ENTERPRISE_YEARLY", ""),
+{{- else if eq .Payment "stripe" }}
+		StripeSecretKey:                        r.string("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:                    r.string("STRIPE_WEBHOOK_SECRET", ""),
+		StripePriceIDProMonthly:                r.string("STRIPE_PRICE_ID_PRO_MONTHLY", ""),
+		StripePriceIDProYearly:                 r.string("STRIPE_PRICE_ID_PRO_YEARLY", ""),
+		StripePriceIDEnterpriseMonthly:         r.string("STRIPE_PRICE_ID_ENTERPRISE_MONTHLY", ""),
+		StripePriceIDEnterpriseYearly:          r.string("STRIPE_PRICE_ID_ENTERPRISE_YEARLY", ""),
+{{- end }}
+		UmamiWebsiteID:    r.string("UMAMI_WEBSITE_ID", ""),
+		UmamiHost:         r.string("UMAMI_HOST", "cloud.umami.is"),
+		PlausibleDomain:   r.string("PLAUSIBLE_DOMAIN", ""),
+		PlausibleHost:     r.string("PLAUSIBLE_HOST", "plausible.io"),
+		GoogleAnalyticsID: r.string("GOOGLE_ANALYTICS_ID", ""),
+
+		LogHTTP: r.boolean("LOG_HTTP", true),
+{{- if .API }}
+
+		CORSAllowedOrigins: r.origins("CORS_ALLOWED_ORIGINS"),
+{{- end }}
+
+{{- if .Storage }}
+		S3Region:               r.string("S3_REGION", ""),
+		S3Bucket:               r.string("S3_BUCKET", ""),
+		S3AccessKey:            r.string("S3_ACCESS_KEY", ""),
+		S3SecretKey:            r.string("S3_SECRET_KEY", ""),
+		S3Endpoint:             r.string("S3_ENDPOINT", ""),
+		S3PresignExpiryPublic:  s3PresignExpiryPublic,
+		S3PresignExpiryPrivate: s3PresignExpiryPrivate,
+{{- end }}
+	}
+{{- if .OAuth }}
+	cfg.APIURL = r.string("API_URL", cfg.AppURL)
+{{- end }}
+{{- if .HasGoogleOAuth }}
+	cfg.GoogleClientID = r.string("GOOGLE_CLIENT_ID", "")
+	cfg.GoogleClientSecret = r.string("GOOGLE_CLIENT_SECRET", "")
+{{- end }}
+{{- if .HasGitHubOAuth }}
+	cfg.GitHubClientID = r.string("GITHUB_CLIENT_ID", "")
+	cfg.GitHubClientSecret = r.string("GITHUB_CLIENT_SECRET", "")
+{{- end }}
+
+	validationErrors := append(r.errors, cfg.validate()...)
+	if len(validationErrors) > 0 {
+		return nil, fmt.Errorf("invalid configuration: %w", errors.Join(validationErrors...))
+	}
+
+	return cfg, nil
+}
+
+func (c *Config) validate() []error {
+	var errs []error
+
+	if c.AppEnv != EnvironmentDevelopment && c.AppEnv != EnvironmentProduction {
+		errs = append(errs, fmt.Errorf("APP_ENV must be %q or %q", EnvironmentDevelopment, EnvironmentProduction))
+	}
+	if err := validateAppURL(c.AppURL); err != nil {
+		errs = append(errs, err)
+	}
+	if err := validatePort(c.Port); err != nil {
+		errs = append(errs, err)
+	}
+	if c.DBConnection == "" {
+		errs = append(errs, errors.New("DB_CONNECTION is required"))
+	}
+	if c.SessionExpiry <= 0 {
+		errs = append(errs, errors.New("SESSION_EXPIRY must be greater than zero"))
+	}
+{{- if .OAuth }}
+	if c.APIURL != c.AppURL {
+		apiURLErr := validateAPIURL(c.APIURL)
+		if apiURLErr != nil {
+			errs = append(errs, apiURLErr)
+		}
+	}
+{{- end }}
+{{- if or .HasGoogleOAuth .HasGitHubOAuth }}
+	errOAuthPair := func(provider, clientID, clientSecret string) {
+		if (clientID == "") != (clientSecret == "") {
+			errs = append(errs, fmt.Errorf("%s OAuth requires both client ID and client secret", provider))
+		}
+	}
+{{- end }}
+{{- if .HasGoogleOAuth }}
+	errOAuthPair("Google", c.GoogleClientID, c.GoogleClientSecret)
+{{- end }}
+{{- if .HasGitHubOAuth }}
+	errOAuthPair("GitHub", c.GitHubClientID, c.GitHubClientSecret)
+{{- end }}
+
+	if c.EmailFrom == "" {
+		errs = append(errs, errors.New("EMAIL_FROM is required"))
+	} else if _, err := mail.ParseAddress(c.EmailFrom); err != nil {
+		errs = append(errs, errors.New("EMAIL_FROM must be a valid email address"))
+	}
+{{- if eq .Mail "resend" }}
+	if c.ResendAPIKey == "" {
+		errs = append(errs, errors.New("RESEND_API_KEY is required for email delivery"))
+	}
+{{- else }}
+	if c.SMTPHost == "" {
+		errs = append(errs, errors.New("SMTP_HOST is required for email delivery"))
+	}
+	if c.SMTPPort < 1 || c.SMTPPort > 65535 {
+		errs = append(errs, errors.New("SMTP_PORT must be a number between 1 and 65535"))
+	}
+	if c.SMTPTLS != SMTPTLSStartTLS && c.SMTPTLS != SMTPTLSImplicit && c.SMTPTLS != SMTPTLSNone {
+		errs = append(errs, errors.New("SMTP_TLS must be starttls, tls, or none"))
+	}
+	if (c.SMTPUsername == "") != (c.SMTPPassword == "") {
+		errs = append(errs, errors.New("SMTP authentication requires both SMTP_USERNAME and SMTP_PASSWORD"))
+	}
+{{- end }}
+
+	errs = append(errs, c.validatePayments()...)
+
+{{- if .Storage }}
+	{
+		required := []struct {
+			key   string
+			value string
+		}{
+			{key: "S3_REGION", value: c.S3Region},
+			{key: "S3_BUCKET", value: c.S3Bucket},
+		}
+		for _, field := range required {
+			if field.value == "" {
+				errs = append(errs, fmt.Errorf("%s is required when storage is included", field.key))
+			}
+		}
+		if (c.S3AccessKey == "") != (c.S3SecretKey == "") {
+			errs = append(errs, errors.New("storage credentials require both S3_ACCESS_KEY and S3_SECRET_KEY"))
+		}
+	}
+{{- end }}
+
+	return errs
+}
+
+func (c *Config) validatePayments() []error {
+	var errs []error
+	require := func(key, value string) {
+		if value == "" {
+			errs = append(errs, fmt.Errorf("%s is required for the selected payment provider", key))
+		}
+	}
+
+{{- if eq .Payment "polar" }}
+		require("POLAR_API_KEY", c.PolarAPIKey)
+		if c.IsProduction() {
+			require("POLAR_WEBHOOK_SECRET", c.PolarWebhookSecret)
+			require("POLAR_PRODUCT_ID_PRO_MONTHLY", c.PolarProductIDProMonthly)
+			require("POLAR_PRODUCT_ID_PRO_YEARLY", c.PolarProductIDProYearly)
+			require("POLAR_PRODUCT_ID_ENTERPRISE_MONTHLY", c.PolarProductIDEnterpriseMonthly)
+			require("POLAR_PRODUCT_ID_ENTERPRISE_YEARLY", c.PolarProductIDEnterpriseYearly)
+		}
+{{- else if eq .Payment "stripe" }}
+		require("STRIPE_SECRET_KEY", c.StripeSecretKey)
+		require("STRIPE_WEBHOOK_SECRET", c.StripeWebhookSecret)
+		if c.IsProduction() {
+			require("STRIPE_PRICE_ID_PRO_MONTHLY", c.StripePriceIDProMonthly)
+			require("STRIPE_PRICE_ID_PRO_YEARLY", c.StripePriceIDProYearly)
+			require("STRIPE_PRICE_ID_ENTERPRISE_MONTHLY", c.StripePriceIDEnterpriseMonthly)
+			require("STRIPE_PRICE_ID_ENTERPRISE_YEARLY", c.StripePriceIDEnterpriseYearly)
+		}
+{{- end }}
+
+	return errs
+}
+
+func validateAppURL(value string) error {
+	if value == "" {
+		return errors.New("APP_URL is required")
+	}
+	return validateAbsoluteHTTPURL("APP_URL", value)
+}
+
+{{- if .OAuth }}
+
+// validateAPIURL checks an explicit API_URL, the public origin of this server.
+// OAuth providers return to API_URL/auth/{provider}/callback, so it carries no path.
+func validateAPIURL(value string) error {
+	err := validateAbsoluteHTTPURL("API_URL", value)
+	if err != nil {
+		return err
+	}
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return err
+	}
+	if parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
+		return errors.New("API_URL must be an origin without a path, for example https://api.example.com")
+	}
+	return nil
+}
+{{- end }}
+
+func validateAbsoluteHTTPURL(key, value string) error {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return fmt.Errorf("%s must be an absolute HTTP or HTTPS URL", key)
+	}
+	return nil
+}
+
+func validatePort(value string) error {
+	port, err := strconv.Atoi(value)
+	if err != nil || port < 1 || port > 65535 {
+		return errors.New("PORT must be a number between 1 and 65535")
+	}
+	return nil
+}
+
+type envReader struct {
+	errors []error
+}
+
+func (r *envReader) string(key, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func (r *envReader) boolean(key string, fallback bool) bool {
+	value := r.string(key, "")
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		r.errors = append(r.errors, fmt.Errorf("%s must be a boolean: %w", key, err))
+		return fallback
+	}
+	return parsed
+}
+
+func (r *envReader) duration(key string, fallback time.Duration) time.Duration {
+	value := r.string(key, "")
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		r.errors = append(r.errors, fmt.Errorf("%s must be a Go duration: %w", key, err))
+		return fallback
+	}
+	return parsed
+}
+
+func (r *envReader) integer(key string, fallback int) int {
+	value := r.string(key, "")
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		r.errors = append(r.errors, fmt.Errorf("%s must be an integer: %w", key, err))
+		return fallback
+	}
+	return parsed
+}
+
+func (r *envReader) prefixes(key string, fallback []netip.Prefix) []netip.Prefix {
+	prefixes := append([]netip.Prefix(nil), fallback...)
+	value := r.string(key, "")
+	if value == "" {
+		return prefixes
+	}
+
+	for _, candidate := range strings.Split(value, ",") {
+		candidate = strings.TrimSpace(candidate)
+		prefix, err := netip.ParsePrefix(candidate)
+		if err != nil {
+			r.errors = append(r.errors, fmt.Errorf("%s must contain comma-separated IP CIDRs: %q", key, candidate))
+			continue
+		}
+		prefixes = append(prefixes, prefix.Masked())
+	}
+
+	return prefixes
+}
+
+func (r *envReader) emails(key string) []string {
+	value := r.string(key, "")
+	if value == "" {
+		return nil
+	}
+
+	emails := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, candidate := range strings.Split(value, ",") {
+		candidate = strings.TrimSpace(candidate)
+		address, err := mail.ParseAddress(candidate)
+		if err != nil || !strings.EqualFold(address.Address, candidate) {
+			r.errors = append(r.errors, fmt.Errorf("%s must contain comma-separated email addresses: %q", key, candidate))
+			continue
+		}
+		normalized := strings.ToLower(address.Address)
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		emails = append(emails, normalized)
+	}
+	return emails
+}
+
+func (c *Config) IsDevelopment() bool {
+	return c.AppEnv == EnvironmentDevelopment
+}
+
+func (c *Config) IsProduction() bool {
+	return c.AppEnv == EnvironmentProduction
+}
+
+func (c *Config) Render() RenderConfig {
+	return RenderConfig{
+		AppEnv:            c.AppEnv,
+		AppURL:            c.AppURL,
+		SupportEmail:      c.SupportEmail,
+		RobotsNoIndex:     c.RobotsNoIndex,
+		UmamiWebsiteID:    c.UmamiWebsiteID,
+		UmamiHost:         c.UmamiHost,
+		PlausibleDomain:   c.PlausibleDomain,
+		PlausibleHost:     c.PlausibleHost,
+		GoogleAnalyticsID: c.GoogleAnalyticsID,
+	}
+}
+
+func (c RenderConfig) IsProduction() bool {
+	return c.AppEnv == EnvironmentProduction
+}

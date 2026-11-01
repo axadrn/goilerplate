@@ -1,0 +1,307 @@
+package pages
+
+import (
+	"github.com/axadrn/goilerplate/v4/site/brand"
+	"github.com/axadrn/goilerplate/v4/site/ui/blocks"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
+	"github.com/axadrn/goilerplate/v4/site/ui/layouts"
+)
+
+const (
+	homeWrap    = "mx-auto w-full max-w-[1240px] px-4 sm:px-8"
+	homeDisplay = "font-display leading-[0.95]"
+	homeSurface = "rounded-[24px] bg-card"
+)
+
+templ Landing() {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "The Go SaaS starter kit, free and open source",
+		Description: brand.Name + " writes a production Go SaaS onto your machine with one command: login, billing, teams, admin, an API and tests. Free and open source. Every line is yours.",
+		Path:        "/",
+	}) {
+		<main>
+			@homeHero()
+			@homeWhatYouGet()
+			@homeStack()
+			@homeUpdate()
+			@homeStatement()
+			@homeStory()
+			@homeFAQ()
+		</main>
+	}
+}
+
+templ homePrimary(href, label string) {
+	<a href={ templ.SafeURL(href) } class="inline-flex h-12 items-center gap-2 rounded-full bg-brand px-7 text-[15px] font-semibold text-brand-foreground transition-opacity hover:opacity-85">
+		{ label }
+		@icon.ArrowRight(icon.Props{Class: "size-4"})
+	</a>
+}
+
+templ homeSecondary(href, label string) {
+	<a href={ templ.SafeURL(href) } class="inline-flex h-12 items-center justify-center rounded-full bg-secondary px-7 text-[15px] font-semibold transition-opacity hover:opacity-80">{ label }</a>
+}
+
+// ---------------------------------------------------------------- hero
+templ homeHero() {
+	<section class="pt-16 sm:pt-28">
+		<div class={ homeWrap, "grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16" }>
+			<div>
+				<h1 class={ homeDisplay, "text-[clamp(2.9rem,6.2vw,5.2rem)]" }>
+					<span class="block">A full Go app.</span>
+					<span class="block">One command.</span>
+				</h1>
+				<p class="mt-7 max-w-[32rem] text-lg leading-8 text-muted-foreground sm:mt-9 sm:text-xl sm:leading-9">
+					{ brand.Name } writes a production Go SaaS onto your machine: login, billing, teams, admin, an API and tests. Free and open source. Every line is yours.
+				</p>
+				<div class="mt-9 flex flex-col gap-3 sm:flex-row">
+					@homePrimary("/docs/installation", "Get started")
+					@homeSecondary("/new", "Build your stack")
+				</div>
+			</div>
+			@homeTerminal()
+		</div>
+		<div class={ homeWrap, "mt-12 sm:mt-16" }>
+			@homeInstall()
+		</div>
+	</section>
+}
+
+// homeTerminal is a real first run: install, generate, start.
+templ homeTerminal() {
+	<div class="ops-term min-w-0 overflow-hidden rounded-[24px] bg-terminal text-[13px] leading-[1.75] text-terminal-foreground sm:text-[14px]" aria-label="A terminal session with goilerplate">
+		<div class="flex items-center gap-2 border-b border-terminal-foreground/10 px-5 py-3.5">
+			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
+			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
+			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
+			<span class="ml-3 text-xs text-terminal-foreground/50">~/code</span>
+		</div>
+		<div class="overflow-x-auto px-5 py-5 whitespace-pre sm:px-6">
+			<p><span class="text-terminal-foreground/45">$ </span>goilerplate new --module example.com/acme \</p>
+			<p>{ "    --framework datastar --workspaces ./acme" }</p>
+			<p class="text-live">✓ Created acme in ./acme with v4.0.0</p>
+			<p class="text-terminal-foreground/60">› Git is ready on main with an initial commit</p>
+			<p class="mt-4"><span class="text-terminal-foreground/45">$ </span>cd acme && cp .env.example .env</p>
+			<p><span class="text-terminal-foreground/45">$ </span>task dev</p>
+			<p class="text-terminal-foreground/60">→ app on http://localhost:8090</p>
+			<p class="mt-4 text-terminal-foreground/45"># sign up, subscribe, invite your team</p>
+			<p class="mt-4"><span class="text-terminal-foreground/45">$ </span><span class="ops-dot-run inline-block h-[1.1em] w-[0.55em] translate-y-[0.2em] bg-terminal-foreground/80"></span></p>
+		</div>
+	</div>
+}
+
+// homeInstall is the one line to copy.
+templ homeInstall() {
+	<div class={ homeSurface, "flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6" }>
+		<div class="min-w-0">
+			<p class="text-sm font-semibold text-muted-foreground">Install with Go 1.26 or newer</p>
+			<code class="mt-2 block overflow-x-auto font-mono text-[14px] whitespace-nowrap sm:text-[15px]" data-install-command>{ brand.Install }</code>
+		</div>
+		<button type="button" class="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full bg-secondary px-5 text-[14px] font-semibold transition-opacity hover:opacity-80" data-copy-install>
+			@icon.Copy(icon.Props{Class: "size-4"})
+			<span data-copy-label>Copy</span>
+		</button>
+	</div>
+	<script>
+		(() => {
+			const button = document.currentScript.previousElementSibling.querySelector("[data-copy-install]");
+			const command = document.currentScript.previousElementSibling.querySelector("[data-install-command]");
+			button.addEventListener("click", async () => {
+				try {
+					await navigator.clipboard.writeText(command.textContent);
+					button.querySelector("[data-copy-label]").textContent = "Copied";
+					setTimeout(() => { button.querySelector("[data-copy-label]").textContent = "Copy"; }, 1600);
+				} catch {}
+			});
+		})();
+	</script>
+}
+
+// ---------------------------------------------------------------- what you get
+templ homeWhatYouGet() {
+	<section id="what" class="scroll-mt-24 pt-32 sm:pt-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "max-w-[14ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>The boring part, done.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				<span class="text-foreground">Every project starts with the foundation already connected and tested.</span>
+				You build the product on top. Only what you pick is generated: choose Stripe and no Polar code is left behind.
+			</p>
+			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-2">
+				@homeFact("Auth", "Passwords, magic links, Google and GitHub sign in, revocable sessions, email verification.")
+				@homeFact("Billing", "Stripe or Polar, subscriptions, a customer portal and signed webhooks.")
+				@homeFact("Teams", "Workspaces with roles, invitations and seat limits.")
+				@homeFact("Admin", "User search, metrics, session revocation and support impersonation.")
+				@homeFact("API and MCP", "A JSON API with personal tokens, and an MCP server for your customers' agents.")
+				@homeFact("Production", "Tests, CI, a Dockerfile, migrations and an AGENTS.md that knows your stack.")
+			</div>
+		</div>
+	</section>
+}
+
+templ homeFact(title, text string) {
+	<div class={ homeSurface, "p-7 sm:p-10" }>
+		<p class="font-display text-[clamp(1.6rem,3vw,2.2rem)]">{ title }</p>
+		<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">{ text }</p>
+	</div>
+}
+
+// ---------------------------------------------------------------- stack
+templ homeStack() {
+	<section id="stack" class="scroll-mt-24 pt-3">
+		<div class={ homeWrap }>
+			<div class={ homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16" }>
+				<div>
+					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Your stack, your call.</h2>
+					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+						<span class="text-foreground">Go, templ, Tailwind CSS and shadcn-templ.</span>
+						Pick the frontend, the database and the providers. The stack builder writes the command.
+					</p>
+					<div class="mt-8">
+						@homePrimary("/new", "Open the stack builder")
+					</div>
+				</div>
+				<div class="self-center divide-y divide-border rounded-[18px] bg-background px-1">
+					@homeChoice("Frontend", "htmx · Datastar · SvelteKit · Headless")
+					@homeChoice("Database", "SQLite · PostgreSQL")
+					@homeChoice("Payments", "Stripe · Polar")
+					@homeChoice("Email", "SMTP · Resend")
+					@homeChoice("Modules", "Workspaces · OAuth · Storage · Blog · Docs")
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ homeChoice(label, value string) {
+	<div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+		<span class="text-[14px] text-muted-foreground">{ label }</span>
+		<span class="font-mono text-[14px] font-medium">{ value }</span>
+	</div>
+}
+
+// ---------------------------------------------------------------- update
+templ homeUpdate() {
+	<section id="update" class="scroll-mt-24 pt-3">
+		<div class={ homeWrap }>
+			<div class={ homeSurface, "grid gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:p-16" }>
+				<div>
+					<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)] text-balance" }>Updates keep your changes.</h2>
+					<p class="mt-6 max-w-lg text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+						<span class="text-foreground">goilerplate update puts the new template on its own Git branch.</span>
+						Git merges it with your code. A conflict looks like any other conflict.
+					</p>
+					<p class="mt-4 max-w-lg text-[17px] leading-7 text-muted-foreground">
+						Your branch stays untouched, and your code never leaves your machine.
+					</p>
+				</div>
+				<div class="ops-term self-center overflow-x-auto rounded-[18px] bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]">
+					<p><span class="text-terminal-foreground/50">$ </span>goilerplate update</p>
+					<p class="text-live">✓ Created goilerplate-update-v4.1.0</p>
+					<p class="text-terminal-foreground/60">Updated: 3 files</p>
+					<p class="text-terminal-foreground/60">{ "  • internal/service/auth.go" }</p>
+					<p class="text-terminal-foreground/60">{ "  • go.mod" }</p>
+					<p class="text-terminal-foreground/60">{ "  • goilerplate.lock" }</p>
+					<p class="text-terminal-foreground/60">Review with: git switch goilerplate-update-v4.1.0</p>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+// ---------------------------------------------------------------- statement
+templ homeStatement() {
+	<section class="pt-3">
+		<div class={ homeWrap }>
+			<div class="rounded-[28px] bg-foreground px-7 py-20 text-background sm:px-14 sm:py-32 lg:px-20">
+				<p class={ homeDisplay, "text-[clamp(2.4rem,7.2vw,6rem)]" }>
+					<span class="block">Free.</span>
+					<span class="block">Open source.</span>
+					<span class="block">Yours.</span>
+				</p>
+				<p class="mt-10 max-w-xl text-lg leading-8 text-background/65 sm:text-xl sm:leading-9">
+					No account, no license key, no telemetry. The CLI is MIT. What it generates is 0BSD: use it, change it, sell it, with no notice to keep.
+				</p>
+			</div>
+		</div>
+	</section>
+}
+
+// ---------------------------------------------------------------- story
+// homeStory is the three projects that take a Go app from the first line to
+// live.
+templ homeStory() {
+	<section id="story" class="scroll-mt-24 pt-32 sm:pt-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "max-w-[16ch] text-[clamp(2.4rem,6.4vw,5rem)] text-balance" }>Go + SQLite, from the first line to live.</h2>
+			<p class="mt-8 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+				Three open source projects, one stack.
+			</p>
+			<div class="mt-12 grid gap-3 sm:mt-16 lg:grid-cols-3">
+				@homeProject("shadcn-templ", "The UI", "shadcn/ui components for Go and templ. Every page goilerplate generates is built with them.", "https://github.com/axadrn/shadcn-templ", false)
+				@homeProject(brand.Name, "The app", "Auth, billing, teams, admin and an API, written into your repository with one command.", "/docs", false)
+				@homeProject("ops", "Live", "Deploys your app to servers you own and backs up every change of its SQLite database.", "https://ops.goilerplate.com", true)
+			</div>
+		</div>
+	</section>
+}
+
+templ homeProject(name, role, text, href string, dark bool) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "group flex flex-col rounded-[24px] p-7 transition-opacity hover:opacity-90 sm:p-10", templ.KV("bg-card", !dark), templ.KV("bg-foreground text-background", dark) }
+	>
+		<p class={ "text-sm font-semibold", templ.KV("text-muted-foreground", !dark), templ.KV("text-background/60", dark) }>{ role }</p>
+		<p class="mt-3 font-display text-[clamp(1.8rem,3vw,2.4rem)]">{ name }</p>
+		<p class={ "mt-4 text-[17px] leading-7", templ.KV("text-muted-foreground", !dark), templ.KV("text-background/70", dark) }>{ text }</p>
+		<span class="mt-8 inline-flex items-center gap-2 text-[15px] font-semibold">
+			if dark {
+				Deploy it with ops
+			} else {
+				Take a look
+			}
+			@icon.ArrowRight(icon.Props{Class: "size-4 transition-transform group-hover:translate-x-0.5"})
+		</span>
+	</a>
+}
+
+// ---------------------------------------------------------------- faq
+templ homeFAQ() {
+	<section id="faq" class="scroll-mt-24 py-32 sm:py-44">
+		<div class={ homeWrap }>
+			<h2 class={ homeDisplay, "text-[clamp(2.1rem,4.2vw,3.4rem)]" }>Questions.</h2>
+			<div class={ homeSurface, "mt-10 divide-y divide-border px-2 sm:px-4" }>
+				@homeQuestion("Is it really free?") {
+					Yes. The CLI, the template and everything it generates are open source. There is no paid edition and no account.
+				}
+				@homeQuestion("Can I sell what I build with it?") {
+					Yes. Generated projects are 0BSD and ship without a LICENSE file. They belong to you, with no notice or attribution to keep.
+				}
+				@homeQuestion("Does my code go anywhere?") {
+					No. goilerplate new renders the project on your machine, without network. goilerplate update downloads the public template of your version from the Go module proxy and merges locally.
+				}
+				@homeQuestion("I made my project with goilerplate v3. What now?") {
+					It keeps working as it is, and the code is yours. goilerplate update works for projects made with v4 or newer.
+				}
+				@homeQuestion("How do I deploy it?") {
+					Every project has a Dockerfile and runs anywhere. ops deploys it to servers you own and backs up its SQLite database. It is open source too.
+				}
+			</div>
+			<div class="mt-12 flex flex-col items-start gap-3 sm:flex-row">
+				@homePrimary("/docs/installation", "Get started")
+				@homeSecondary(blocks.GitHubURL, "Star it on GitHub")
+			</div>
+		</div>
+	</section>
+}
+
+templ homeQuestion(question string) {
+	<details class="group">
+		<summary class="flex cursor-pointer list-none items-center justify-between gap-6 px-4 py-5 text-[17px] font-semibold sm:px-5 sm:py-6 sm:text-lg [&::-webkit-details-marker]:hidden">
+			{ question }
+			@icon.Plus(icon.Props{Class: "size-5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-45"})
+		</summary>
+		<p class="max-w-2xl px-4 pb-6 text-[16px] leading-7 text-muted-foreground sm:px-5 sm:text-[17px]">
+			{ children... }
+		</p>
+	</details>
+}

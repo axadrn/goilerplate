@@ -1,0 +1,29 @@
+---
+title: "Navigation"
+description: "Control page order and link between related topics"
+order: 2
+---
+
+## Order pages
+
+The `order` value in frontmatter controls a page's position inside its section:
+
+```md
+---
+title: "Deploy"
+description: "Publish the application"
+order: 3
+---
+```
+
+Pages with the same order fall back to alphabetical titles.
+
+## Link to another page
+
+Use ordinary root-relative Markdown links:
+
+```md
+Continue with [Workflow](/docs/guides/workflow).
+```
+
+The browser gets normal URLs. Partial navigation progressively enhances the same links when JavaScript is available.

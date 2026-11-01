@@ -1,0 +1,77 @@
+package pages
+
+import (
+	"strconv"
+
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/blocks"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/field"
+	"{{.ModulePath}}/internal/ui/components/input"
+	"{{.ModulePath}}/internal/ui/csrf"
+	"{{.ModulePath}}/internal/ui/layouts"
+)
+
+templ AuthOnboarding(errorMsg string) {
+	@layouts.Auth(layouts.SEOProps{Title: "Complete Your Profile", Description: "Tell us your name", Path: ctxkeys.URLPath(ctx)}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("Complete your profile", "Choose the name people will see") {
+				@field.Group() {
+					@AuthOnboardingForm(errorMsg)
+					@field.Separator() {
+						Not you? 
+					}
+					<form
+						action="/auth/logout"
+						method="POST"
+						hx-post="/auth/logout"
+						hx-swap="none"
+						hx-disable="find button[type='submit']"
+					>
+						@csrf.Token()
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Class: "w-full"}) {
+							Sign out 
+						}
+					</form>
+				}
+			}
+		}
+	}
+}
+
+templ AuthOnboardingForm(errorMsg string) {
+	{{ user := ctxkeys.User(ctx) }}
+	<form
+		id="onboarding-form"
+		action="/auth/onboarding"
+		method="POST"
+		hx-post="/auth/onboarding"
+		hx-target="#onboarding-form"
+		hx-swap="outerHTML"
+		hx-disable="find button[type='submit']"
+	>
+		@csrf.Token()
+		@field.Group() {
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "name"}) {
+					Your name 
+				}
+				@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "John Doe", Attributes: templ.Attributes{"aria-invalid": strconv.FormatBool(errorMsg != ""), "autofocus": ""}})
+				if user != nil {
+					@field.Description() {
+						Continue as <strong>{ user.Email }</strong>. 
+					}
+				}
+				if errorMsg != "" {
+					@field.Error() {
+						{ errorMsg }
+					}
+				}
+			}
+			@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full"}) {
+				Continue 
+			}
+		}
+	</form>
+}

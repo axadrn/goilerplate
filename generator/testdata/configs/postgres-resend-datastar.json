@@ -1,0 +1,14 @@
+{
+  "project_name": "Datastar App",
+  "module_path": "example.com/datastar-app",
+  "framework": "datastar",
+  "database": "postgres",
+  "payment": "stripe",
+  "mail": "resend",
+  "workspaces": false,
+  "oauth": [],
+  "storage": false,
+  "content": [],
+  "api": false,
+  "mcp": false
+}

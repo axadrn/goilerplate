@@ -1,0 +1,78 @@
+// Package mcp serves the MCP server at /mcp. It is a third transport next to
+// the HTML handlers and the JSON API: tools call the same services and report
+// errors with the codes of the JSON API envelope. Agents authenticate with a
+// personal API token, and the scopes of that token decide which tools work.
+package mcp
+
+import (
+	"net/http"
+
+	"{{.ModulePath}}/internal/api"
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+{{- if .Workspaces }}
+	"{{.ModulePath}}/internal/middleware"
+{{- end }}
+	"{{.ModulePath}}/internal/service"
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// Version is the version the server reports to MCP clients. Raise it when the
+// tools change.
+const Version = "1.0.0"
+
+// instructions tell the agent how the tools behave as a whole. Clients pass
+// them to the model when they connect.
+const instructions = "Every tool acts for the user who created the personal API token in the Authorization header. " +
+	"Tools that only read need the read scope. Tools that change data need a token with read and write access; " +
+	"with a read-only token they fail with the code insufficient_scope. " +
+{{- if .Workspaces }}
+	"The token is bound to one workspace. Workspace tools take an optional workspace slug and default to that workspace; other workspaces are not found. " +
+{{- end }}
+	"Failed calls return an error result whose text is {\"error\":{\"code\":...,\"message\":...,\"fields\":{...}}}, with the same codes as the JSON API."
+
+// Services are the services the tools call. Add your own services here and
+// pass them in internal/routes.
+type Services struct {
+	Users *service.UserService
+{{- if .Workspaces }}
+	Workspaces    *service.WorkspaceService
+	Subscriptions *service.SubscriptionService
+	// Invitations is the invitation limiter of the web routes and the JSON
+	// API, so invite_member draws from the same budget.
+	Invitations *middleware.RateLimiter
+{{- end }}
+}
+
+// NewServer returns the MCP server with every built-in tool registered.
+func NewServer(services Services) *mcpsdk.Server {
+	server := mcpsdk.NewServer(&mcpsdk.Implementation{Name: brand.Name, Version: Version}, &mcpsdk.ServerOptions{
+		Instructions: instructions,
+	})
+	registerTools(server, services)
+	return server
+}
+
+// Handler serves server over Streamable HTTP. It is stateless: every POST is
+// one complete exchange, so the server keeps no sessions and scales like the
+// JSON API. Requests without a personal API token get 401 unauthenticated.
+func Handler(server *mcpsdk.Server) http.Handler {
+	streamable := mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
+		return server
+	}, &mcpsdk.StreamableHTTPOptions{
+		Stateless:    true,
+		JSONResponse: true,
+		// Every request carries a bearer token and never a cookie, so DNS
+		// rebinding gains nothing. The protection would also reject a reverse
+		// proxy on the same host that forwards the public Host header.
+		DisableLocalhostProtection: true,
+	})
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ctxkeys.APIToken(r.Context()) == nil {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="mcp"`)
+			api.Error(w, http.StatusUnauthorized, "unauthenticated", "Send a personal API token as Authorization: Bearer pat_....")
+			return
+		}
+		streamable.ServeHTTP(w, r)
+	})
+}

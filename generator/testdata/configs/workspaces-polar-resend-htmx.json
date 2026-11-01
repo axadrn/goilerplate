@@ -1,0 +1,1 @@
+{"project_name":"Polar Resend","module_path":"example.com/polar-resend","framework":"htmx","database":"sqlite","payment":"polar","mail":"resend","workspaces":true,"oauth":[],"storage":true,"content":[],"api":false,"mcp":false}

@@ -2,49 +2,10 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"strings"
 	"testing"
-
-	"github.com/axadrn/goilerplate/v3/api"
-	"github.com/axadrn/goilerplate/v3/internal/config"
 )
-
-func TestStyledWhoAmIUsesTheSharedTheme(t *testing.T) {
-	output := &bytes.Buffer{}
-	service := &fakeService{who: api.WhoAmIResponse{
-		Account:  api.Account{GitHubLogin: "axadrn", Email: "hello@example.com"},
-		Licenses: []api.License{{ID: "lic_1", Status: api.LicenseStatusActive, Role: api.LicenseRoleMember}},
-	}}
-	app := testApp(output, &memoryStore{configuration: config.Config{SessionToken: "session"}}, &fakeDevice{}, service)
-	app.StyledOutput = true
-
-	if err := app.Run(context.Background(), []string{"whoami"}); err != nil {
-		t.Fatal(err)
-	}
-	got := output.String()
-	for _, value := range []string{"\x1b[", "goilerplate", "account", "@axadrn", "Email", "License", "active", "Licenses", "active", "member"} {
-		if !strings.Contains(got, value) {
-			t.Fatalf("styled whoami does not contain %q: %q", value, got)
-		}
-	}
-}
-
-func TestStyledPricingUsesTheSharedTheme(t *testing.T) {
-	output := &bytes.Buffer{}
-	app := testApp(output, &memoryStore{}, &fakeDevice{}, &fakeService{})
-	app.StyledOutput = true
-	app.OpenBrowser = func(context.Context, string) error { return nil }
-
-	app.openPricing(context.Background(), config.Config{})
-	got := output.String()
-	for _, value := range []string{"\x1b[", "goilerplate", "license", "needs a license", "✓", "Pricing opened", "›", "No new login needed"} {
-		if !strings.Contains(got, value) {
-			t.Fatalf("styled pricing does not contain %q: %q", value, got)
-		}
-	}
-}
 
 func TestSharedThemeCoversEveryMessageKind(t *testing.T) {
 	output := &bytes.Buffer{}

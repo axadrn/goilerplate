@@ -1,0 +1,154 @@
+package blocks
+
+import (
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/components/sheet"
+)
+
+templ Navbar() {
+		<nav class="sticky top-0 z-50 bg-background border-b">
+		<div class="container mx-auto px-4 py-4 flex justify-between items-center">
+			<!-- Left: Logo and Desktop Nav -->
+			<div class="flex items-center gap-6">
+				@button.Button(button.Props{
+					Href:    "/",
+					Variant: button.VariantGhost,
+					Size:    button.SizeSm,
+					Class:   "font-bold",
+				}) {
+					@icon.Layers()
+					{ brand.Name }
+				}
+				<!-- Desktop Navigation -->
+				<div class="hidden md:flex gap-2">
+					@button.Button(button.Props{
+						Href:    "/#features",
+						Variant: button.VariantGhost,
+						Size:    button.SizeSm,
+					}) {
+						Features
+					}
+					@NavbarPricingDesktop()
+					@button.Button(button.Props{
+						Href:    "/#faq",
+						Variant: button.VariantGhost,
+						Size:    button.SizeSm,
+					}) {
+						FAQ
+					}
+					@NavbarBlogDesktop()
+					@NavbarDocsDesktop()
+				</div>
+			</div>
+			<!-- Right: Desktop Actions and Mobile Menu -->
+			<div class="flex gap-2 items-center">
+				{{ user := ctxkeys.User(ctx) }}
+				if user != nil {
+					<!-- Logged in: Show Dashboard -->
+					<div class="hidden md:flex gap-2 items-center">
+						@button.Button(button.Props{
+							Href:    "/app",
+							Variant: button.VariantGhost,
+							Size:    button.SizeSm,
+						}) {
+							@icon.LayoutDashboard(icon.Props{Class: "size-4"})
+							Dashboard
+						}
+						@ThemeSwitcher()
+					</div>
+					<!-- Mobile: Dashboard Button -->
+					@button.Button(button.Props{
+					Href:  "/app",
+						Size:  button.SizeSm,
+						Class: "md:hidden",
+					}) {
+						@icon.LayoutDashboard(icon.Props{Class: "size-4"})
+						Dashboard
+					}
+				} else {
+					<!-- Not logged in: Show Get Started -->
+					<div class="hidden md:flex gap-2 items-center">
+						@button.Button(button.Props{
+							Href: "/auth",
+							Size: button.SizeSm,
+						}) {
+							Get Started
+						}
+						@ThemeSwitcher()
+					</div>
+					<!-- Mobile: Get Started + Menu -->
+					@button.Button(button.Props{
+						Href:  "/auth",
+						Size:  button.SizeSm,
+						Class: "md:hidden",
+					}) {
+						Get Started
+					}
+				}
+				<!-- Mobile Menu Sheet -->
+				@sheet.Sheet(sheet.Props{
+					ID: "mobile-nav",
+				}) {
+					@button.Button(button.Props{
+						Variant:    button.VariantGhost,
+						Size:       button.SizeSm,
+						Class:      "px-2 md:hidden",
+						Attributes: sheet.Trigger(ctx),
+					}) {
+						@icon.Menu(icon.Props{Class: "size-5"})
+					}
+					@sheet.Content(sheet.ContentProps{
+						Side: sheet.SideRight,
+					}) {
+						@MobileNav()
+					}
+				}
+			</div>
+		</div>
+	</nav>
+}
+
+templ MobileNav() {
+	<div class="flex flex-col h-full">
+		<!-- Navigation Links -->
+		<div class="flex-1 overflow-y-auto">
+			<div class="p-6 space-y-1">
+				<a href="/#features" class="flex items-center px-3 py-2 rounded-md hover:bg-accent text-foreground w-full text-left" { sheet.CloseFor("mobile-nav")... }>Features</a>
+				@NavbarPricingMobile()
+				<a href="/#faq" class="flex items-center px-3 py-2 rounded-md hover:bg-accent text-foreground w-full text-left" { sheet.CloseFor("mobile-nav")... }>FAQ</a>
+				@NavbarBlogMobile()
+				@NavbarDocsMobile()
+			</div>
+			<!-- Actions -->
+			<div class="p-6 space-y-3 border-t">
+				{{ user := ctxkeys.User(ctx) }}
+				if user != nil {
+					@button.Button(button.Props{
+						Href:  "/app",
+						Class: "w-full",
+					}) {
+						@icon.LayoutDashboard(icon.Props{Class: "size-4"})
+						Dashboard
+					}
+				} else {
+					@button.Button(button.Props{
+						Href:  "/auth",
+						Class: "w-full",
+					}) {
+						Get Started
+					}
+				}
+			</div>
+		</div>
+		<!-- Footer with Theme Switcher -->
+		<div class="p-6 border-t">
+			<div class="flex items-center justify-between">
+				<span class="text-sm text-muted-foreground">Theme</span>
+				@ThemeSwitcher()
+			</div>
+		</div>
+	</div>
+}

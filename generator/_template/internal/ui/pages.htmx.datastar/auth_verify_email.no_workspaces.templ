@@ -1,0 +1,79 @@
+package pages
+
+import (
+	"{{.ModulePath}}/internal/brand"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/ui/blocks"
+	"{{.ModulePath}}/internal/ui/components/alert"
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/empty"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/layouts"
+)
+
+templ VerifyEmailSuccess() {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "Email Changed",
+		Description: "Your email has been changed",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("Email verified", "Your email address has been updated") {
+				@empty.Empty(empty.Props{Class: "border-0 p-0"}) {
+					@empty.Header() {
+						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon, Class: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}) {
+							@icon.CircleCheck()
+						}
+						@empty.Description() {
+							Redirecting you to settings. 
+						}
+					}
+					@empty.Content() {
+						<script nonce={ templ.GetNonce(ctx) }>
+							setTimeout(() => {
+								window.location.href = '/app/settings';
+							}, 3000);
+						</script>
+						@button.Button(button.Props{Href: "/app/settings", Class: "w-full"}) {
+							Go to settings 
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ VerifyEmailError(errorMessage string) {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "Verification Failed",
+		Description: "Email verification failed",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@blocks.AuthShell(brand.Name) {
+			@blocks.AuthCard("Verification failed", "We couldn't verify your email") {
+				@empty.Empty(empty.Props{Class: "border-0 p-0"}) {
+					@empty.Header() {
+						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon, Class: "bg-destructive/10 text-destructive"}) {
+							@icon.CircleX()
+						}
+						@empty.Description() {
+							The verification link may have expired or already been used. 
+						}
+					}
+					@empty.Content(empty.ContentProps{Class: "max-w-none"}) {
+						@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
+							@icon.CircleAlert()
+							@alert.Description() {
+								{ errorMessage }
+							}
+						}
+						@button.Button(button.Props{Href: "/auth", Class: "w-full"}) {
+							Try again 
+						}
+					}
+				}
+			}
+		}
+	}
+}

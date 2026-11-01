@@ -1,0 +1,157 @@
+package api
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
+
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/ctxkeys"
+	"{{.ModulePath}}/internal/model"
+)
+
+const testFrontendURL = "https://app.example.com"
+{{- if .OAuth }}
+
+// testAPIURL differs from testFrontendURL so the tests tell the two apart.
+const testAPIURL = "https://api.example.com"
+{{- end }}
+
+func newTestOAuthHandler() *OAuthHandler {
+	return NewOAuthHandler(nil, &config.Config{
+		AppEnv:         config.EnvironmentProduction,
+		AppURL:         testFrontendURL,
+{{- if .OAuth }}
+		APIURL:         testAPIURL,
+{{- end }}
+{{- if .HasGoogleOAuth }}
+		GoogleClientID: "google-client",
+{{- end }}
+{{- if .HasGitHubOAuth }}
+		GitHubClientID: "github-client",
+{{- end }}
+	})
+}
+
+func TestOAuthStartSetsOneTimeState(t *testing.T) {
+	handler := newTestOAuthHandler()
+	recorder := httptest.NewRecorder()
+
+	handler.start(recorder, httptest.NewRequest(http.MethodGet, "/auth/provider", nil), func(state string) string {
+		return "https://provider.example.com/authorize?state=" + state
+	})
+
+	location, err := url.Parse(recorder.Header().Get("Location"))
+	if err != nil {
+		t.Fatalf("parse redirect: %v", err)
+	}
+	cookies := recorder.Result().Cookies()
+	if recorder.Code != http.StatusTemporaryRedirect || len(cookies) != 1 {
+		t.Fatalf("status = %d, cookies = %#v", recorder.Code, cookies)
+	}
+	cookie := cookies[0]
+	if cookie.Name != oauthStateCookie || cookie.Value == "" || cookie.Value != location.Query().Get("state") {
+		t.Fatalf("state cookie = %#v, redirect = %q", cookie, location)
+	}
+	if !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteLaxMode || cookie.MaxAge != 600 {
+		t.Fatalf("state cookie flags = %#v", cookie)
+	}
+}
+
+func TestOAuthStartSendsSignedInBrowsersToTheApp(t *testing.T) {
+	handler := newTestOAuthHandler()
+	request := httptest.NewRequest(http.MethodGet, "/auth/provider", nil)
+	request = request.WithContext(ctxkeys.WithUser(request.Context(), &model.User{ID: "user-1", Name: "User"}))
+	recorder := httptest.NewRecorder()
+
+	handler.start(recorder, request, func(string) string {
+		t.Fatal("a signed-in browser went to the provider")
+		return ""
+	})
+
+	expectRedirect(t, recorder, http.StatusSeeOther, testFrontendURL+"/app")
+}
+
+func TestOAuthCallbackFailuresGoToTheFrontend(t *testing.T) {
+	tests := []struct {
+		name   string
+		query  string
+		cookie string
+	}{
+		{name: "missing state cookie", query: "?state=abc&code=code"},
+		{name: "state mismatch", query: "?state=abc&code=code", cookie: "other"},
+		{name: "empty state", query: "?code=code", cookie: ""},
+		{name: "missing code", query: "?state=abc", cookie: "abc"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handler := newTestOAuthHandler()
+			request := httptest.NewRequest(http.MethodGet, "/auth/provider/callback"+test.query, nil)
+			if test.cookie != "" {
+				request.AddCookie(&http.Cookie{Name: oauthStateCookie, Value: test.cookie})
+			}
+			recorder := httptest.NewRecorder()
+
+			handler.finish(recorder, request, "provider", func(context.Context, string) (*http.Client, error) {
+				t.Fatal("the code was exchanged")
+				return nil, nil
+			}, func(*http.Client) (string, error) {
+				t.Fatal("the email was fetched")
+				return "", nil
+			})
+
+			expectRedirect(t, recorder, http.StatusSeeOther, testFrontendURL+"/auth?error=oauth_failed")
+			for _, cookie := range recorder.Result().Cookies() {
+				if cookie.Name == "session_token" {
+					t.Fatalf("failed sign-in set a session cookie: %#v", cookie)
+				}
+			}
+		})
+	}
+}
+{{- if .HasGoogleOAuth }}
+
+func TestGoogleAuthRedirectsToGoogle(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	newTestOAuthHandler().GoogleAuth(recorder, httptest.NewRequest(http.MethodGet, "/auth/google", nil))
+
+	expectProviderRedirect(t, recorder, "accounts.google.com", "google-client", testAPIURL+"/auth/google/callback")
+}
+{{- end }}
+{{- if .HasGitHubOAuth }}
+
+func TestGitHubAuthRedirectsToGitHub(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	newTestOAuthHandler().GitHubAuth(recorder, httptest.NewRequest(http.MethodGet, "/auth/github", nil))
+
+	expectProviderRedirect(t, recorder, "github.com", "github-client", testAPIURL+"/auth/github/callback")
+}
+{{- end }}
+{{- if .OAuth }}
+
+func expectProviderRedirect(t *testing.T, recorder *httptest.ResponseRecorder, host, clientID, callback string) {
+	t.Helper()
+	if recorder.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("status = %d", recorder.Code)
+	}
+	location, err := url.Parse(recorder.Header().Get("Location"))
+	if err != nil {
+		t.Fatalf("parse redirect: %v", err)
+	}
+	query := location.Query()
+	if location.Host != host || query.Get("client_id") != clientID || query.Get("redirect_uri") != callback || query.Get("state") == "" {
+		t.Fatalf("redirect = %q", location)
+	}
+}
+{{- end }}
+
+func expectRedirect(t *testing.T, recorder *httptest.ResponseRecorder, status int, location string) {
+	t.Helper()
+	if recorder.Code != status || recorder.Header().Get("Location") != location {
+		t.Fatalf("status = %d, Location = %q, want %d %q", recorder.Code, recorder.Header().Get("Location"), status, location)
+	}
+}

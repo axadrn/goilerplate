@@ -1,0 +1,49 @@
+package pages
+
+import (
+	"strconv"
+
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/field"
+	"{{.ModulePath}}/internal/ui/components/input"
+	"{{.ModulePath}}/internal/ui/csrf"
+)
+
+templ AuthMagicLinkForm(errorMsg string) {
+	<form
+		id="magic-link-form"
+		action="/auth/magic-link"
+		method="POST"
+		hx-post="/auth/magic-link"
+		hx-target="#magic-link-form"
+		hx-swap="outerHTML"
+		hx-disable="find button[type='submit']"
+	>
+		@csrf.Token()
+		@field.Group() {
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "email"}) {
+					Email
+				}
+				@input.Input(input.Props{
+					ID:          "email",
+					Name:        "email",
+					Type:        "email",
+					Placeholder: "name@example.com",
+					Attributes: templ.Attributes{
+						"aria-invalid": strconv.FormatBool(errorMsg != ""),
+						"autofocus":    "",
+					},
+				})
+				if errorMsg != "" {
+					@field.Error() {
+						{ errorMsg }
+					}
+				}
+			}
+			@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full"}) {
+				Continue with Email
+			}
+		}
+	</form>
+}

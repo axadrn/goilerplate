@@ -1,0 +1,14 @@
+{
+  "project_name": "Postgres Workspace",
+  "module_path": "example.com/postgres-workspace",
+  "framework": "htmx",
+  "database": "postgres",
+  "payment": "polar",
+  "mail": "resend",
+  "workspaces": true,
+  "oauth": ["google"],
+  "storage": false,
+  "content": ["docs"],
+  "api": false,
+  "mcp": false
+}

@@ -1,0 +1,33 @@
+package payment
+
+import (
+	"testing"
+
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/model"
+)
+
+func TestNewProviderBuildsSelectedProvider(t *testing.T) {
+	cfg := &config.Config{
+{{- if eq .Payment "polar" }}
+		PolarAPIKey:      "polar-secret",
+		PolarSandboxMode: true,
+{{- else }}
+		StripeSecretKey:     "stripe-secret",
+		StripeWebhookSecret: "webhook-secret",
+{{- end }}
+	}
+	provider, err := NewProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewProvider() error = %v", err)
+	}
+{{- if eq .Payment "polar" }}
+	if provider.Name() != model.ProviderPolar {
+		t.Fatalf("provider name = %q, want %q", provider.Name(), model.ProviderPolar)
+	}
+{{- else }}
+	if provider.Name() != model.ProviderStripe {
+		t.Fatalf("provider name = %q, want %q", provider.Name(), model.ProviderStripe)
+	}
+{{- end }}
+}

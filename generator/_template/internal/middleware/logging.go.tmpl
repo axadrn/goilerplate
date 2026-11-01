@@ -1,0 +1,109 @@
+package middleware
+
+import (
+	"log/slog"
+	"net/http"
+	"strings"
+	"time"
+)
+
+// responseWriter wraps http.ResponseWriter to capture status code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+	written    bool
+}
+
+// Keep streaming and other optional HTTP capabilities visible through logging.
+func (rw *responseWriter) Unwrap() http.ResponseWriter {
+	return rw.ResponseWriter
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	if !rw.written {
+		rw.statusCode = code
+		rw.written = true
+		rw.ResponseWriter.WriteHeader(code)
+	}
+}
+
+func (rw *responseWriter) Write(b []byte) (int, error) {
+	if !rw.written {
+		rw.WriteHeader(http.StatusOK)
+	}
+	return rw.ResponseWriter.Write(b)
+}
+
+{{ if not .HasHTMLFrontend -}}
+// Browser noise paths are never logged (they would bury real requests).
+var skipLoggingPaths = []string{
+	"/favicon.ico",
+}
+{{ else -}}
+// Static asset paths are never logged (they would bury real requests).
+var skipLoggingPaths = []string{
+	"/assets/",
+	"/components/", // bundled vendored shadcn-templ component scripts
+	"/uploads/",
+	"/favicon.ico",
+}
+{{- end }}
+
+// RequestLogging returns middleware that logs each HTTP request (method, path,
+// status, duration). Static assets are always skipped. When enabled is false
+// it is a no-op pass-through (e.g. when a reverse proxy already logs requests).
+func RequestLogging(enabled bool, clientIPs ClientIPResolver) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		if !enabled {
+			return next
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			for _, prefix := range skipLoggingPaths {
+				if strings.HasPrefix(r.URL.Path, prefix) {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			start := time.Now()
+
+			rw := &responseWriter{
+				ResponseWriter: w,
+				statusCode:     http.StatusOK,
+				written:        false,
+			}
+
+			next.ServeHTTP(rw, r)
+
+			slog.Info("http request",
+				"method", r.Method,
+				"path", safeRequestLogPath(r.URL.Path),
+				"status", rw.statusCode,
+				"duration_ms", time.Since(start).Milliseconds(),
+				"remote_addr", clientIPs.ClientIP(r),
+			)
+		})
+	}
+}
+
+// safeRequestLogPath replaces the secret token of an email link with :token.
+func safeRequestLogPath(path string) string {
+	const apiInvitations = "/api/v1/invitations/"
+	if strings.HasPrefix(path, apiInvitations) {
+		if strings.HasSuffix(path, "/accept") {
+			return apiInvitations + ":token/accept"
+		}
+		return apiInvitations + ":token"
+	}
+	for _, prefix := range []string{
+		"/auth/magic-link/",
+		"/auth/forgot-password/",
+		"/auth/verify-email-change/",
+		"/workspaces/invitations/",
+	} {
+		if strings.HasPrefix(path, prefix) {
+			return prefix + ":token"
+		}
+	}
+	return path
+}

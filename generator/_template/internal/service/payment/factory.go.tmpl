@@ -1,0 +1,14 @@
+package payment
+
+import (
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/service"
+)
+
+func NewProvider(cfg *config.Config, subscriptions *service.SubscriptionService) (Provider, error) {
+{{- if eq .Payment "polar" }}
+	return NewPolarProvider(cfg, subscriptions), nil
+{{- else if eq .Payment "stripe" }}
+	return NewStripeProvider(cfg, subscriptions), nil
+{{- end }}
+}

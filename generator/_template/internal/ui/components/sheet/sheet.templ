@@ -1,0 +1,278 @@
+package sheet
+
+import (
+	"context"
+	"strconv"
+
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+type ctxKey string
+
+const stateKey ctxKey = "sheetState"
+
+type Side string
+
+const (
+	SideTop    Side = "top"
+	SideRight  Side = "right"
+	SideBottom Side = "bottom"
+	SideLeft   Side = "left"
+)
+
+type ctxState struct {
+	id               string
+	open             bool
+	controlled       bool
+	disableClickAway bool
+}
+
+func state(ctx context.Context) ctxState {
+	if s, ok := ctx.Value(stateKey).(ctxState); ok {
+		return s
+	}
+	return ctxState{}
+}
+
+type Props struct {
+	ID string
+	// Open is the controlled open state. Use DefaultOpen when the browser
+	// should own the state after the initial render.
+	Open        *bool
+	DefaultOpen bool
+	// DisablePointerDismissal is Base UI's disablePointerDismissal: a press
+	// on the backdrop does not close the sheet.
+	DisablePointerDismissal bool
+}
+
+func initialOpen(p Props) bool {
+	if p.Open != nil {
+		return *p.Open
+	}
+	return p.DefaultOpen
+}
+
+type ContentProps struct {
+	Class      string
+	Attributes templ.Attributes
+	// Side of the screen the sheet slides in from. Defaults to right.
+	Side            Side
+	HideCloseButton bool
+}
+
+type HeaderProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type FooterProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type TitleProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type DescriptionProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+// Sheet renders no element: it only carries the id and options that link
+// Trigger, Content and Close (via ctx). Like shadcn, the sheet IS the dialog
+// primitive with side styling; the dialog script drives it.
+templ Sheet(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.ID == "" {
+		{{ p.ID = utils.RandomID() }}
+	}
+	{{ ctx = context.WithValue(ctx, stateKey, ctxState{id: p.ID, open: initialOpen(p), controlled: p.Open != nil, disableClickAway: p.DisablePointerDismissal}) }}
+	{ children... }
+}
+
+// Trigger returns the attributes that turn any element (usually a button)
+// into the sheet trigger — the asChild equivalent: no wrapper element.
+func Trigger(ctx context.Context) templ.Attributes {
+	return TriggerFor(state(ctx).id)
+}
+
+// TriggerFor targets a sheet outside the current Sheet root by id.
+func TriggerFor(id string) templ.Attributes {
+	return templ.Attributes{
+		// useButton: tabIndex 0 and the native type.
+		"tabindex":                   "0",
+		"type":                       "button",
+		"data-slot":                  "sheet-trigger",
+		"data-base-ui-click-trigger": true,
+		"data-templ-controls":        id,
+		"aria-haspopup":              "dialog",
+		"aria-expanded":              "false",
+	}
+}
+
+// Close returns the attributes that make any element close the sheet.
+func Close(ctx context.Context) templ.Attributes {
+	return CloseFor(state(ctx).id)
+}
+
+// CloseFor targets a sheet outside the current Sheet root by id.
+func CloseFor(id string) templ.Attributes {
+	return templ.Attributes{
+		// useButton: tabIndex 0 and the native type.
+		"tabindex":                "0",
+		"type":                    "button",
+		"data-slot":               "sheet-close",
+		"data-templ-dialog-close": id,
+	}
+}
+
+templ Content(props ...ContentProps) {
+	{{ var p ContentProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.Side == "" {
+		{{ p.Side = SideRight }}
+	}
+	{{ s := state(ctx) }}
+	// Hidden until the script portals it to <body> on open, so the SSRd
+	// content never participates in layout or sibling CSS.
+	<div data-templ-portal hidden>
+		<div data-base-ui-portal data-slot="sheet-portal" hidden>
+			// 1:1 base/ui/sheet.tsx SheetOverlay (Dialog.Backdrop): the look
+			// comes from. user-select none is Base UI's
+			// inline style on the backdrop.
+			<div
+				data-slot="sheet-overlay"
+				role="presentation"
+				style="user-select: none; -webkit-user-select: none;"
+				class="bg-black/10 supports-backdrop-filter:backdrop-blur-xs fixed inset-0 z-50 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0"
+			></div>
+			// 1:1 base/ui/sheet.tsx SheetContent (Dialog.Popup): the look
+			// comes from; the data-starting-style/
+			// data-ending-style variants are Base UI's transition lifecycle,
+			// driven by dialog.js.
+			<div
+				id={ s.id }
+				role="dialog"
+				tabindex="-1"
+				data-base-ui-focusable
+				data-slot="sheet-content"
+				data-side={ string(p.Side) }
+				if s.controlled {
+					data-templ-open={ strconv.FormatBool(s.open) }
+				} else {
+					data-templ-default-open?={ s.open }
+				}
+				data-templ-modal="true"
+				if s.disableClickAway {
+					data-templ-disable-pointer-dismissal="true"
+				}
+				class={
+					utils.CN(
+						"bg-popover text-popover-foreground fixed z-50 flex flex-col gap-4 bg-clip-padding text-sm shadow-lg transition duration-200 ease-in-out data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem] data-[side=left]:data-ending-style:translate-x-[-2.5rem] data-[side=left]:data-starting-style:translate-x-[-2.5rem] data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem] data-[side=top]:data-ending-style:translate-y-[-2.5rem] data-[side=top]:data-starting-style:translate-y-[-2.5rem]",
+						p.Class,
+					),
+				}
+				{ p.Attributes... }
+			>
+				{ children... }
+				if !p.HideCloseButton {
+					@button.Button(button.Props{
+						Variant: button.VariantGhost,
+						Size:    button.SizeIconSm,
+						Class:   "absolute top-3 right-3",
+						Attributes: templ.Attributes{
+							"data-slot":             "sheet-close",
+							"data-templ-dialog-close": "",
+						},
+					}) {
+						@icon.X()
+						<span class="sr-only">Close</span>
+					}
+				}
+			</div>
+		</div>
+	</div>
+}
+
+templ Header(props ...HeaderProps) {
+	{{ var p HeaderProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sheet-header"
+		class={ utils.CN("gap-0.5 p-4 flex flex-col", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Footer(props ...FooterProps) {
+	{{ var p FooterProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sheet-footer"
+		class={ utils.CN("gap-2 p-4 mt-auto flex flex-col", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Title(props ...TitleProps) {
+	{{ var p TitleProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<h2
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sheet-title"
+		data-templ-dialog-title
+		class={ utils.CN("text-foreground text-base font-medium font-heading", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</h2>
+}
+
+templ Description(props ...DescriptionProps) {
+	{{ var p DescriptionProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<p
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="sheet-description"
+		data-templ-dialog-description
+		class={ utils.CN("text-muted-foreground text-sm", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</p>
+}

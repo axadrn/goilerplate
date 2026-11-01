@@ -1,0 +1,22 @@
+package pages
+
+import (
+	"strings"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/ui/components/avatar"
+)
+
+templ SettingsAvatarDisplay(user *model.User) {
+	@templ.Fragment("settings-avatar-display") {
+		<div id="settings-avatar" hx-swap-oob="true">
+			@avatar.Avatar(avatar.Props{Class: "size-20"}) {
+				if user.AvatarURL != "" {
+					@avatar.Image(avatar.ImageProps{Src: user.AvatarURL, Alt: user.Email})
+				}
+				@avatar.Fallback() {
+					{ strings.ToUpper(string(user.Email[0])) }
+				}
+			}
+		</div>
+	}
+}

@@ -1,8 +1,8 @@
 # goilerplate
 
-**The Go SaaS starter kit.** One command generates a production Go app with login, billing, teams, admin, an API and tests. Every line is yours.
+**The Go SaaS starter kit, free and open source.** One command generates a production Go app with login, billing, teams, admin, an API and tests, right on your machine. Every line is yours.
 
-[Website](https://goilerplate.com) · [Docs](https://goilerplate.com/docs) · [Pricing](https://goilerplate.com/#pricing) · [Changelog](https://goilerplate.com/changelog)
+[Website](https://goilerplate.com) · [Docs](https://goilerplate.com/docs) · [Changelog](https://goilerplate.com/changelog)
 
 ## What you get
 
@@ -17,27 +17,22 @@ Stack: Go, templ, Tailwind CSS, shadcn-templ, with htmx, Datastar, SvelteKit or 
 
 ## Quick start
 
-You need Go 1.26+, Git and a [license](https://goilerplate.com/#pricing).
+You need Go 1.26+ and Git.
 
 ```bash
-go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest
-goilerplate login
+go install github.com/axadrn/goilerplate/v4/cmd/goilerplate@latest
 goilerplate new
 ```
 
-`goilerplate new` without options opens an interactive setup.
+`goilerplate new` without options opens an interactive setup. It renders the project on your machine: no account, no network.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `new` | Generate a new project |
-| `update` | Update a generated project on a new Git branch |
+| `update` | Update a generated project on a new Git branch, from v4 on |
 | `doctor` | Check a project's tools and `.env` |
-| `login` / `logout` | Sign in with GitHub, revoke the session |
-| `whoami` | Show your account and license |
-| `claim` | Connect a purchase made with another email |
-| `license` | Invite, list or remove license members |
 | `changelog` | Show release notes |
 | `version` | Show the CLI version |
 
@@ -65,4 +60,7 @@ SvelteKit projects also need Node.js 22.17+ and pnpm.
 
 ## License
 
-The CLI is [MIT](LICENSE). Generating projects needs a goilerplate license.
+- The CLI and this repository are [MIT](LICENSE).
+- The template in `generator/_template/` and every project goilerplate generates are [0BSD](LICENSE-0BSD). Use, change and sell what you generate. No notice or attribution is required, and generated projects ship without a LICENSE file, so you pick your own.
+- Contributions come in under the license of the files they change. No CLA.
+- The licenses cover the code, not the name goilerplate or its logo.

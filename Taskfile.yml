@@ -1,0 +1,26 @@
+version: "3"
+
+tasks:
+  dev:
+    desc: Build the website and serve it on the first free port from 8090, or APP_PORT
+    vars:
+      APP_PORT:
+        sh: go run ./site/cmd/devport {{if .APP_PORT}}-port '{{.APP_PORT}}'{{else}}-start 8090{{end}}
+    cmds:
+      - task: site:build
+      - 'echo "Local: http://localhost:{{.APP_PORT}}"'
+      - go run ./site/cmd/server -dir site/dist -addr 127.0.0.1:{{.APP_PORT}}
+
+  site:build:
+    desc: Build the website into site/dist
+    cmds:
+      - go tool templ generate -path site
+      - tailwindcss -i site/assets/css/globals.css -o site/assets/css/output.css --minify
+      - go run ./site/cmd/build
+
+  test:
+    desc: Run every check CI runs on Go code
+    cmds:
+      - go mod tidy -diff
+      - go vet ./...
+      - go test -race ./...

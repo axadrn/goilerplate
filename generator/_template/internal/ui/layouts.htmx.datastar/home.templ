@@ -1,0 +1,11 @@
+package layouts
+
+import "{{.ModulePath}}/internal/ui/blocks"
+
+templ Home(seo SEOProps) {
+	@Base(seo) {
+		@blocks.Navbar()
+		{ children... }
+		@blocks.Footer()
+	}
+}

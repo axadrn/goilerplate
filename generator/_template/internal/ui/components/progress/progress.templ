@@ -1,0 +1,219 @@
+package progress
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"strings"
+
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+type ctxKey string
+
+const stateKey ctxKey = "progressState"
+
+type ctxState struct {
+	value int
+	max   int
+}
+
+func state(ctx context.Context) ctxState {
+	if s, ok := ctx.Value(stateKey).(ctxState); ok {
+		return s
+	}
+	return ctxState{max: 100}
+}
+
+func percentage(value, max int) int {
+	if max <= 0 {
+		max = 100
+	}
+	if value < 0 {
+		value = 0
+	}
+	if value > max {
+		value = max
+	}
+	return (value * 100) / max
+}
+
+// statusAttr mirrors Base UI's ProgressStatus data attribute on every part:
+// data-complete once the value reaches max, data-progressing otherwise (a Go
+// int is never indeterminate).
+func statusAttr(value, max int) templ.Attributes {
+	if max <= 0 {
+		max = 100
+	}
+	if value >= max {
+		return templ.Attributes{"data-complete": ""}
+	}
+	return templ.Attributes{"data-progressing": ""}
+}
+
+type Props struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	Value      int
+	// Max defaults to 100.
+	Max int
+}
+
+type LabelProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type ValueProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+templ Progress(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.Max == 0 {
+		{{ p.Max = 100 }}
+	}
+	{{ ctx = context.WithValue(ctx, stateKey, ctxState{value: p.Value, max: p.Max}) }}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="progress"
+		role="progressbar"
+		aria-valuemin="0"
+		aria-valuemax={ fmt.Sprintf("%d", p.Max) }
+		aria-valuenow={ fmt.Sprintf("%d", p.Value) }
+		aria-valuetext={ fmt.Sprintf("%d%%", percentage(p.Value, p.Max)) }
+		class={ utils.CN("flex flex-wrap gap-3", p.Class) }
+		{ statusAttr(p.Value, p.Max)... }
+		{ p.Attributes... }
+	>
+		{ children... }
+		@Track() {
+			@Indicator()
+		}
+		// Base UI's NVDA workaround span, part of the rendered output.
+		<span role="presentation" style="clip-path:inset(50%);overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;position:fixed;top:0;left:0">x</span>
+	</div>
+}
+
+type TrackProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+// Track is 1:1 base/ui/progress.tsx ProgressTrack; Progress renders it
+// after the children like the reference, and it stays composable alone.
+templ Track(props ...TrackProps) {
+	{{ var p TrackProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	{{ s := state(ctx) }}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="progress-track"
+		class={ utils.CN("bg-muted h-1 rounded-full relative flex w-full items-center overflow-x-hidden", p.Class) }
+		{ statusAttr(s.value, s.max)... }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+type IndicatorProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+// Indicator is 1:1 base/ui/progress.tsx ProgressIndicator; the width comes
+// from the root's value via context.
+templ Indicator(props ...IndicatorProps) {
+	{{ var p IndicatorProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	{{ s := state(ctx) }}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="progress-indicator"
+		class={ utils.CN("bg-primary h-full transition-all", p.Class) }
+		style={ fmt.Sprintf("inset-inline-start:0;height:inherit;width:%d%%", percentage(s.value, s.max)) }
+		{ statusAttr(s.value, s.max)... }
+		{ p.Attributes... }
+	></div>
+}
+
+templ Label(props ...LabelProps) {
+	{{ var p LabelProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.ID == "" {
+		{{ p.ID = utils.RandomID() }}
+	}
+	{{ s := state(ctx) }}
+	<span
+		id={ p.ID }
+		data-slot="progress-label"
+		role="presentation"
+		class={ utils.CN("text-sm font-medium", p.Class) }
+		{ statusAttr(s.value, s.max)... }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</span>
+}
+
+// Value renders the current value as a percentage (Base UI Progress.Value).
+templ Value(props ...ValueProps) {
+	{{ var p ValueProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	{{ s := state(ctx) }}
+	<span
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="progress-value"
+		aria-hidden="true"
+		class={ utils.CN("text-muted-foreground ml-auto text-sm tabular-nums", p.Class) }
+		{ statusAttr(s.value, s.max)... }
+		{ p.Attributes... }
+	>
+		@childrenOr(fmt.Sprintf("%d%%", percentage(s.value, s.max))) {
+			{ children... }
+		}
+	</span>
+}
+
+// childrenOr is ProgressValue's children function: what the caller renders,
+// or the formatted value without children.
+func childrenOr(label string) templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		html, err := templ.ToGoHTML(ctx, templ.GetChildren(ctx))
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(string(html)) == "" {
+			_, err = io.WriteString(w, templ.EscapeString(label))
+			return err
+		}
+		_, err = io.WriteString(w, string(html))
+		return err
+	})
+}

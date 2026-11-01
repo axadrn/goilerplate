@@ -1,0 +1,9 @@
+package layouts
+
+import "{{.ModulePath}}/internal/model"
+
+templ AppSidebarAvatar(user *model.User) {
+	<div id="sidebar-avatar">
+		@AppSidebarAvatarContent(user)
+	</div>
+}

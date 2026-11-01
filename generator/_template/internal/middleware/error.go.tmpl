@@ -1,0 +1,74 @@
+{{- if not .HasHTMLFrontend -}}
+package middleware
+
+import (
+	"net/http"
+
+	"{{.ModulePath}}/internal/api"
+)
+
+// renderMiddlewareError answers every middleware error with the JSON error
+// envelope. A headless project has no pages.
+func renderMiddlewareError(w http.ResponseWriter, _ *http.Request, status int, _, description string) {
+	api.Error(w, status, api.CodeForStatus(status), description)
+}
+{{- else -}}
+package middleware
+
+import (
+{{- if eq .Framework "htmx" }}
+	"fmt"
+{{- end }}
+	"log/slog"
+	"net/http"
+
+{{- if eq .Framework "datastar" }}
+	"github.com/starfederation/datastar-go/datastar"
+{{- end }}
+{{- if .API }}
+	"{{.ModulePath}}/internal/api"
+{{- end }}
+	"{{.ModulePath}}/internal/ui/components/toast"
+	"{{.ModulePath}}/internal/ui/pages"
+)
+
+func renderMiddlewareError(w http.ResponseWriter, r *http.Request, status int, title, description string) {
+{{- if .API }}
+	if isAPIRequest(r) {
+		api.Error(w, status, api.CodeForStatus(status), description)
+		return
+	}
+{{- end }}
+{{- if eq .Framework "htmx" }}
+	if r.Header.Get("HX-Request") == "true" {
+		if _, err := fmt.Fprint(w, `<div hx-swap-oob="beforeend:#toast-container">`); err != nil {
+			slog.Error("render middleware error toast wrapper failed", "error", err)
+			return
+		}
+		if err := toast.Toast(toast.Props{Title: title, Description: description, Type: toast.TypeError}).Render(r.Context(), w); err != nil {
+			slog.Error("render middleware error toast failed", "error", err)
+			return
+		}
+		if _, err := fmt.Fprint(w, `</div>`); err != nil {
+			slog.Error("render middleware error toast wrapper failed", "error", err)
+		}
+		return
+	}
+{{- else }}
+	if r.Header.Get("Datastar-Request") == "true" {
+		if err := datastar.NewSSE(w, r).PatchElementTempl(
+			toast.Toast(toast.Props{Title: title, Description: description, Type: toast.TypeError}),
+			datastar.WithSelector("#toast-container"),
+			datastar.WithModeAppend(),
+		); err != nil {
+			slog.Error("render middleware error toast failed", "error", err)
+		}
+		return
+	}
+{{- end }}
+	w.WriteHeader(status)
+	if err := pages.ErrorPage(status, title, description).Render(r.Context(), w); err != nil {
+		slog.Error("render middleware error page failed", "error", err)
+	}
+}
+{{- end }}

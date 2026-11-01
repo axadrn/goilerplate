@@ -1,0 +1,24 @@
+package layouts
+
+import (
+	"{{.ModulePath}}/internal/model"
+	dropdown "{{.ModulePath}}/internal/ui/components/dropdownmenu"
+)
+
+templ AppSidebarUserSummary(user *model.User) {
+	<div id="sidebar-user-name" class="grid flex-1 text-left text-sm leading-tight" hx-swap-oob="true">
+		<span class="truncate font-medium">{ user.Name }</span>
+		<span class="truncate text-xs text-muted-foreground">{ user.Email }</span>
+	</div>
+}
+
+templ AppSidebarUserLabel(user *model.User) {
+	<div id="dropdown-user-label" hx-swap-oob="true">
+		@dropdown.Label() {
+			<div class="flex flex-col">
+				<span class="font-medium">{ user.Name }</span>
+				<span class="text-xs text-muted-foreground">{ user.Email }</span>
+			</div>
+		}
+	</div>
+}

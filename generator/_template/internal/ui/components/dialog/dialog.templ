@@ -1,0 +1,308 @@
+package dialog
+
+import (
+	"context"
+	"strconv"
+
+	"{{.ModulePath}}/internal/ui/components/button"
+	"{{.ModulePath}}/internal/ui/components/icon"
+	"{{.ModulePath}}/internal/ui/utils"
+)
+
+type ctxKey string
+
+const stateKey ctxKey = "dialogState"
+
+type ctxState struct {
+	id               string
+	open             bool
+	controlled       bool
+	disableClickAway bool
+}
+
+func state(ctx context.Context) ctxState {
+	if s, ok := ctx.Value(stateKey).(ctxState); ok {
+		return s
+	}
+	return ctxState{}
+}
+
+type Props struct {
+	ID string
+	// Open is the controlled open state. Use DefaultOpen when the browser
+	// should own the state after the initial render.
+	Open        *bool
+	DefaultOpen bool
+	// DisablePointerDismissal is Base UI's disablePointerDismissal: a press
+	// on the backdrop does not close the dialog.
+	DisablePointerDismissal bool
+}
+
+func initialOpen(p Props) bool {
+	if p.Open != nil {
+		return *p.Open
+	}
+	return p.DefaultOpen
+}
+
+type ContentProps struct {
+	Class           string
+	Attributes      templ.Attributes
+	HideCloseButton bool
+	// Modal is Base UI's modal: focus trap, scroll lock and inert outside.
+	// nil means true.
+	Modal *bool
+}
+
+type HeaderProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type FooterProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type TitleProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+type DescriptionProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+// Dialog renders no element: it only carries the id and options that link
+// Trigger, Content and Close (via ctx).
+templ Dialog(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.ID == "" {
+		{{ p.ID = utils.RandomID() }}
+	}
+	{{ ctx = context.WithValue(ctx, stateKey, ctxState{id: p.ID, open: initialOpen(p), controlled: p.Open != nil, disableClickAway: p.DisablePointerDismissal}) }}
+	{ children... }
+}
+
+// Trigger returns the attributes that turn any element (usually a button)
+// into the dialog trigger — the asChild equivalent: no wrapper element.
+func Trigger(ctx context.Context) templ.Attributes {
+	return TriggerFor(state(ctx).id)
+}
+
+// TriggerFor targets a dialog outside the current Dialog root by id.
+func TriggerFor(id string) templ.Attributes {
+	return templ.Attributes{
+		// useButton: tabIndex 0 and the native type.
+		"tabindex":                   "0",
+		"type":                       "button",
+		"data-slot":                  "dialog-trigger",
+		"data-base-ui-click-trigger": true,
+		"data-templ-controls":        id,
+		"aria-haspopup":              "dialog",
+		"aria-expanded":              "false",
+	}
+}
+
+// Close returns the attributes that make any element close the dialog.
+func Close(ctx context.Context) templ.Attributes {
+	return CloseFor(state(ctx).id)
+}
+
+// CloseFor targets a dialog outside the current Dialog root by id.
+func CloseFor(id string) templ.Attributes {
+	return templ.Attributes{
+		// useButton: tabIndex 0 and the native type.
+		"tabindex":                "0",
+		"type":                    "button",
+		"data-slot":               "dialog-close",
+		"data-templ-dialog-close": id,
+	}
+}
+
+// PortalProps is DialogPortal's surface: the portal node renders no
+// visible element of its own (their Portal.Props carry no className).
+type PortalProps struct {
+	Attributes templ.Attributes
+}
+
+// Portal is 1:1 base/ui/dialog.tsx DialogPortal. Hidden until the script
+// portals it to <body> on open, so the SSRd content never participates in
+// layout or sibling CSS. The wrapper div is the FloatingPortal node: it
+// stays in <body>, [hidden] while the dialog is unmounted (Base UI removes
+// the portal subtree instead), and the script drives the Base UI
+// data-open/data-closed/data-starting-style/data-ending-style lifecycle on
+// backdrop and popup.
+templ Portal(props ...PortalProps) {
+	{{ var p PortalProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div data-templ-portal hidden>
+		<div data-base-ui-portal data-slot="dialog-portal" hidden { p.Attributes... }>
+			{ children... }
+		</div>
+	</div>
+}
+
+type OverlayProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+}
+
+// Overlay is 1:1 base/ui/dialog.tsx DialogOverlay (Dialog.Backdrop): the
+// look comes from. user-select none is Base UI's inline
+// style on the backdrop.
+templ Overlay(props ...OverlayProps) {
+	{{ var p OverlayProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="dialog-overlay"
+		role="presentation"
+		style="user-select: none; -webkit-user-select: none;"
+		class={ utils.CN("data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs fixed inset-0 isolate z-50", p.Class) }
+		{ p.Attributes... }
+	></div>
+}
+
+templ Content(props ...ContentProps) {
+	{{ var p ContentProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	{{ s := state(ctx) }}
+	// 1:1 base/ui/dialog.tsx DialogContent: Portal > Overlay > Popup.
+	@Portal() {
+		@Overlay()
+		// 1:1 base/ui/dialog.tsx DialogContent (Dialog.Popup): the look
+		// comes from. tabindex is managed at runtime
+		// like Base UI's handleTabIndex.
+		<div
+			id={ s.id }
+			role="dialog"
+			tabindex="-1"
+			data-base-ui-focusable
+			data-slot="dialog-content"
+			if s.controlled {
+				data-templ-open={ strconv.FormatBool(s.open) }
+			} else {
+				data-templ-default-open?={ s.open }
+			}
+			data-templ-modal={ strconv.FormatBool(p.Modal == nil || *p.Modal) }
+			if s.disableClickAway {
+				data-templ-disable-pointer-dismissal="true"
+			}
+			class={
+				utils.CN(
+					"bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-4 rounded-xl p-4 text-sm ring-1 duration-100 sm:max-w-sm fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
+					p.Class,
+				),
+			}
+			{ p.Attributes... }
+		>
+			{ children... }
+			if !p.HideCloseButton {
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIconSm,
+					Class:   "absolute top-2 right-2",
+					Attributes: templ.Attributes{
+						"data-slot":             "dialog-close",
+						"data-templ-dialog-close": "",
+					},
+				}) {
+					@icon.X()
+					<span class="sr-only">Close</span>
+				}
+			}
+		</div>
+	}
+}
+
+templ Header(props ...HeaderProps) {
+	{{ var p HeaderProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="dialog-header"
+		class={ utils.CN("gap-2 flex flex-col", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Footer(props ...FooterProps) {
+	{{ var p FooterProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="dialog-footer"
+		class={ utils.CN("bg-muted/50 -mx-4 -mb-4 rounded-b-xl border-t p-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+templ Title(props ...TitleProps) {
+	{{ var p TitleProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	// data-templ-dialog-title is the Title registration: the script wires the
+	// popup's aria-labelledby to this element, like Base UI's useDialogTitle.
+	<h2
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="dialog-title"
+		data-templ-dialog-title
+		class={ utils.CN("text-base leading-none font-medium font-heading", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</h2>
+}
+
+templ Description(props ...DescriptionProps) {
+	{{ var p DescriptionProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	// data-templ-dialog-description is the Description registration: the script
+	// wires the popup's aria-describedby to this element, like Base UI.
+	<p
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="dialog-description"
+		data-templ-dialog-description
+		class={ utils.CN("text-muted-foreground *:[a]:hover:text-foreground text-sm *:[a]:underline *:[a]:underline-offset-3", p.Class) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</p>
+}

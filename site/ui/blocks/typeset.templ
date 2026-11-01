@@ -1,0 +1,8 @@
+package blocks
+
+// Typeset renders markdown HTML with the native shadcn typeset styles.
+templ Typeset(htmlContent string) {
+	<div class="typeset w-full">
+		@templ.Raw(htmlContent)
+	</div>
+}

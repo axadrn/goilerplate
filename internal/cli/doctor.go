@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/axadrn/goilerplate/v3/internal/doctor"
+	"github.com/axadrn/goilerplate/v4/internal/doctor"
 )
 
 func (a *App) doctor(ctx context.Context, arguments []string) error {

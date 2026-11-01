@@ -1,0 +1,138 @@
+package service
+
+import (
+	"encoding/xml"
+{{- if or .HasBlog .HasDocs }}
+	"log/slog"
+{{- end }}
+	"strings"
+	"time"
+
+	"{{.ModulePath}}/internal/model"
+)
+
+var publicRoutes = []struct {
+	Path       string
+	Priority   string
+	ChangeFreq string
+}{
+	{"/", "1.0", "daily"},
+{{- if .HasBlog }}
+	{"/blog", "0.8", "daily"},
+{{- end }}
+{{- if .HasDocs }}
+	{"/docs", "0.8", "weekly"},
+{{- end }}
+	{"/auth", "0.3", "monthly"},
+	{"/auth/password", "0.3", "monthly"},
+}
+
+type SitemapService struct {
+{{- if .HasBlog }}
+	blogService *BlogService
+{{- end }}
+{{- if .HasDocs }}
+	docsService *DocsService
+{{- end }}
+	baseURL string
+}
+
+func NewSitemapService(
+{{- if .HasBlog }}
+	blogService *BlogService,
+{{- end }}
+{{- if .HasDocs }}
+	docsService *DocsService,
+{{- end }}
+	baseURL string,
+) *SitemapService {
+	return &SitemapService{
+{{- if .HasBlog }}
+		blogService: blogService,
+{{- end }}
+{{- if .HasDocs }}
+		docsService: docsService,
+{{- end }}
+		baseURL: strings.TrimSuffix(baseURL, "/"),
+	}
+}
+
+func (s *SitemapService) GenerateSitemap() ([]byte, error) {
+	sitemap := model.Sitemap{XMLNS: "http://www.sitemaps.org/schemas/sitemap/0.9"}
+	sitemap.URLs = append(sitemap.URLs, s.staticURLs()...)
+{{- if .HasBlog }}
+	blogURLs, err := s.blogURLs()
+	if err != nil {
+		slog.Warn("failed to get blog URLs for sitemap", "error", err)
+	} else {
+		sitemap.URLs = append(sitemap.URLs, blogURLs...)
+	}
+{{- end }}
+{{- if .HasDocs }}
+	sitemap.URLs = append(sitemap.URLs, s.docsURLs()...)
+{{- end }}
+	output, err := xml.MarshalIndent(sitemap, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return []byte(xml.Header + string(output)), nil
+}
+
+func (s *SitemapService) staticURLs() []model.SitemapURL {
+	today := time.Now().Format("2006-01-02")
+	urls := make([]model.SitemapURL, 0, len(publicRoutes))
+	for _, route := range publicRoutes {
+		urls = append(urls, model.SitemapURL{
+			Loc: s.baseURL + route.Path, LastMod: today,
+			ChangeFreq: route.ChangeFreq, Priority: route.Priority,
+		})
+	}
+	return urls
+}
+{{- if .HasBlog }}
+func (s *SitemapService) blogURLs() ([]model.SitemapURL, error) {
+	posts, err := s.blogService.Posts()
+	if err != nil {
+		return nil, err
+	}
+	today := time.Now().Format("2006-01-02")
+	urls := make([]model.SitemapURL, 0, len(posts))
+	for _, post := range posts {
+		lastModified := today
+		if !post.Date.IsZero() {
+			lastModified = post.Date.Format("2006-01-02")
+		}
+		urls = append(urls, model.SitemapURL{
+			Loc: s.baseURL + "/blog/" + post.Slug, LastMod: lastModified,
+			ChangeFreq: "weekly", Priority: "0.7",
+		})
+	}
+	return urls, nil
+}
+{{- end }}
+{{- if .HasDocs }}
+func (s *SitemapService) docsURLs() []model.SitemapURL {
+	if err := s.docsService.BuildDocsTree(); err != nil {
+		slog.Warn("failed to build docs tree for sitemap", "error", err)
+		return nil
+	}
+	today := time.Now().Format("2006-01-02")
+	var urls []model.SitemapURL
+	for _, page := range s.docsService.FlatDocsList() {
+		if page.HTMLContent == "" && len(page.Children) > 0 {
+			continue
+		}
+		priority := "0.6"
+		if strings.Count(page.Slug, "/") == 0 {
+			priority = "0.8"
+		} else if strings.Count(page.Slug, "/") == 1 {
+			priority = "0.7"
+		}
+		urls = append(urls, model.SitemapURL{
+			Loc: s.baseURL + "/docs/" + page.Slug, LastMod: today,
+			ChangeFreq: "weekly", Priority: priority,
+		})
+	}
+	return urls
+}
+{{- end }}

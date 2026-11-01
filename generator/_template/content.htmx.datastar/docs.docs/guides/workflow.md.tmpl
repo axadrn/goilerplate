@@ -1,0 +1,44 @@
+---
+title: "Workflow"
+description: "A replaceable guide with steps, code, and expected output"
+order: 1
+---
+
+This page is a documentation starter. Replace it with one workflow that matters to your users.
+
+## 1. Define one outcome
+
+A useful guide begins with a result. This starter adds a small JSON status endpoint.
+
+```go
+func ProductStatus(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status": "ready",
+	})
+}
+```
+
+## 2. Register the route
+
+Keep the route close to the rest of the HTTP surface:
+
+```go
+mux.HandleFunc("GET /product-status", ProductStatus)
+```
+
+## 3. Verify the result
+
+```bash
+curl http://localhost:8090/product-status
+```
+
+```json
+{
+  "status": "ready"
+}
+```
+
+## 4. Replace the starter
+
+Document the real happy path first. Add edge cases only when they help a reader make a decision or recover from a failure.
