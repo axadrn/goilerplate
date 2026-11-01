@@ -13,8 +13,13 @@ templ HighlightScripts() {
 			if (pre.hasAttribute('data-has-copy-button')) return;
 			pre.setAttribute('data-has-copy-button', 'true');
 
-			// Add relative positioning to pre for button placement
-			pre.classList.add('relative');
+			// The button sits on a wrapper, not in the pre: the pre scrolls
+			// sideways and would carry the button with it.
+			const block = document.createElement('div');
+			block.setAttribute('data-slot', 'code-block');
+			block.className = 'relative';
+			pre.parentNode.insertBefore(block, pre);
+			block.appendChild(pre);
 
 			// Create copy button with Tailwind classes matching shadcn-templ.
 			const button = document.createElement('button');
@@ -56,7 +61,7 @@ templ HighlightScripts() {
 				}
 			});
 
-			pre.appendChild(button);
+			block.appendChild(button);
 		}
 
 		// Process code blocks

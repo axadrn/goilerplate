@@ -553,13 +553,21 @@
     line-height: 1.75;
     margin-block-start: 1.5em;
   }
-  .typeset pre [data-slot="code-copy-button"] {
+  /* The wrapper the copy script puts around a pre owns its flow margin, so
+     the button lines up with the block, not with the margin above it. */
+  .typeset [data-slot="code-block"] {
+    margin-block-start: 1.5em;
+  }
+  .typeset [data-slot="code-block"] > pre {
+    margin-block-start: 0;
+  }
+  .typeset [data-slot="code-block"] > [data-slot="code-copy-button"] {
     background: var(--secondary);
     border-color: transparent;
     border-radius: 9999px;
     color: var(--muted-foreground);
   }
-  .typeset pre [data-slot="code-copy-button"]:hover {
+  .typeset [data-slot="code-block"] > [data-slot="code-copy-button"]:hover {
     color: var(--foreground);
   }
   .typeset ul > li::marker {
@@ -599,15 +607,18 @@
   .typeset table {
     border-block-end: 0;
   }
+  /* A wide table scrolls inside its .typeset-scroll box: it fills the text
+     column, and its columns keep a readable width instead of squeezing. */
+  .typeset .typeset-scroll table {
+    width: auto;
+    min-width: 100%;
+  }
+  .typeset .typeset-scroll :is(th, td) {
+    min-width: 8rem;
+  }
   .typeset blockquote {
     border-inline-start: 2px solid var(--border);
     color: var(--muted-foreground);
   }
-  @media (max-width: 48rem) {
-    .typeset table {
-      display: block;
-      overflow-x: auto;
-      white-space: nowrap;
-    }
-  }
+
 }
