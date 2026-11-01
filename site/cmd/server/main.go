@@ -365,9 +365,13 @@ func (s *site) asset(w http.ResponseWriter, r *http.Request, name string) {
 		s.render(w, r, http.StatusNotFound, pages.NotFound())
 		return
 	}
-	if s.dev {
+	switch {
+	case s.dev:
 		w.Header().Set("Cache-Control", "no-cache")
-	} else {
+	case strings.HasPrefix(name, "fonts/"):
+		// Fonts load on every page; a long cache keeps text from flashing.
+		w.Header().Set("Cache-Control", "public, max-age=31536000")
+	default:
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 	}
 	http.ServeFile(w, r, file)

@@ -67,7 +67,7 @@ func Base(props ...SEOProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<link rel=\"icon\" href=\"/favicon.ico\" sizes=\"32x32\"><link rel=\"icon\" href=\"/assets/img/favicon.svg\" type=\"image/svg+xml\"><link rel=\"apple-touch-icon\" href=\"/assets/img/apple-touch-icon.png\"><link href=\"/assets/css/output.css\" rel=\"stylesheet\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<link rel=\"icon\" href=\"/favicon.ico\" sizes=\"32x32\"><link rel=\"icon\" href=\"/assets/img/favicon.svg\" type=\"image/svg+xml\"><link rel=\"apple-touch-icon\" href=\"/assets/img/apple-touch-icon.png\"><link rel=\"preload\" href=\"/assets/fonts/geist/geist-variable.woff2\" as=\"font\" type=\"font/woff2\" crossorigin=\"anonymous\"><link href=\"/assets/css/output.css\" rel=\"stylesheet\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -83,7 +83,7 @@ func Base(props ...SEOProps) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.GetNonce(ctx)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 33, Col: 145}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 35, Col: 145}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -142,7 +142,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fullTitle)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 48, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 50, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -155,7 +155,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(props.Description).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 49, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 51, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -168,7 +168,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(appName).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 51, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 53, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
@@ -196,7 +196,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(baseURL + props.Path).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 59, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 61, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -214,7 +214,7 @@ func seo(props SEOProps) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(props.MarkdownPath).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 62, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 64, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 			if templ_7745c5c3_Err != nil {
@@ -232,7 +232,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fullTitle).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 65, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 67, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -245,7 +245,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression(props.Description).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 66, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 68, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -258,7 +258,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(baseURL + props.Path).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 68, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 70, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -271,7 +271,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templruntime.NewAttributeExpression(appName).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 69, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 71, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 		if templ_7745c5c3_Err != nil {
@@ -284,7 +284,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templruntime.NewAttributeExpression(baseURL + "/assets/img/og.png").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 71, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 73, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -297,7 +297,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templruntime.NewAttributeExpression(appName + " - " + appTagline).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 74, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 76, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 		if templ_7745c5c3_Err != nil {
@@ -310,7 +310,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fullTitle).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 77, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 79, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 		if templ_7745c5c3_Err != nil {
@@ -323,7 +323,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templruntime.NewAttributeExpression(props.Description).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 78, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 80, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -336,7 +336,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.NewAttributeExpression(baseURL + "/assets/img/og.png").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 79, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 81, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 		if templ_7745c5c3_Err != nil {
@@ -349,7 +349,7 @@ func seo(props SEOProps) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templruntime.NewAttributeExpression(appName + " - " + appTagline).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 80, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 82, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 		if templ_7745c5c3_Err != nil {
@@ -387,7 +387,7 @@ func themeScript() templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.GetNonce(ctx)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 86, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/layouts/base.templ`, Line: 88, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 		if templ_7745c5c3_Err != nil {
