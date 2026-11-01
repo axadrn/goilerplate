@@ -10,10 +10,12 @@ order: 2
 
 ```bash
 ops servers add web-1
+ops apps add --server web-1 acme
+ops env set APP_URL=https://acme.com SMTP_HOST=smtp.acme.com ...
 ops deploy
 ```
 
-Your app is live with HTTPS on your domain. Every change of its database is backed up to your bucket.
+Your app is live with HTTPS on your domain. Every change of its database is backed up to your bucket. You set no database path: the `compose.yml` goilerplate wrote already keeps it.
 
 ## ELI5
 
@@ -75,18 +77,19 @@ Run the next commands in your project folder. `acme` is the name of your project
 ops apps add --server web-1 acme
 ```
 
-Set the production values from your `.env.example`. Keep the database in `/data`: ops keeps that folder across deploys and backs up the database in it.
+Set the production values from your `.env.example`:
 
 ```bash
 ops env set \
   APP_URL=https://acme.com \
   EMAIL_FROM=noreply@acme.com \
   RESEND_API_KEY=re_... \
-  ADMIN_EMAILS=you@acme.com \
-  'DB_CONNECTION=/data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)'
+  ADMIN_EMAILS=you@acme.com
 ```
 
 Add the payment, OAuth and storage keys your stack uses. The app lists every missing value at startup.
+
+Leave `DB_CONNECTION` out. The database stays in `data/`. Your project's `compose.yml` mounts that folder, so ops keeps it across deploys and backs it up.
 
 ## 6. Add your domain
 
@@ -102,13 +105,13 @@ Point an A record of `acme.com` at the server's IP. ops shows the address and th
 ops deploy
 ```
 
-ops sends your code to your bucket. The server builds the Dockerfile goilerplate wrote, waits until `/healthz` answers and puts the app live. The log ends with `v1 is live` and the database it found in `/data`.
+ops sends your code to your bucket. The server builds the Dockerfile goilerplate wrote, waits until `/healthz` answers and puts the app live. The log names the database it found in `/app/data` and ends with `v1 is live`.
 
 Every next deploy is the same one command. ops takes a snapshot of the database before each one.
 
 ## Real visitor IPs
 
-The sign-in rate limit counts requests per visitor IP. Your app sits behind the proxy ops runs, so trust its network once. On the server:
+The sign-in rate limit counts requests per visitor IP. Your app sits behind the proxy ops runs, so every request seems to come from the proxy. Without this step, all your visitors share one limit. Tell the app to trust the proxy's network, once. On the server:
 
 ```bash
 docker network inspect ops-proxy --format '{{(index .IPAM.Config 0).Subnet}}'

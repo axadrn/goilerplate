@@ -15,6 +15,8 @@ docker run --env-file .env -p 8090:8090 acme-app
 
 The image already contains the selected architecture and brand. Env supplies only deployment coordinates, external IDs, operator switches, and secrets. Use the generated `.env.example` as the exact checklist.
 
+Want it on your own server with HTTPS and SQLite backups in one command? [Deploy with ops](/docs/guides/deploy-with-ops).
+
 ## Recommended shape
 
 Use one reverse proxy, one application container, and either:
@@ -63,7 +65,19 @@ Trust only a network that connects directly to the app. Never use `0.0.0.0/0` or
 
 ## SQLite
 
-Mount the directory containing the database as a persistent volume. Run one writable application replica.
+The database lives in `data/`, inside the container at `/app/data`. Keep that folder on a volume, or every new container starts with an empty database.
+
+A SQLite project comes with a `compose.yml` that does this for you:
+
+```yaml
+services:
+  web:
+    build: .
+    volumes:
+      - ./data:/app/data
+```
+
+It runs the production build, so `docker compose up` needs the production env. For local work use `task dev`. With plain Docker, mount the folder yourself: `docker run --env-file .env -p 8090:8090 -v ./data:/app/data acme-app`. Run one writable application replica.
 
 Back up the database file and verify restoration. WAL mode and busy timeout are already in the default connection string.
 

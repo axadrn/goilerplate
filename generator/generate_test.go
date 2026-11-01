@@ -670,11 +670,19 @@ func TestGenerateOmitsUnselectedFeatures(t *testing.T) {
 		"internal/db/migrations/006_simplify_users_and_tokens.sql",
 		"internal/db/migrations/007_rename_organizations_to_workspaces.sql",
 		"cmd/seed/main.go",
-		"compose.yml",
 	} {
 		if _, ok := tree[path]; ok {
 			t.Errorf("unselected file %s was generated", path)
 		}
+	}
+	compose := string(tree["compose.yml"])
+	for _, required := range []string{"./data:/app/data", "x-ops:", "port: 8090", "health: /healthz"} {
+		if !strings.Contains(compose, required) {
+			t.Errorf("SQLite compose.yml is missing %q", required)
+		}
+	}
+	if strings.Contains(compose, "postgres") {
+		t.Error("SQLite compose.yml mentions postgres")
 	}
 
 	combined := string(tree[".env.example"]) + string(tree["go.mod"]) + string(tree["internal/ui/blocks/navbar.templ"]) + string(tree["internal/ui/blocks/footer.templ"]) + string(tree["internal/ui/layouts/app.templ"])
