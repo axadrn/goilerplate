@@ -410,6 +410,8 @@ templ homeTerm(label, value string) {
 }
 
 // ---------------------------------------------------------------- ops
+// homeOps is the way to production: ops, by the same maker, deploys a
+// goilerplate app and backs up its SQLite database.
 templ homeOps() {
 	<section id="ops" class={ homeSection }>
 		<div class={ homeWrap }>
@@ -417,23 +419,30 @@ templ homeOps() {
 				@card.Content(card.ContentProps{Class: "grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16"}) {
 					<div>
 						<p class="text-sm font-semibold text-muted-foreground">ops</p>
-						<h2 class={ homeH2, "mt-4" }>Ship it. ops keeps it running.</h2>
-						<p class={ homeLead, "mt-6 max-w-md" }>Deploys, backups, updates and a database UI for your Go and SQLite app. On your own server, with no open ports and no SSH keys. Open source too.</p>
-						<div class="mt-10">
+						<h2 class={ homeH2, "mt-4" }>Deploy your goilerplate app with ops.</h2>
+						<p class={ homeLead, "mt-6 max-w-md" }>
+							<span class="text-foreground">Live with HTTPS on your own server. SQLite backups included.</span>
+							Every change of your database goes to your bucket, and you go back to any second. 30-day free trial, no card.
+						</p>
+						<div class="mt-10 flex flex-col gap-3 sm:flex-row">
 							@button.Button(button.Props{Href: blocks.RefURL(blocks.OpsURL, "card"), Size: button.SizeLg}) {
-								Visit ops
+								Try ops free
 								@icon.ArrowRight()
+							}
+							@button.Button(button.Props{Href: "/docs/guides/deploy-with-ops", Variant: button.VariantSecondary, Size: button.SizeLg}) {
+								Read the guide
 							}
 						</div>
 					</div>
-					<div class="ops-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]" aria-label="A terminal session with ops">
+					<div class="ops-term overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-[13px] leading-6 whitespace-pre text-terminal-foreground sm:text-[14px]" aria-label="Three commands that put a goilerplate app live with ops">
+						<p class="text-terminal-foreground/45"># 1. install ops</p>
+						<p><span class="text-terminal-foreground/45">$ </span>curl -fsSL https://ops.goilerplate.com/cli.sh | sh</p>
+						<p class="mt-4 text-terminal-foreground/45"># 2. add your server</p>
+						<p><span class="text-terminal-foreground/45">$ </span>ops servers add web-1</p>
+						<p class="mt-4 text-terminal-foreground/45"># 3. deploy</p>
 						<p><span class="text-terminal-foreground/45">$ </span>ops deploy</p>
-						<p class="text-terminal-foreground/60">→ building on web-1</p>
-						<p class="text-terminal-foreground/60">→ snapshot of /data/app.db: before-v14</p>
-						<p class="text-terminal-foreground/60">→ health check /healthz</p>
-						<p class="text-live">✓ v14 of acme is live in 38s</p>
-						<p class="mt-4"><span class="text-terminal-foreground/45">$ </span>ops restore --at "14:01:59"</p>
-						<p class="text-live">✓ Restored. acme runs again.</p>
+						<p class="text-terminal-foreground/60">→ snapshot of /data/app.db: before-v2</p>
+						<p class="text-live">✓ v2 of acme is live</p>
 					</div>
 				}
 			}
