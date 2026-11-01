@@ -43,6 +43,8 @@ tasks:
       - CHANGELOG.md
       - site/assets/css/output.css
     cmds:
+      # The first run comes at start, before templ's proxy listens: wait for it.
+      - until curl -s -o /dev/null http://127.0.0.1:{{.DEV_PORT}}; do sleep 0.5; done
       - go tool templ generate --notify-proxy --proxyport={{.DEV_PORT}}
 
   test:
