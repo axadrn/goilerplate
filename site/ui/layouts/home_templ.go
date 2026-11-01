@@ -61,6 +61,10 @@ func Home(seo SEOProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			templ_7745c5c3_Err = blocks.FloatingNews("ops-1", blocks.OpsURL, "ops is out").Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 			return nil
 		})
 		templ_7745c5c3_Err = Base(seo).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
