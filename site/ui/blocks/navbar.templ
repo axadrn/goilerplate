@@ -20,6 +20,12 @@ const OpsURL = "https://ops.goilerplate.com"
 // ShadcnTemplURL is the component library every page is built with.
 const ShadcnTemplURL = "https://shadcn-templ.com"
 
+// RefURL links another product of the same maker and tells it where on
+// goilerplate.com the link sits, such as RefURL(OpsURL, "nav").
+func RefURL(url, placement string) string {
+	return url + "/?ref=goilerplate-" + placement
+}
+
 // navItem is one link of the main navigation.
 type navItem struct {
 	Href, Label string
@@ -28,7 +34,7 @@ type navItem struct {
 var navItems = []navItem{
 	{"/docs", "Docs"},
 	{"/new", "Builder"},
-	{OpsURL, "Ops"},
+	{RefURL(OpsURL, "nav"), "Ops"},
 	{"/changelog", "Changelog"},
 }
 

@@ -122,11 +122,11 @@ func Footer() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = footerLink(ShadcnTemplURL, "shadcn-templ", true).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = footerLink(RefURL(ShadcnTemplURL, "footer"), "shadcn-templ", true).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = footerLink(OpsURL, "ops", true).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = footerLink(RefURL(OpsURL, "footer"), "ops", true).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

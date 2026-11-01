@@ -20,9 +20,9 @@ type makerProject struct {
 }
 
 var makerProjects = []makerProject{
-	{"shadcn-templ", "The Go port of shadcn/ui", ShadcnTemplURL},
+	{"shadcn-templ", "The Go port of shadcn/ui", RefURL(ShadcnTemplURL, "maker")},
 	{"goilerplate", "The Go SaaS starter, free and open source", "https://goilerplate.com"},
-	{"ops", "Deploys and backups on your own server", OpsURL},
+	{"ops", "Deploys and backups on your own server", RefURL(OpsURL, "maker")},
 }
 
 // MakerProjects links shadcn-templ, goilerplate and ops side by side.

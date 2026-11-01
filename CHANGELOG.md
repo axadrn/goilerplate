@@ -264,7 +264,7 @@ goilerplate now focuses on what it does best: the Go SaaS backend stack.
 
 - The stack now ships at the repository root. It previously lived in `boilerplate/`. This is a breaking change for your next `git pull upstream main`. See the release notes for migration steps.
 - Premium blocks and the website login are no longer part of the product. Nothing is revoked. `v2.2.0` and every earlier release still include all 222 blocks. They remain in the repository history and your fork.
-- For open-source UI blocks, see [shadcn-templ.com](https://shadcn-templ.com).
+- For open-source UI blocks, see [shadcn-templ.com](https://shadcn-templ.com/?ref=goilerplate-changelog).
 - Bumped templ to v0.3.1020 so fresh setups no longer crash on the first `task dev`.
 
 ## v2.2.0

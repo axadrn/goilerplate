@@ -29,8 +29,8 @@ templ Footer() {
 				}
 				@footerGroup("Learn") {
 					@footerLink("/docs", "Documentation", false)
-					@footerLink(ShadcnTemplURL, "shadcn-templ", true)
-					@footerLink(OpsURL, "ops", true)
+					@footerLink(RefURL(ShadcnTemplURL, "footer"), "shadcn-templ", true)
+					@footerLink(RefURL(OpsURL, "footer"), "ops", true)
 				}
 				@footerGroup("Legal") {
 					@footerLink("/legal/privacy", "Privacy", false)

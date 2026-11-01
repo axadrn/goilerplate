@@ -420,7 +420,7 @@ templ homeOps() {
 						<h2 class={ homeH2, "mt-4" }>Ship it. ops keeps it running.</h2>
 						<p class={ homeLead, "mt-6 max-w-md" }>Deploys, backups, updates and a database UI for your Go and SQLite app. On your own server, with no open ports and no SSH keys. Open source too.</p>
 						<div class="mt-10">
-							@button.Button(button.Props{Href: blocks.OpsURL, Size: button.SizeLg}) {
+							@button.Button(button.Props{Href: blocks.RefURL(blocks.OpsURL, "card"), Size: button.SizeLg}) {
 								Visit ops
 								@icon.ArrowRight()
 							}
