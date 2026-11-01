@@ -22,6 +22,9 @@ This repository is goilerplate, free and open source: the CLI, the generator wit
 
 - Use a feature branch and pull request for substantial work.
 - Keep commits attributed only to the human author. Do not add automation attribution.
+- Commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, with an optional scope like `feat(cli):`. A short first line, then a sentence or two of why when it helps.
+- Commits and pull requests carry no AI attribution: no `Co-Authored-By` for a tool, no "Generated with" line.
+- Release notes have three sections, empty ones left out: `### New`, `### Fixed`, `### Upgrade` (how to update, one line). They come from the `feat:` and `fix:` commits.
 
 ## Prose
 
