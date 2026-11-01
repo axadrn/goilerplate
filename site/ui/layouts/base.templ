@@ -1,6 +1,7 @@
 package layouts
 
 import "github.com/axadrn/goilerplate/v4/site/brand"
+import "github.com/axadrn/goilerplate/v4/site/sitectx"
 import "github.com/axadrn/goilerplate/v4/site/ui/components"
 
 type SEOProps struct {
@@ -22,9 +23,15 @@ templ Base(props ...SEOProps) {
 			} else {
 				<title>{ brand.Name }</title>
 			}
+			<link rel="icon" href="/favicon.ico" sizes="32x32"/>
 			<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"/>
+			<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png"/>
 			<link href="/assets/css/output.css" rel="stylesheet"/>
 			@components.Scripts()
+			// Umami Analytics
+			if !sitectx.Dev(ctx) {
+				<script defer data-website-id="fc73fc11-017e-47a6-91af-e92bc1b541f1" src="https://umami.axeladrian.com/script.js" nonce={ templ.GetNonce(ctx) }></script>
+			}
 			@themeScript()
 		</head>
 		<body class="style-nova min-h-screen">

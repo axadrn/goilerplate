@@ -44,7 +44,7 @@ func main() {
 	changelog := flag.String("changelog", "CHANGELOG.md", "the changelog to publish")
 	assets := flag.String("assets", "site/assets", "directory with the built assets")
 	stars := flag.Bool("stars", true, "ask GitHub for the star count of the repo every hour")
-	dev := flag.Bool("dev", false, "read the Markdown again on every request")
+	dev := flag.Bool("dev", false, "read the Markdown again on every request and leave out the analytics")
 	flag.Parse()
 
 	site, err := newSite(*content, *changelog, *assets, *dev)
@@ -305,6 +305,10 @@ func (s *site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/legal/privacy":
 		s.render(w, r, http.StatusOK, pages.Legal(md.privacy))
 		return
+	case "/favicon.ico":
+		// Browsers, link previews and analytics ask for it at the root.
+		s.asset(w, r, "img/favicon.ico")
+		return
 	case "/robots.txt":
 		s.text(w, r, "text/plain; charset=utf-8", []byte("User-agent: *\nAllow: /\nSitemap: "+brand.URL+"/sitemap.xml\n"))
 		return
@@ -327,7 +331,7 @@ func (s *site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *site) render(w http.ResponseWriter, r *http.Request, status int, component templ.Component) {
-	ctx := sitectx.With(r.Context(), sitectx.Page{Path: r.URL.Path, Stars: int(s.stars.Load())})
+	ctx := sitectx.With(r.Context(), sitectx.Page{Path: r.URL.Path, Stars: int(s.stars.Load()), Dev: s.dev})
 	var buffer bytes.Buffer
 	if err := component.Render(ctx, &buffer); err != nil {
 		log.Printf("render %s: %v", r.URL.Path, err)

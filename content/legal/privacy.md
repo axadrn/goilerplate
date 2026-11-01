@@ -12,7 +12,9 @@ Axel Adrian is responsible for this site. Privacy questions can be sent to [{{su
 
 ## The website
 
-goilerplate.com is a static site. There are no accounts, no forms, no analytics and no advertising or tracking cookies.
+goilerplate.com is a static site. There are no accounts, no forms and no advertising or tracking cookies.
+
+Page views are counted with [Umami](https://umami.is) on our own server. Umami sets no cookies and stores no IP addresses. We only see totals, such as which pages are read and which site sent a visitor.
 
 The site runs on its own server behind Cloudflare. Like any web server, both process your network address and basic request data such as the path, time and browser, to deliver pages and stop abuse. These logs are kept only as long as needed for security and troubleshooting.
 
