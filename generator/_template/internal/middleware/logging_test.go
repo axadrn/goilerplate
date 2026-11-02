@@ -1,6 +1,10 @@
 package middleware
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
 
 func TestSafeRequestLogPathRedactsTokens(t *testing.T) {
 	tests := map[string]string{
@@ -16,5 +20,22 @@ func TestSafeRequestLogPathRedactsTokens(t *testing.T) {
 		if got := safeRequestLogPath(path); got != want {
 			t.Fatalf("safeRequestLogPath(%q) = %q, want %q", path, got, want)
 		}
+	}
+}
+
+func TestResponseWriterFlushSendsStatusOnce(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	writer := &responseWriter{ResponseWriter: recorder, statusCode: http.StatusOK}
+	if err := http.NewResponseController(writer).Flush(); err != nil {
+		t.Fatalf("Flush() error = %v", err)
+	}
+	if !writer.written {
+		t.Fatal("Flush() did not record the status")
+	}
+	if _, err := writer.Write([]byte("data: x\n\n")); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if !recorder.Flushed || recorder.Code != http.StatusOK {
+		t.Fatalf("recorder flushed=%v code=%d", recorder.Flushed, recorder.Code)
 	}
 }

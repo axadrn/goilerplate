@@ -34,6 +34,15 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	return rw.ResponseWriter.Write(b)
 }
 
+// FlushError records the status a flush sends, so a later Write does not send
+// it again. Server-sent events flush the headers before the first event.
+func (rw *responseWriter) FlushError() error {
+	if !rw.written {
+		rw.WriteHeader(http.StatusOK)
+	}
+	return http.NewResponseController(rw.ResponseWriter).Flush()
+}
+
 {{ if not .HasHTMLFrontend -}}
 // Browser noise paths are never logged (they would bury real requests).
 var skipLoggingPaths = []string{
