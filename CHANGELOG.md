@@ -4,7 +4,7 @@ Public product updates for goilerplate.
 
 ## v4.0.0
 
-Unreleased
+November 2, 2026
 
 ### goilerplate is free and open source
 
