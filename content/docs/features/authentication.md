@@ -43,7 +43,7 @@ Successful change revokes other sessions and creates a replacement current sessi
 
 Google and GitHub live in isolated generated handlers. Select Google, GitHub, both, or neither. Env supplies client IDs and secrets only for the providers present in that build.
 
-OAuth state is signed and short-lived. It is tied to the browser flow. Callback errors do not expose provider tokens.
+OAuth state is a random value in a short-lived HttpOnly cookie. The callback must send the same value back. Callback errors do not expose provider tokens.
 
 OAuth signs in only with an address the provider has verified. Google must report `verified_email`. GitHub uses the public address, or the primary one when it is private, and `/user/emails` must list it as verified. Otherwise the sign-in fails and no account is created or linked.
 

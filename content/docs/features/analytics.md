@@ -16,7 +16,7 @@ GOOGLE_ANALYTICS_ID=
 
 You may enable one provider or several. Most products should start with one.
 
-Analytics belongs to the htmx and Datastar web pages. SvelteKit and Headless projects have no analytics settings and no `ROBOTS_NOINDEX`.
+Analytics belongs to the htmx and Datastar web pages. SvelteKit and Headless projects have no analytics settings. `ROBOTS_NOINDEX=true` still sends `X-Robots-Tag: noindex, nofollow` there.
 
 ## Plausible
 

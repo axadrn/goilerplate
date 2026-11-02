@@ -155,7 +155,7 @@ Seats use the generic `Limit` primitive. Invitation acceptance applies the trans
 
 Trials require a real end time. Missing lifecycle data fails closed instead of granting indefinite access.
 
-Past-due access lasts for `Lifecycle.PastDueGraceDays`, measured from the locally stored provider-state timestamp. Cancellation keeps access only until the stored billing period ends. After either window closes, `Lifecycle.PaidFallback` decides whether the account becomes Free or Blocked.
+Past-due access lasts for `Lifecycle.PastDueGraceDays`, measured from the locally stored provider-state timestamp. Cancellation keeps access only until the stored billing period ends. After either window closes, `Lifecycle.PaidFallback` decides whether the account becomes Free or locked.
 
 ## Periodic quotas
 

@@ -87,7 +87,7 @@ A `read` token may call reads. A token with `read` and `write` may also make the
 
 | Access | Routes |
 | --- | --- |
-| Read | `GET /api/v1/account`, `GET /api/v1/openapi.yaml`, `GET /api/v1/csrf`. With workspaces: `GET /api/v1/workspaces`, `GET .../{workspaceSlug}`, `GET .../activity`, `GET .../billing`, `GET /api/v1/invitations/{token}`. Without workspaces: `GET /api/v1/billing`. |
+| Read | `GET /api/v1/account`, `GET /api/v1/meta`, `GET /api/v1/openapi.yaml`, `GET /api/v1/csrf`. With workspaces: `GET /api/v1/workspaces`, `GET .../{workspaceSlug}`, `GET .../activity`, `GET .../billing`, `GET /api/v1/invitations/{token}`. Without workspaces: `GET /api/v1/billing`. |
 | Write | `PATCH /api/v1/account/name`. With storage: `POST` and `DELETE /api/v1/account/avatar`. With workspaces: `PATCH .../name`, `POST .../invitations`, `POST .../invitations/{invitationID}/resend`, `DELETE .../invitations/{invitationID}`. |
 | Never | Sign-in, onboarding and logout, email, password, sessions, API tokens, account deletion, creating, deleting or leaving workspaces, accepting invitations, member role changes, member removal, checkout, billing portal and management, admin. |
 

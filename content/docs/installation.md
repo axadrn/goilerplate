@@ -17,9 +17,11 @@ That is it. No account, no login. The generated folder already contains a clean 
 
 ## What you need
 
-- Git.
+- Git 2.38 or newer.
 - Go 1.26 or newer to install the CLI and build the generated project.
 - Task for the short development commands.
+- The Tailwind CSS standalone CLI for an htmx or Datastar project. `task dev` runs `tailwindcss`.
+- Node.js 22.17 or newer and pnpm for a SvelteKit project.
 - Docker only when you select PostgreSQL or want containerized local services.
 
 ## Install

@@ -42,7 +42,7 @@ Defaults reduce risk. They do not replace a security review for your product.
 
 Generation and updates never require repository access. Your source code stays on your machine.
 
-`goilerplate update` downloads generated template trees and lets Git merge them locally. Conflicts remain normal Git conflicts.
+`goilerplate update` downloads the template of your old version, renders the old and new trees on your machine, and lets Git merge them. Conflicts remain normal Git conflicts.
 
 ## Boring operations
 

@@ -197,11 +197,13 @@ Every non-2xx answer uses one envelope:
 
 | Status | Codes |
 | --- | --- |
-| 400 | `invalid_body`, `invalid_token`, `invalid_cursor` |
+| 400 | `bad_request`, `invalid_body`, `invalid_token`, `invalid_cursor` |
 | 401 | `unauthenticated`, `invalid_credentials` |
-| 403 | `forbidden`, `insufficient_scope`, `onboarding_required`, `impersonation_read_only`, `invitation_email_mismatch` |
+| 403 | `forbidden`, `insufficient_scope`, `onboarding_required`, `impersonation_read_only`, `invitation_email_mismatch`, `email_not_verified`, `feature_unavailable`, `limit_reached`, `quota_exceeded` |
 | 404 | `not_found` |
-| 409 | State conflicts such as `last_owner`, `seat_limit`, `checkout_conflict`, `password_already_set`, `token_limit` |
+| 405 | `method_not_allowed` |
+| 409 | State conflicts such as `last_owner`, `seat_limit`, `checkout_conflict`, `password_already_set`, `token_limit`, `email_taken`, `already_member`, `active_subscription` |
+| 413 | `body_too_large` |
 | 410 | `invitation_unavailable` |
 | 415 | `unsupported_media_type` |
 | 422 | `validation_failed`, `invalid_plan`, `invalid_interval` |
@@ -431,7 +433,7 @@ Exact origins only, comma separated. Wildcards and paths fail at startup. Listed
 
 ## OpenAPI
 
-Every project ships a hand-written OpenAPI 3.1 document at `internal/api/openapi.yaml`. The server serves it at `GET /api/v1/openapi.yaml`.
+Every project with the JSON API ships a hand-written OpenAPI 3.1 document at `internal/api/openapi.yaml`. The server serves it at `GET /api/v1/openapi.yaml`.
 
 All `/api/v1` routes are registered from one table in `internal/api/routes.go`. A test compares that table with the document in both directions. Add a route without documenting it and `go test` fails.
 

@@ -152,7 +152,7 @@ See [Subscriptions and Billing](/docs/features/subscriptions).
 
 ## Optional modules
 
-Optional configuration appears only when the generated code can use it. This includes OAuth, S3 storage, Admin access, analytics, error tracking, and development seeds.
+Optional configuration appears only when the generated code can use it. This includes OAuth, S3 storage, Admin access, analytics, and error tracking.
 
 Projects with the JSON API add `CORS_ALLOWED_ORIGINS`. OAuth projects add `API_URL`. See [JSON API](/docs/features/json-api#cors).
 

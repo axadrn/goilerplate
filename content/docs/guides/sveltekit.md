@@ -120,7 +120,7 @@ The app signs in with `?session=cookie` on the sign-in endpoints. The server set
 
 JavaScript never sees a session token. Nothing goes into `localStorage` or `sessionStorage`. Cookie sign-in and every other cookie request that changes data needs the `X-CSRF-Token` header with the token from `GET /api/v1/csrf`. `web/src/lib/api.ts` does that for you. It fetches the CSRF token once, retries once after a 403, sends JSON or `FormData`, and turns the error envelope into an `ApiError` with `status`, `code`, `message`, and `fields`.
 
-The app reads `is_admin` from `GET /api/v1/account` to show Admin, and `GET /api/v1/meta` for the support address in the sidebar. With workspaces, an invitation link opened before sign-in sets the HttpOnly `pending_invitation` cookie, and the account reports it as `pending_invitation`. After sign-in and onboarding, `/app` sends the person back to the invitation. The details are in [JSON API](/docs/features/json-api#cookie-sessions).
+The app reads `is_admin` from `GET /api/v1/account` to show Admin, and `GET /api/v1/meta` for the support address in the sidebar. With workspaces, an invitation link opened before sign-in sets the HttpOnly `pending_invitation` cookie, and the account reports it as `pending_invitation`. After sign-in and onboarding, `/app` sends the person back to the invitation. The details are in [JSON API](/docs/features/json-api#onboarding).
 
 Logout is a full page load to `/auth`, so no account data stays in memory.
 

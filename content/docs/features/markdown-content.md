@@ -33,7 +33,7 @@ order: 3
 ---
 ```
 
-Blog posts may add metadata supported by the generated model. Date. Author. Tags. Image. Draft state.
+Blog posts may add metadata supported by the generated model. Date. Author. Tags. Hero image.
 
 ## Documentation navigation
 
@@ -43,7 +43,7 @@ Previous and next links use the same tree.
 
 ## Rendering
 
-Markdown is parsed on the server into sanitized HTML. Code blocks receive syntax highlighting and a copy button. Headings receive stable IDs for links and the page table of contents.
+Markdown is parsed on the server into sanitized HTML. Code blocks receive a copy button. Headings receive stable IDs for links and the page table of contents.
 
 ## When this is the right choice
 

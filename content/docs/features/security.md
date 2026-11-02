@@ -14,18 +14,19 @@ Security is still your responsibility after you change the product.
 
 Every response sets:
 
-- Content Security Policy with a per-request nonce.
+- Content Security Policy. htmx and Datastar pages use a per-request nonce, the SvelteKit app uses a hash, and JSON answers allow nothing.
 - `X-Content-Type-Options: nosniff`.
 - `Referrer-Policy`.
 - `Permissions-Policy`.
 - Frame restrictions.
-- Production transport security.
+
+In production, cookies are `Secure`. Set HSTS at your HTTPS proxy.
 
 Generated frontend assets are local. Optional analytics hosts enter the policy only through typed configuration.
 
 ## CSRF
 
-Every state-changing browser form includes a signed CSRF token. Unsafe requests without a valid token are rejected before the handler runs.
+Every state-changing browser form includes a random CSRF token that must match its cookie. Unsafe requests without a valid token are rejected before the handler runs.
 
 Provider webhooks use their own HMAC signatures and do not use browser CSRF tokens.
 
@@ -50,7 +51,7 @@ Templates escape untrusted output by default. Signed URLs and secrets are never 
 
 ## Rate limits
 
-Abuse-sensitive paths have separate limits. This includes authentication and email delivery. Account email changes and workspace invitations. Checkout and similar operations. Each limit uses the right identity for that operation.
+Abuse-sensitive paths have separate limits. This includes authentication and email delivery. Account email changes and workspace invitations. Each limit uses the right identity for that operation.
 
 Reverse proxy headers are trusted only when the direct peer belongs to configured trusted CIDRs. Untrusted clients cannot choose their own rate-limit key through `X-Forwarded-For`.
 

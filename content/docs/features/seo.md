@@ -9,7 +9,7 @@ order: 6
 Every public page passes one small SEO value to the base layout:
 
 ```go
-@layouts.Base(layout.SEOProps{
+@layouts.Base(layouts.SEOProps{
     Title:       "Pricing",
     Description: "Simple pricing for Acme.",
     Path:        "/pricing",
@@ -26,7 +26,7 @@ Site-wide identity lives in `internal/brand/brand.go`. Change the product name, 
 - `Description`: plain summary for search and sharing.
 - `Path`: canonical path beginning with `/`.
 
-Optional fields choose a custom social image and Open Graph type.
+Optional fields: `NoIndex` keeps a page out of search, and `MarkdownPath` links its Markdown version.
 
 The layout combines page metadata with the owned brand values. Page copy stays next to the page. Shared identity stays in `internal/brand`.
 
