@@ -17,6 +17,7 @@ This repository is goilerplate, free and open source: the CLI, the generator wit
 - The CLI makes no network call except `changelog` (GitHub releases) and `update`, which downloads a released template from the Go module proxy. No telemetry.
 - Nothing private enters this repository: no secrets, no customer data, no server names or internal plans.
 - Run `go test -race ./...`, `go vet ./...`, `go build ./...`, and `go mod tidy -diff` before pushing.
+- Then check what you changed, and only that: a small change gets a quick look at the changed page or generated project; a release with many changes gets the full run (generate every stack, click through it in Chromium and WebKit).
 
 ## Git
 
