@@ -44,6 +44,8 @@ Use the connection URL from the managed database or private PostgreSQL service.
 
 Enable TLS according to the provider. Keep the database on a private network when possible and grant the application user only the permissions it needs.
 
+The generated `compose.yml` starts only the local development database. Deploy the app with the [Deployment](/docs/guides/deployment) guide.
+
 ## Pooling
 
 Start with the driver defaults. Measure connection use under real load before changing pool sizes.
