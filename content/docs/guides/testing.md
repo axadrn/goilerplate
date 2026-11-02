@@ -35,6 +35,7 @@ The suite follows the generated selection. Provider and optional-feature tests s
 | S3-compatible storage | Bucket use, upload, deletion, URL signing, and file ownership |
 | htmx 4.0, Datastar 1.0, SvelteKit, or Headless | Only the selected frontend: policy, handler, and UI behavior for htmx or Datastar, the app handler, CSP and route reservations for SvelteKit, the JSON root and JSON errors for Headless |
 | JSON API | Every endpoint, bearer and cookie sessions, CSRF on cookie requests, CORS, personal API tokens and scopes, and a test that keeps the OpenAPI document and the routes in sync |
+| MCP | Tools that match the selection, personal API token auth and scopes, stateless requests, workspace bounds, roles, the shared invitation limit, activity paging, billing without links, and an added example tool |
 
 These tests protect the generated foundation. Add tests for the product behavior you build on top.
 

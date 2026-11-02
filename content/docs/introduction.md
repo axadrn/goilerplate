@@ -28,7 +28,7 @@ Every project starts with the boring foundation already connected:
 - SQLite or PostgreSQL with versioned migrations.
 - Authentication, sessions, security headers, validation, and rate limits.
 - Optional payments, workspaces, OAuth, email, storage, blog, and docs.
-- Stack-aware `AGENTS.md`, public `/llms.txt`, and raw Markdown documentation.
+- Stack-aware `AGENTS.md`. Public `/llms.txt` and raw Markdown documentation for htmx and Datastar.
 - Dockerfile. Taskfile. Health checks. Logs. A selection-aware Go test suite and GitHub Actions CI.
 
 The generator includes only selected modules. Choosing Stripe does not leave Polar code behind. Leaving Workspaces disabled does not generate workspaces, memberships, or invitations.

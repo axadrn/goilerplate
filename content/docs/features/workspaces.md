@@ -14,7 +14,7 @@ This is not the global operator Admin panel. It is product code for your future 
 
 Imagine you build project management software.
 
-Acme creates one workspace. Alice and Bob join it. Acme's projects belong to that workspace. So do its members, subscription, and audit history.
+Acme creates one workspace. Alice and Bob join it. Its members, subscription, and audit history belong to that workspace.
 
 Alice can also be invited to another workspace in the same SaaS. The workspace switcher appears only when she has more than one workspace membership.
 
@@ -29,7 +29,6 @@ Tenant-owned product rows also carry `workspace_id`.
 Routes make the active workspace visible:
 
 ```text
-/app/{workspaceSlug}/projects
 /app/{workspaceSlug}/workspace
 /app/{workspaceSlug}/billing
 ```
@@ -66,7 +65,7 @@ A workspace with active external billing or a live checkout attempt cannot be de
 
 ## Audit history
 
-Member and role changes create tenant-visible audit events. So do invitation, project, and workspace changes. Events use redacted metadata. They never store tokens, secrets, or private provider URLs.
+Member and role changes create tenant-visible audit events. So do invitation and workspace changes. Events use redacted metadata. They never store tokens, secrets, or private provider URLs.
 
 The global operator log is separate. See [Admin Panel](/docs/features/admin-panel).
 

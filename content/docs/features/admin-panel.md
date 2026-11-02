@@ -38,6 +38,12 @@ Operators are ordinary user accounts. The panel reuses the app's login, sessions
 - Inspect operator audit history.
 - Start a bounded support impersonation session.
 
+## By frontend
+
+- htmx and Datastar have the full panel at `/admin`, impersonation included.
+- SvelteKit has `/admin` with metrics, users, session revocation, and operator history. It has no impersonation.
+- Headless has no `/admin` page. Operators call `GET /api/v1/admin/users` and `POST /api/v1/admin/users/{userID}/sessions/revoke` with an operator session. API tokens cannot reach them.
+
 ## Read-only impersonation
 
 Impersonation creates a separate database session and cookie with a hard one-hour limit. The original operator session remains available for return.

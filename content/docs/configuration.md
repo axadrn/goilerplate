@@ -40,7 +40,7 @@ Edit `internal/brand/brand.go` to change the product name, tagline, or descripti
 
 ### Development ports
 
-`task dev` uses these defaults:
+In htmx and Datastar projects, `task dev` uses these defaults:
 
 - Go application: `8090`
 - templ proxy: `7331`
@@ -55,7 +55,7 @@ task dev APP_PORT=8091 DEV_PORT=7332 OPEN_BROWSER=true
 
 The development task supplies the selected app port as `PORT` and the proxy URL as `APP_URL`. Port selection lives in `cmd/devport/main.go` and is wired through `Taskfile.yml`.
 
-`APP_PORT`, `DEV_PORT`, and `OPEN_BROWSER` are development-task settings only. Production continues to use `PORT` and `APP_URL` from its environment.
+`OPEN_BROWSER` and the templ proxy apply to htmx and Datastar only. SvelteKit takes `APP_PORT` and `DEV_PORT` for Go and Vite, Headless only `APP_PORT`. All three are development-task settings only. Production continues to use `PORT` and `APP_URL` from its environment.
 
 ### Development
 

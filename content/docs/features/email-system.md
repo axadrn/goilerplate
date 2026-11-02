@@ -41,11 +41,15 @@ Email delivery requires the API key. The Audience ID is optional and used only f
 
 ## Included transactional flows
 
-- Magic link sign-in.
-- Email verification.
-- Password recovery.
-- Email change verification.
-- Workspace invitations when Workspaces is selected.
+The template sends exactly these emails:
+
+- Sign-in link. Opening it also verifies the address.
+- Welcome, after onboarding sets the name.
+- Password reset. A one-time sign-in link that removes the old password.
+- Email change verification, sent to the new address.
+- Email change notice, sent to the old address.
+- Account deleted.
+- Workspace invitation, when Workspaces is selected.
 
 Each message receives plain text and HTML content through the same service boundary. Action emails include a primary button and a visible fallback URL.
 

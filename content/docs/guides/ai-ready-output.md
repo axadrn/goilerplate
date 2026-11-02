@@ -13,7 +13,7 @@ Generated projects give coding agents local repository rules and give documentat
 These are two separate surfaces:
 
 - `AGENTS.md` explains how to work inside the generated repository.
-- `/llms.txt` points external tools to the public product documentation.
+- `/llms.txt` points external tools to the public product documentation. htmx and Datastar only.
 
 ## Repository instructions
 
@@ -33,7 +33,7 @@ Edit it as the product develops. Add business rules that should survive across t
 
 ## Public LLM documentation
 
-Projects serve `/llms.txt` as a small index of public product documentation. When the Docs module is selected, every page also has a raw Markdown version.
+htmx and Datastar projects serve `/llms.txt` as a small index of public product documentation. SvelteKit and Headless do not serve it. When the Docs module is selected, every page also has a raw Markdown version.
 
 [Open the live goilerplate llms.txt](/llms.txt)
 
