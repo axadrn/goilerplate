@@ -632,7 +632,7 @@ func Configurator() templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = configuratorToggle("content-docs", "Docs", "Markdown docs, navigation and syntax highlighting.", false).Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = configuratorToggle("content-docs", "Docs", "Markdown docs, navigation and copyable code blocks.", false).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
