@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>{page.data.title ? `${page.data.title} - ${config.name}` : config.name}</title>
+	<title>{page.data.title ? `${page.data.title} · ${config.name}` : config.name}</title>
 </svelte:head>
 
 <AdminLayout>

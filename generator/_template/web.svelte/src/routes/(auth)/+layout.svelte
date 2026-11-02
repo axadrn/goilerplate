@@ -9,7 +9,7 @@
 
 <svelte:head>
 	{#if page.data.title}
-		<title>{page.data.title} - {config.name}</title>
+		<title>{page.data.title} · {config.name}</title>
 	{/if}
 </svelte:head>
 

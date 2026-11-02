@@ -69,7 +69,7 @@ templ seo(props SEOProps) {
 	{{ baseURL := cfg.AppURL }}
 	{{ appName := brand.Name }}
 	{{ appTagline := brand.Tagline }}
-	{{ fullTitle := props.Title + " - " + appName }}
+	{{ fullTitle := props.Title + " · " + appName }}
 	@templ.Fragment("seo-title") {
 		<title id="page-title">{ fullTitle }</title>
 	}

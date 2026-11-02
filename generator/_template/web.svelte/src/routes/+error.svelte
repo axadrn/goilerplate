@@ -11,7 +11,7 @@
 </script>
 
 <svelte:head>
-	<title>{title} - {config.name}</title>
+	<title>{title} · {config.name}</title>
 </svelte:head>
 
 <Empty.Root class="min-h-svh rounded-none border-0">

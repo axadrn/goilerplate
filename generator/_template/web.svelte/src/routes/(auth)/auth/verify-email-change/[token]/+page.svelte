@@ -59,7 +59,7 @@
 </script>
 
 <svelte:head>
-	<title>{title} - {config.name}</title>
+	<title>{title} · {config.name}</title>
 </svelte:head>
 
 {#if status === 'verified'}
