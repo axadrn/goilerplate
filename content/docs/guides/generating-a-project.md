@@ -20,7 +20,7 @@ Done. The new folder is already a clean Git repository on `main` with an `Initia
 
 The website does not generate a project. It builds a command.
 
-The CLI sends your generator config to the generator service. The service returns only a generated template tree. The CLI puts it in a new folder, starts Git, and commits it. Your existing files and repositories never leave your machine.
+The template is built into the CLI. The CLI renders it with your choices on your machine, puts it in a new folder, starts Git, and commits it. No network is needed, and nothing leaves your machine.
 
 ## Interactive mode
 
