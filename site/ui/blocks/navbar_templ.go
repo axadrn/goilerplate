@@ -30,7 +30,7 @@ const OpsURL = "https://ops.goilerplate.com"
 const ShadcnTemplURL = "https://shadcn-templ.com"
 
 // RefURL links another product of the same maker and tells it where on
-// goilerplate.com the link sits, such as RefURL(OpsURL, "nav").
+// goilerplate.com the link sits, such as RefURL(OpsURL, "footer").
 func RefURL(url, placement string) string {
 	return url + "/?ref=goilerplate-" + placement
 }
@@ -43,7 +43,6 @@ type navItem struct {
 var navItems = []navItem{
 	{"/docs", "Docs"},
 	{"/new", "Builder"},
-	{RefURL(OpsURL, "nav"), "Ops"},
 	{"/changelog", "Changelog"},
 }
 
@@ -73,7 +72,7 @@ func Navbar() templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(brand.Name + " home").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 47, Col: 138}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `site/ui/blocks/navbar.templ`, Line: 46, Col: 138}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -107,7 +106,7 @@ func Navbar() templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 53, Col: 19}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `site/ui/blocks/navbar.templ`, Line: 52, Col: 19}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -148,7 +147,7 @@ func Navbar() templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(githubstars.Short(stars))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 62, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `site/ui/blocks/navbar.templ`, Line: 61, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -297,7 +296,7 @@ func MobileLink(href, label string) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(href)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 85, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `site/ui/blocks/navbar.templ`, Line: 84, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 			if templ_7745c5c3_Err != nil {
@@ -328,7 +327,7 @@ func MobileLink(href, label string) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 86, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `site/ui/blocks/navbar.templ`, Line: 85, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {

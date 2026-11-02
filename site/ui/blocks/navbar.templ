@@ -21,7 +21,7 @@ const OpsURL = "https://ops.goilerplate.com"
 const ShadcnTemplURL = "https://shadcn-templ.com"
 
 // RefURL links another product of the same maker and tells it where on
-// goilerplate.com the link sits, such as RefURL(OpsURL, "nav").
+// goilerplate.com the link sits, such as RefURL(OpsURL, "footer").
 func RefURL(url, placement string) string {
 	return url + "/?ref=goilerplate-" + placement
 }
@@ -34,7 +34,6 @@ type navItem struct {
 var navItems = []navItem{
 	{"/docs", "Docs"},
 	{"/new", "Builder"},
-	{RefURL(OpsURL, "nav"), "Ops"},
 	{"/changelog", "Changelog"},
 }
 
