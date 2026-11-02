@@ -56,15 +56,15 @@ func TestInspectReportsModuleVersionsAndMissingTools(t *testing.T) {
 	inspector := fakeInspector(map[string]string{"go": "go1.24.0", "git": "git version 2.37.0"})
 
 	report := inspector.Inspect(context.Background(), root)
-	if report.Errors != 3 {
+	if report.Errors != 4 {
 		t.Fatalf("errors = %d, checks = %#v", report.Errors, report.Checks)
 	}
-	for _, name := range []string{"go.mod", "go", "git"} {
+	for _, name := range []string{"go.mod", "go", "git", "tailwindcss"} {
 		if !hasCheck(report, name, LevelError) {
 			t.Fatalf("missing failed check %q in %#v", name, report.Checks)
 		}
 	}
-	for _, name := range []string{"task", "tailwindcss"} {
+	for _, name := range []string{"task"} {
 		if !hasCheck(report, name, LevelWarning) {
 			t.Fatalf("missing optional warning %q in %#v", name, report.Checks)
 		}
@@ -105,6 +105,16 @@ func TestInspectChecksTheFrontendToolsOfTheSelection(t *testing.T) {
 			outputs:   map[string]string{"go": "go1.25.7", "git": "git version 2.50.1", "task": "", "tailwindcss": ""},
 			absent:    []string{"node", "pnpm"},
 		},
+		"htmx without tailwindcss": {
+			framework: "htmx",
+			outputs:   map[string]string{"go": "go1.25.7", "git": "git version 2.50.1", "task": ""},
+			errors:    []string{"tailwindcss"},
+		},
+		"datastar without tailwindcss": {
+			framework: "datastar",
+			outputs:   map[string]string{"go": "go1.25.7", "git": "git version 2.50.1", "task": ""},
+			errors:    []string{"tailwindcss"},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
@@ -144,7 +154,7 @@ func TestInspectAllowsCommentsAndNoGoVersionGate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/acme // generated project\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	report := fakeInspector(map[string]string{"git": "git version 2.50.1"}).Inspect(context.Background(), root)
+	report := fakeInspector(map[string]string{"git": "git version 2.50.1", "tailwindcss": ""}).Inspect(context.Background(), root)
 	if report.Errors != 0 || hasCheckName(report, "go") {
 		t.Fatalf("report = %#v", report)
 	}

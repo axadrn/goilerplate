@@ -88,7 +88,7 @@ func (i Inspector) Inspect(ctx context.Context, directory string) Report {
 	case "headless":
 		// Headless has no frontend build.
 	default:
-		report = i.checkTool(report, "tailwindcss", "Optional. Install the Tailwind CSS CLI from https://tailwindcss.com/docs/installation/tailwind-cli", LevelWarning)
+		report = i.checkTool(report, "tailwindcss", "Install the Tailwind CSS CLI from https://tailwindcss.com/docs/installation/tailwind-cli. task dev builds the CSS with it", LevelError)
 	}
 
 	environmentPath := filepath.Join(root, ".env")
