@@ -39,7 +39,6 @@ func (h *AuthHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	slog.Info("onboarding completed", "user_id", user.ID)
 	h.writeUser(w, user.ID)
 }
 

@@ -234,7 +234,6 @@ func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	slog.Info("onboarding completed", "user_id", user.ID)
 	if hasPendingInvitation {
 		redirect(w, r, "/workspaces/invitations/"+pendingInvitation, http.StatusSeeOther)
 		return

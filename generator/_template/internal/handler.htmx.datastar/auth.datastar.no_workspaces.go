@@ -224,7 +224,6 @@ func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	slog.Info("onboarding completed", "user_id", user.ID)
 	redirect(w, r, "/app/dashboard", http.StatusSeeOther)
 }
 

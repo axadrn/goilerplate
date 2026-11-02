@@ -86,7 +86,6 @@ func (h *AuthHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		created := NewWorkspace(workspace)
 		response.Workspace = &created
 	}
-	slog.Info("onboarding completed", "user_id", user.ID)
 	JSON(w, http.StatusOK, response)
 }
 
