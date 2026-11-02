@@ -2,9 +2,13 @@
 
 Thanks for helping. Read `AGENTS.md` for how the code is built and tested.
 
-Pull requests are welcome. For anything bigger than a fix, open an issue
-first so we can agree on the approach. Your contribution comes in under the
-license of this repository.
+Your contribution comes in under the license of this repository.
+
+## Issue first
+
+Open an issue before you write code. We agree there on what to build and how.
+Pull requests without an agreed issue get closed. Small fixes, like a typo or a
+broken link, are welcome anytime.
 
 ## Commits and releases
 
