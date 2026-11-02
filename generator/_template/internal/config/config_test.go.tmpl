@@ -40,6 +40,9 @@ func TestLoadDefaultsSelectedDatabaseConnection(t *testing.T) {
 		t.Fatalf("DBConnection = %q, want PostgreSQL URL", cfg.DBConnection)
 	}
 {{- else }}
+	if !strings.HasPrefix(cfg.DBConnection, "./data/app.db?") {
+		t.Fatalf("DBConnection = %q, want ./data/app.db, the file .env.example names", cfg.DBConnection)
+	}
 	if !strings.Contains(cfg.DBConnection, "_pragma=busy_timeout(5000)") {
 		t.Fatalf("DBConnection = %q, want SQLite busy timeout", cfg.DBConnection)
 	}
