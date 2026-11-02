@@ -7,7 +7,12 @@
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { notifyWorkspaceFailure, notifyWorkspaceUpdated, roleLabels } from '#lib/workspace/workspace.js';
 
-	let { apiPath, onchange }: { apiPath: string; onchange: () => Promise<void> } = $props();
+	let {
+		apiPath,
+		billingPath,
+		full,
+		onchange
+	}: { apiPath: string; billingPath: string; full: boolean; onchange: () => Promise<void> } = $props();
 
 	const roleItems = (['member', 'admin'] as const).map((value) => ({ value, label: roleLabels[value] }));
 
@@ -43,7 +48,15 @@
 <Card.Root>
 	<Card.Header>
 		<Card.Title>Invite a team member</Card.Title>
-		<Card.Description>Invitations expire after seven days. Pending invitations do not consume seats.</Card.Description>
+		<Card.Description>
+			{#if full}
+				Every seat is taken. <a href={billingPath} class="font-medium text-foreground underline underline-offset-4"
+					>Upgrade to invite teammates</a
+				>.
+			{:else}
+				Invitations expire after seven days. Pending invitations do not consume seats.
+			{/if}
+		</Card.Description>
 	</Card.Header>
 	<Card.Content>
 		<form
@@ -62,11 +75,12 @@
 					type="email"
 					placeholder="teammate@example.com"
 					aria-invalid={invalid ? 'true' : 'false'}
+					disabled={full}
 				/>
 			</Field.Field>
 			<Field.Field>
 				<Field.Label for="invite-role">Role</Field.Label>
-				<Select.Root type="single" name="role" bind:value={role} items={roleItems}>
+				<Select.Root type="single" name="role" bind:value={role} items={roleItems} disabled={full}>
 					<Select.Trigger id="invite-role" class="w-full">
 						<Select.Value />
 					</Select.Trigger>
@@ -77,7 +91,7 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
-			<Button type="submit">Send invite</Button>
+			<Button type="submit" disabled={full}>Send invite</Button>
 		</form>
 	</Card.Content>
 </Card.Root>

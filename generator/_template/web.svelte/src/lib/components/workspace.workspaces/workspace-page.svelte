@@ -16,6 +16,7 @@
 	const seats = $derived(
 		detail.seats.limit === null ? `${detail.seats.used} seats` : `${detail.seats.used} of ${detail.seats.limit} seats`
 	);
+	const seatsFull = $derived(detail.seats.limit !== null && detail.seats.used >= detail.seats.limit);
 
 	// reload fetches the workspace again after a change; the sidebar shows
 	// names and roles from the account.
@@ -48,7 +49,12 @@
 		<GeneralCard {apiPath} name={detail.workspace.name} onchange={reload} />
 	{/if}
 	{#if detail.permissions.manage_members}
-		<InviteCard {apiPath} onchange={reload} />
+		<InviteCard
+			{apiPath}
+			billingPath="/app/{detail.workspace.slug}/billing"
+			full={seatsFull}
+			onchange={reload}
+		/>
 	{/if}
 	<MembersCard {apiPath} {detail} onchange={reload} onleave={leave} />
 	{#if detail.permissions.manage_members && detail.invitations.length > 0}

@@ -36,6 +36,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 	{{ viewer := ctxkeys.WorkspaceMember(ctx) }}
 	{{ subscription := ctxkeys.Subscription(ctx) }}
 	{{ seatLimit := subscription.Access().Limit(access.LimitMembers) }}
+	{{ seatsFull := !subscription.Access().HasCapacity(access.LimitMembers, len(members)) }}
 	{{ basePath := "/app/" + workspace.Slug }}
 	<div id="workspace-content" class="container max-w-5xl space-y-6 px-6 py-8">
 		<div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -88,7 +89,11 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 						Invite a team member 
 					}
 					@card.Description() {
-						Invitations expire after seven days. Pending invitations do not consume seats. 
+						if seatsFull {
+							Every seat is taken. <a href={ templ.SafeURL(basePath + "/billing") } class="font-medium text-foreground underline underline-offset-4">Upgrade to invite teammates</a>.
+						} else {
+							Invitations expire after seven days. Pending invitations do not consume seats. 
+						}
 					}
 				}
 				@card.Content() {
@@ -106,13 +111,13 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 							@field.Label(field.LabelProps{For: "invite-email"}) {
 								Email 
 							}
-							@input.Input(input.Props{ID: "invite-email", Name: "email", Type: "email", Placeholder: "teammate@example.com"})
+							@input.Input(input.Props{ID: "invite-email", Name: "email", Type: "email", Placeholder: "teammate@example.com", Disabled: seatsFull})
 						}
 						@field.Field() {
 							@field.Label(field.LabelProps{For: "invite-role"}) {
 								Role 
 							}
-							@selectcomp.Select(selectcomp.Props{Name: "role", DefaultValue: model.WorkspaceRoleMember, Items: workspaceRoleItems}) {
+							@selectcomp.Select(selectcomp.Props{Name: "role", DefaultValue: model.WorkspaceRoleMember, Items: workspaceRoleItems, Disabled: seatsFull}) {
 								@selectcomp.Trigger(selectcomp.TriggerProps{ID: "invite-role", Class: "w-full"}) {
 									@selectcomp.Value()
 								}
@@ -126,7 +131,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 								}
 							}
 						}
-						@button.Button(button.Props{Type: button.TypeSubmit}) {
+						@button.Button(button.Props{Type: button.TypeSubmit, Disabled: seatsFull}) {
 							Send invite 
 						}
 					</form>
