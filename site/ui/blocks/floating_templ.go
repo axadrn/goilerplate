@@ -108,7 +108,7 @@ func FloatingNews(id, href, label string) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = badge.Badge(badge.Props{Href: href, Variant: badge.VariantGhost, Class: "h-8 gap-2 pl-1 text-[13px]", Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = badge.Badge(badge.Props{Href: href, Variant: badge.VariantGhost, Class: "h-8 gap-2 pl-1 text-sm", Attributes: templ.Attributes{"target": "_blank", "rel": "noopener"}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
