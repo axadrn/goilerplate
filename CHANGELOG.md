@@ -1,16 +1,14 @@
 # Changelog
 
-Public product updates for goilerplate.
+What shipped in goilerplate, newest first.
 
 ## v4.0.0
 
 November 2, 2026
 
-### goilerplate is free and open source
+**In short:** goilerplate is free and open source: the CLI, the generator with every module, the docs and this website, in one public repository. No license, no account, no server.
 
-The CLI, the generator with every module, the docs and this website are now one public repository. No license, no account, no server.
-
-#### Why
+### Why
 
 A few days ago I ended the Free edition, because AI changed how people build apps: an agent writes login, billing and a dashboard in an afternoon. The numbers since then said the same thing. Selling a boilerplate no longer makes sense.
 
@@ -18,71 +16,82 @@ So I am following that thought to its end instead of going back and forth. goile
 
 If you bought goilerplate or templUI Pro: thank you. Everything you generated keeps working, and you get ops Hosted at half price for as long as you use it.
 
-- `goilerplate new` renders the project on your machine. It needs no login and no network.
-- `goilerplate update` downloads the template your project was made with from the Go module proxy and merges with Git on your machine, as before. Updates work for projects made with v4 or newer. Projects made with v3 keep working; they do not update to v4.
-- `login`, `logout`, `whoami`, `claim`, `license` and `account` are gone.
-- The CLI is MIT. The template and every generated project are 0BSD: no notice to keep. New projects ship without a LICENSE file, so you pick your own.
+### Changed
+- **`goilerplate new` works offline**: it renders the project on your machine, with no login and no network.
+- **`goilerplate update`** downloads the template your project was made with from the Go module proxy and merges with Git on your machine, as before. It works for projects made with v4 or newer; projects made with v3 keep working, but do not update to v4.
+- **Licenses**: the CLI is MIT. The template and every generated project are 0BSD, with no notice to keep. New projects ship without a LICENSE file, so you pick your own.
+- **The module path ends in `/v4`.**
 
-Install the new CLI: `go install github.com/axadrn/goilerplate/v4/cmd/goilerplate@latest`. The module path ends in `/v4` now.
+### Removed
+- **`login`, `logout`, `whoami`, `claim`, `license` and `account`**: there is nothing to sign in to any more.
+
+### Upgrade
+Install the new CLI: `go install github.com/axadrn/goilerplate/v4/cmd/goilerplate@latest`.
 
 ## v3.2.3
 
 November 1, 2026
 
-### Fixes
+**In short:** `goilerplate update` says clearly when your Git is too old.
 
-- `goilerplate update` needs Git 2.38 or newer. With an older Git it printed only a cryptic `git merge-tree` usage line, now it names the required and the installed version before downloading anything.
+### Fixed
+- **Git version check**: `goilerplate update` needs Git 2.38 or newer. With an older Git it printed only a cryptic `git merge-tree` usage line; now it names the required and the installed version before downloading anything.
 
-Update the CLI: run `go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest` or download the binary from the release, then run `goilerplate update`.
+### Upgrade
+Update the CLI with `go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest` or the binary from the release, then run `goilerplate update`.
 
 ## v3.2.2
 
 October 31, 2026
 
-### Short workspace URLs
+**In short:** Short workspace URLs, like `/app/acme/…`.
 
-- A new workspace gets the slug of its name: `/app/acme/…` instead of `/app/acme-s-workspace-1a2b3c4d/…`. The workspace from sign-up takes the person's name, `/app/ada-lovelace/…`.
-- A number is added only when the slug is taken: `acme-2`. The unique index on the slug decides, so two workspaces created at the same moment never get the same one.
-- Accented letters become plain ones (`Ärzte Zürich` is `arzte-zurich`). Names of app pages such as `settings` or `admin` are reserved.
-- Existing workspaces keep their slug, so no link, bookmark or invitation breaks. There is no migration.
+### New
+- **Short workspace URLs**: a new workspace gets the slug of its name, `/app/acme/…` instead of `/app/acme-s-workspace-1a2b3c4d/…`. The workspace from sign-up takes the person's name, `/app/ada-lovelace/…`.
+- **A number only when needed**: `acme-2` when the slug is taken. The unique index decides, so two workspaces created at the same moment never get the same one.
+- **Plain letters**: accented letters become plain ones (`Ärzte Zürich` is `arzte-zurich`), and names of app pages such as `settings` or `admin` are reserved.
 
-### Fixes
+### Fixed
+- **Workspace switcher**: it shows the first letter of a name that starts with a non-ASCII letter, such as `Ä`, instead of a broken character.
+- **Docs table of contents**: it marks the last headings of short pages as you reach them.
 
-- The workspace switcher shows the first letter of a name that starts with a non-ASCII letter, such as `Ä`, instead of a broken character.
-- The table of contents in the docs marks the last headings of short pages as you reach them.
-
-Update your project: commit your work, run `goilerplate update`, then switch to the `goilerplate-update-v3.2.2` branch and run `go tool templ generate`.
+### Upgrade
+Commit your work, run `goilerplate update`, switch to the `goilerplate-update-v3.2.2` branch and run `go tool templ generate`. Existing workspaces keep their slug, so no link breaks; there is no migration.
 
 ## v3.2.1
 
 October 30, 2026
 
-### Fixes for the new CLI
+**In short:** Two fixes for the new CLI wizard and its help.
 
-- `goilerplate new` without options lets you type the project directory again. The first wizard step was not focused since v3.2.0.
-- `goilerplate help new` lists every option, starting with the required `--module`.
+### Fixed
+- **Wizard focus**: `goilerplate new` without options lets you type the project directory again. The first step was not focused since v3.2.0.
+- **Help**: `goilerplate help new` lists every option, starting with the required `--module`.
 
-Update the CLI: `go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest`.
+### Upgrade
+`go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest`.
 
 ## v3.2.0
 
 October 30, 2026
 
-### One product. No Free edition.
+**In short:** One product, no Free edition. AI made a free starter pointless: anyone can generate the easy 80% in an afternoon. What takes weeks is the last 20%: billing that survives webhooks, tenant isolation, admin tools, and updates that keep coming.
 
-AI made a free starter pointless: anyone can generate the easy 80% in an afternoon. What takes weeks is the last 20%: billing that survives webhooks, tenant isolation, admin tools, and updates that keep coming. That is the product, so it is the only thing goilerplate sells now.
+### New
+- **shadcn-templ v2.0.0** is stable.
 
-- The Free edition is closed. Every account that existed before today got the full license, for free.
-- `goilerplate new` needs a license and has no `--edition` flag anymore. The wizard starts at the project directory and asks every module question. `--payment` is `stripe` or `polar`.
-- `goilerplate doctor` shows only the template version.
-- `goilerplate new --help` prints the help for `new`.
-- Projects generated with the Free edition cannot run `goilerplate update`, because there is no Free template to update to. Generate a new project with `goilerplate new` and move your code over.
-- shadcn-templ v2.0.0 is stable.
-- The price goes from $99 to $149 on December 1, 2026. Every license bought before keeps lifetime updates.
+### Changed
+- **`goilerplate new` needs a license** and has no `--edition` flag. The wizard starts at the project directory and asks every module question; `--payment` is `stripe` or `polar`.
+- **Every account from before today got the full license**, for free.
+- **`goilerplate doctor`** shows only the template version.
+- **`goilerplate new --help`** prints the help for `new`.
+- **The price** goes from $99 to $149 on December 1, 2026. Every license bought before keeps lifetime updates.
 
-### Updating from v3.1.x
+### Removed
+- **The Free edition.** Projects generated with it cannot run `goilerplate update`, because there is no Free template to update to: generate a new project with `goilerplate new` and move your code over.
 
-1. Install the goilerplate CLI v3.2.0: `go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest`. Older CLIs default to the Free edition, which the server now refuses.
+### Upgrade
+1. Install the CLI v3.2.0: `go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest`. Older CLIs default to the Free edition, which the server now refuses.
 2. Commit your work, run `goilerplate update`, then switch to the `goilerplate-update-v3.2.0` branch.
 3. Run `go tool templ generate` and `go mod tidy`, then build and test.
 
@@ -90,445 +99,602 @@ AI made a free starter pointless: anyone can generate the easy 80% in an afterno
 
 October 30, 2026
 
-### templ v0.3.1100 and Go 1.26
+**In short:** A security fix: templ v0.3.1100, which needs Go 1.26.
 
-templ v0.3.1100 fixes a security issue: code generated by earlier versions does not sanitize spread attributes such as `{ attrs... }`, or URLs in attributes such as `<iframe src>`. Every vendored component passes `Attributes` through a spread, so every project with an htmx or Datastar frontend was affected. Headless and SvelteKit projects have no templ code.
+### Fixed
+- **templ v0.3.1100**: code generated by earlier versions does not sanitize spread attributes such as `{ attrs... }`, or URLs in attributes such as `<iframe src>`. Every vendored component passes `Attributes` through a spread, so every project with an htmx or Datastar frontend was affected. Headless and SvelteKit projects have no templ code.
+- **goldmark v1.8.6** for docs and blog content (CVE-2026-5160).
+- **Docker images on `alpine:3.24`** instead of `alpine:3.20.2`, which no longer gets security updates.
+- **`golang.org/x/crypto` v0.57.0, `golang.org/x/net` v0.59.0** and the other `golang.org/x` modules templ pulls in.
 
-- templ v0.3.1100. It needs Go 1.26, so generated projects now say `go 1.26.0` and build on `golang:1.26`. `goilerplate doctor` reads the version from your `go.mod` and asks for Go 1.26.
-- goldmark v1.8.6 for docs and blog content (CVE-2026-5160).
-- shadcn-templ v2.0.0-beta.16 in `AGENTS.md`. The vendored components the template ships are unchanged.
-- Docker images run on `alpine:3.24` instead of `alpine:3.20.2`, which no longer gets security updates.
-- `golang.org/x/crypto` v0.57.0, `golang.org/x/net` v0.59.0 and the other `golang.org/x` modules templ pulls in.
+### Changed
+- **Go 1.26**: generated projects say `go 1.26.0` and build on `golang:1.26`. `goilerplate doctor` reads the version from your `go.mod` and asks for Go 1.26.
+- **shadcn-templ v2.0.0-beta.16** in `AGENTS.md`. The vendored components are unchanged.
 
-### Updating from v3.1.0
-
+### Upgrade
 1. Install Go 1.26 or newer.
-2. Commit your work, run `goilerplate update`, then switch to the `goilerplate-update-v3.1.1` branch. If you would rather update by hand: `go get github.com/a-h/templ@v0.3.1100 github.com/yuin/goldmark@v1.8.6`, `go mod edit -go=1.26.0`, and `golang:1.26` and `alpine:3.24` in your `Dockerfile`.
+2. Commit your work, run `goilerplate update`, then switch to the `goilerplate-update-v3.1.1` branch. By hand instead: `go get github.com/a-h/templ@v0.3.1100 github.com/yuin/goldmark@v1.8.6`, `go mod edit -go=1.26.0`, and `golang:1.26` and `alpine:3.24` in your `Dockerfile`.
 3. Run `go tool templ generate` and `go mod tidy`, then build and test. Code generated by an older templ no longer compiles against v0.3.1100, so regenerating is required.
 
 ## v3.1.0
 
 October 6, 2026
 
-### One Go backend. HTML, JSON, MCP, and SvelteKit.
+**In short:** One Go backend, every way to talk to it: HTML, a JSON API, MCP and SvelteKit. Services still own the rules; the new transports are thin and call the same methods as your htmx or Datastar handlers.
 
-Until now every goilerplate project was a server-rendered web app. v3.1.0 keeps that as the default and adds every other way to talk to the same backend. Services still own the rules. The new transports are thin and call the same methods as your htmx or Datastar handlers.
+### New
+- **JSON API (`--api`)**: `/api/v1` next to your htmx or Datastar app, from the same binary. Free covers auth, account and sessions; Paid adds billing, admin, workspaces, members, invitations, activity and avatars.
+- **API details**: the login session doubles as the credential, `Authorization: Bearer <token>`; cookie sessions keep working with `X-CSRF-Token` from `GET /api/v1/csrf`. One error envelope, snake case JSON, cursor pagination for activity, 415 for anything that is not `application/json`, a 1 MiB body limit.
+- **OpenAPI**: a hand-written OpenAPI 3.1 document at `/api/v1/openapi.yaml`, with a test that fails when a route and the document drift apart.
+- **CORS** for listed origins through `CORS_ALLOWED_ORIGINS`; OAuth callbacks can use a separate `API_URL`.
+- **Headless (`--headless`)**: the Go backend with the JSON API and no native frontend, no templ, Tailwind or assets. `GET /` answers JSON and the Docker image is about 51 MB.
+- **Personal API tokens** (`pat_...`) with read or read and write scope, bound to one workspace, stored as hashes, shown once, created and revoked under Settings, Security. New routes are closed to tokens until they opt in; tokens never manage people, credentials or billing. They end when the password is reset or changed and when an admin revokes a user's sessions.
+- **MCP server (`--mcp`)** at `/mcp`, built on the official Go SDK, so your customers connect Claude, Cursor or VS Code with a token. Free ships `whoami`; Paid adds `get_billing`; Workspaces add `list_workspaces`, `get_workspace`, `list_activity`, `invite_member` and `rename_workspace`. `AGENTS.md` shows how to add your own tool in under 20 lines.
+- **SvelteKit (`--framework svelte`)**: a SvelteKit 3 app with Svelte 5 and shadcn-svelte on the Headless backend, embedded into the Go binary: one origin, one deploy, about 53 MB. Same look and pages as the templ app, cookie sign-in with CSRF, a strict CSP. Needs Node.js 22.17 or newer and pnpm; `goilerplate doctor` checks both. htmx and Datastar stay the recommendation.
+- **The CLI** has `--api`, `--headless`, `--mcp` and `--framework svelte`, and the wizard asks for them.
 
-#### JSON API (`--api`, Free and Paid)
+### Changed
+- **shadcn-templ v2.0.0-beta.13**: Base UI behavior across components, a minified bundle from `/assets/js` and gzip for text assets. The bundle goes from 613 KB to about 77 KB on the wire.
+- **Safer by default**: OAuth refuses provider accounts without a verified email, payment webhooks reject bodies over 1 MiB, the invitation limit is shared across web, API and MCP, and invitation tokens no longer show up in request logs.
 
-- `/api/v1` next to your htmx or Datastar app, from the same binary. Free covers auth, account and sessions. Paid adds billing, admin, workspaces, members, invitations, activity and avatars.
-- The login session doubles as the API credential: `Authorization: Bearer <token>`. Cookie sessions keep working for a same-origin browser frontend with `X-CSRF-Token` from `GET /api/v1/csrf`.
-- One error envelope, snake case JSON, cursor pagination for activity, 415 for anything that is not `application/json`, 1 MiB body limit.
-- A hand-written OpenAPI 3.1 document at `/api/v1/openapi.yaml`, with a test that fails when a route and the document drift apart.
-- CORS for listed origins through `CORS_ALLOWED_ORIGINS`. OAuth callbacks can use a separate `API_URL`.
+### Fixed
+- **UI**: select triggers show their labels again, the mobile sidebar closes on the first Escape, and Back and Forward work after docs navigation in htmx and Datastar.
+- **Datastar settings**: Sign Out Everywhere, Remove Password and remove avatar no longer stay disabled.
+- **Forms** show their red border on errors.
+- **Account deletion**: a refused deletion no longer deletes the user's files first.
+- **A data race** in the first concurrent page renders is gone.
 
-#### Headless (`--headless`, Free and Paid)
-
-- The Go backend with the JSON API and no native frontend: no templ, Tailwind or assets. `GET /` answers JSON, unknown paths answer the JSON 404, and the Docker image is about 51 MB.
-
-#### Personal API tokens and the MCP server (`--mcp`, Free and Paid)
-
-- Personal API tokens (`pat_...`) with read or read and write scope, bound to one workspace, stored as hashes, shown once. A card in Settings, Security creates and revokes them. New routes are closed to tokens until they opt in, and tokens never manage people, credentials or billing.
-- Tokens end when the password is reset or changed and when an admin revokes a user's sessions. Signing out everywhere keeps them, so integrations survive a normal sign out.
-- An MCP server at `/mcp` built on the official Go SDK. Your customers connect Claude, Cursor or VS Code with a token. Free ships `whoami`; Paid adds `get_billing`; Workspaces add `list_workspaces`, `get_workspace`, `list_activity`, `invite_member` and `rename_workspace`. Checkout, deletion, role changes, member removal, passwords, email and admin never become tools.
-- `AGENTS.md` shows how to add your own tool next to its service in under 20 lines. The example is tested.
-
-#### SvelteKit (`--framework svelte`, Free and Paid)
-
-- A SvelteKit 3 app with Svelte 5 and shadcn-svelte on top of the Headless backend, built with `adapter-static` and embedded into the Go binary. One origin, one deploy, about 53 MB as a Docker image.
-- Same look as the templ app, same pages: auth, onboarding, settings with sessions, avatar and API tokens, billing, admin and workspaces.
-- Cookie sign-in with `?session=cookie` and CSRF, no tokens in browser storage, a strict CSP with script hashes.
-- Needs Node.js 22.17 or newer and pnpm. `goilerplate doctor` checks both.
-- htmx and Datastar stay the recommendation. SvelteKit is there for teams that already use it.
-
-#### Everything else
-
-- shadcn-templ v2.0.0-beta.13: Base UI behavior across components, a minified component bundle served from `/assets/js`, and gzip for text assets. The bundle goes from 613 KB to about 77 KB on the wire.
-- Select triggers show their labels again, the mobile sidebar closes on the first Escape, Back and Forward work after docs navigation in htmx and Datastar.
-- Fixed: three Datastar settings buttons (Sign Out Everywhere, Remove Password, remove avatar) stayed disabled. Form errors now show their red border. A refused account deletion no longer deletes the user's files first. A data race in the first concurrent page renders is gone.
-- OAuth refuses provider accounts without a verified email address. Payment webhooks reject bodies over 1 MiB. The workspace invitation limit is shared across web, API and MCP. Invitation tokens no longer show up in request logs.
-- The CLI has `--api`, `--headless`, `--mcp` and `--framework svelte`, and the wizard asks for them.
-
-### Updating from v3.0.x
-
+### Upgrade
 1. Install the goilerplate CLI v3.1.0. The v3.0.x CLI can run this update, but it cannot read locks written by v3.1.0.
 2. Commit your work, run `goilerplate update`, then switch to the `goilerplate-update-v3.1.0` branch.
-3. If `internal/routes/routes.go` conflicts, keep the new `middleware.Gzip(assetHandler)` line and delete `mux.Handle("GET /components/{bundle}", components.ScriptsHandler())`. That handler no longer exists. Vendored components you edited may also conflict.
-4. If you edited component JavaScript or added components the template does not ship, re-add them with `go run github.com/axadrn/shadcn-templ/v2/cmd/shadcn-templ@v2.0.0-beta.13 add <name> --overwrite`, then run the same command with `bundle` and commit `assets/js/shadcn-templ-*.js` and `internal/ui/components/scripts_bundle.go`.
+3. If `internal/routes/routes.go` conflicts, keep the new `middleware.Gzip(assetHandler)` line and delete `mux.Handle("GET /components/{bundle}", components.ScriptsHandler())`. Vendored components you edited may also conflict.
+4. If you edited component JavaScript or added components the template does not ship, re-add them with `go run github.com/axadrn/shadcn-templ/v2/cmd/shadcn-templ@v2.0.0-beta.13 add <name> --overwrite`, run the same command with `bundle`, and commit `assets/js/shadcn-templ-*.js` and `internal/ui/components/scripts_bundle.go`.
 5. In your own templates, JavaScript and CSS, replace `data-tui-*` with `data-slot` (for example `[data-slot=dialog-content]`), open state with `data-open` and `data-closed`, and `window.tui` with `window.templ`. Nothing fails to compile here, so search for `data-tui` and `window.tui`.
-6. `API_URL` is new and optional. It defaults to `APP_URL`. No required environment keys were added.
+6. `API_URL` is new and optional; it defaults to `APP_URL`.
 7. Run `go tool templ generate` and `go mod tidy`, then build and test.
 
-Adding the JSON API, MCP or SvelteKit to an existing project is a new generation with the same answers plus the new flags. `goilerplate update` keeps your current selection.
+Adding the JSON API, MCP or SvelteKit to an existing project is a new generation with the same answers plus the new flags; `goilerplate update` keeps your current selection.
 
 ## v3.0.3
 
 September 7, 2026
 
-### Admin link for Paid projects without Workspaces
+**In short:** The Admin link is back in Paid projects without Workspaces.
 
-- Fixed the missing Admin menu link in Paid projects without Workspaces.
+### Fixed
+- **Admin link**: Paid projects without Workspaces show the Admin menu link again.
+
+### Upgrade
+Run `goilerplate update`.
 
 ## v3.0.2
 
 September 4, 2026
 
-### Free picks Datastar too
+**In short:** Free projects can pick Datastar, as promised.
 
-- `goilerplate new --framework datastar` rejected Free with `Free uses SQLite, SMTP, htmx, and no paid modules`. Free has included Datastar 1.0 since September 1, the CLI still carried the August rule.
-- The interactive `goilerplate new` wizard skipped the frontend question for Free and always generated htmx. It now asks.
+### Fixed
+- **`goilerplate new --framework datastar`** no longer rejects Free with `Free uses SQLite, SMTP, htmx, and no paid modules`. Free has included Datastar 1.0 since September 1; the CLI still carried the August rule.
+- **The wizard** asks for the frontend for Free too, instead of always generating htmx.
 - Reported and fixed by Tom Siouan in the first community pull request. Thank you.
+
+### Upgrade
+`go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest`.
 
 ## v3.0.1
 
 September 4, 2026
 
-### Doctor checks the .env you actually have
+**In short:** `goilerplate doctor` checks the `.env` you actually have.
 
-- `goilerplate doctor` failed every fresh v3 project with `missing required values: APP_NAME`. Since v3.0.0 the project name lives in `internal/brand`, so the generator never writes that key. Doctor now requires exactly the keys your selected stack ships in `.env.example`.
-- If you added `APP_NAME` to `.env` to get past the check, remove it. Nothing reads it.
+### Fixed
+- **`goilerplate doctor`** no longer fails every fresh v3 project with `missing required values: APP_NAME`. Since v3.0.0 the project name lives in `internal/brand`; doctor now requires exactly the keys your stack ships in `.env.example`.
 - Reported by an Early Access developer within hours of launch. Thank you.
+
+### Upgrade
+`go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest`. If you added `APP_NAME` to `.env` to get past the check, remove it; nothing reads it.
 
 ## v3.0.0
 
 September 3, 2026
 
-### The stack you would choose. The code you would write. Generated.
+**In short:** goilerplate v3 is a generator. Pick the stack, run one command, get a clean Go repository with the hard parts already connected and none of the code you left out.
 
-goilerplate v3 is a generator now.
+### New
+- **The generator**: start in the web configurator or run `goilerplate new`. Choose htmx 4 or Datastar 1, SQLite or PostgreSQL, Stripe or Polar, SMTP or Resend, and add Workspaces, OAuth, S3-compatible storage, a Markdown blog and Markdown docs only when you need them.
+- **Only what you chose**: unselected modules, dependencies, environment variables and tests stay out, and every project starts with one tailored `001_initial_schema.sql`.
+- **Production foundations, already wired**: passwords, magic links, verification, recovery, OAuth, revocable sessions, workspaces, roles, invitations, tenant isolation, billing, audit history, storage, content, SEO, legal pages, admin, analytics hooks, structured logs, Sentry, health checks, graceful shutdown, CSRF, security headers, rate limits, validation, selection-aware tests and GitHub Actions CI. shadcn-templ components are vendored: open the file and change it.
+- **Updates that stay in Git**: `goilerplate update` regenerates your exact configuration on its own branch, so every change is visible before it reaches your code. `goilerplate.lock` records the template version and the stack.
+- **Ready for coding agents**: `AGENTS.md`, `llms.txt` and Markdown docs from the first prompt.
+- **Free is real**: $0 forever with unlimited local projects: Go, templ, Tailwind CSS, shadcn-templ, htmx 4 or Datastar 1, SQLite, SMTP, authentication, security defaults, tests and CI.
 
-This is the first public release of the goilerplate CLI. It ships the v3 product generation.
+### Changed
+- **Earlier customers are already in**: every goilerplate v1, v2 and templUI Pro license is a Paid v3 license with lifetime updates. No new purchase, no renewal.
 
-Pick the stack. Run one command. Get a clean Go repository with the hard parts already connected and none of the code you left out.
-
-No framework hiding underneath. No remote editor. No cleanup week before the first feature. Your code, from line one.
-
-### Generator
-
-- Start in the web configurator or run `goilerplate new` in the terminal.
-- Choose htmx 4 or Datastar 1, SQLite or PostgreSQL, Stripe or Polar, SMTP or Resend.
-- Add Workspaces, OAuth, S3-compatible storage, a Markdown blog, and Markdown documentation only when you need them.
-- Every choice changes the repository. Unselected modules, dependencies, environment variables, and tests stay out.
-- Every project starts with one tailored `001_initial_schema.sql` containing exactly its selected schema.
-
-One command. One stack. One repository that already makes sense.
-
-### Production foundations, already wired
-
-- Passwords, magic links, verification, recovery, OAuth, and revocable sessions.
-- Workspaces, roles, invitations, tenant isolation, billing, and audit history.
-- Stripe or Polar behind one local subscription and access model.
-- S3-compatible storage, Markdown content, SEO, sitemap, and legal foundations.
-- Admin operations, analytics hooks, structured logs, Sentry, health checks, and graceful shutdown.
-- CSRF protection, security headers, rate limits, validation, and database constraints.
-- Selection-aware tests, race detection, dependency verification, build, vet, and GitHub Actions CI.
-- Vendored shadcn-templ components. Open the file and change it.
-
-This is application code, not a dependency graph disguised as a product.
-
-### Updates that stay in Git
-
-`goilerplate new` creates the project. `goilerplate update` keeps it current.
-
-- Updates regenerate your exact configuration and open their own Git branch.
-- Every change is visible before it reaches your code.
-- Your modifications remain ordinary Git history.
-- `goilerplate.lock` records the template version and selected stack.
-- `AGENTS.md`, `llms.txt`, and Markdown docs make the repository legible to developers and coding agents from the first prompt.
-
-Future releases, without giving the repository back.
-
-### Free is real
-
-Free is $0 forever with unlimited local projects.
-
-It includes Go, templ, Tailwind CSS, shadcn-templ, htmx 4 or Datastar 1, SQLite, SMTP, authentication, security defaults, tests, and CI.
-
-Generate it. Run it. Read every file.
-
-### v1, v2, and templUI Pro customers are already in
-
-Every goilerplate v1, goilerplate v2, and templUI Pro license is already a Paid v3 license with lifetime updates.
-
-No new purchase. No renewal. Your v3 access is already active.
-
-The legacy repository stays archived and read-only with its complete releases and tags.
+### Upgrade
+Install the CLI: `go install github.com/axadrn/goilerplate/v3/cmd/goilerplate@latest`, then `goilerplate new`. The legacy repository stays archived and read-only with its releases and tags.
 
 ## v2.3.0
 
 August 15, 2026
 
-### The backend release
+**In short:** goilerplate focuses on the Go SaaS backend stack.
 
-goilerplate now focuses on what it does best: the Go SaaS backend stack.
+### Changed
+- **The stack lives at the repository root**, not in `boilerplate/`. This breaks your next `git pull upstream main`; see the release for the steps.
+- **templ v0.3.1020**, so fresh setups no longer crash on the first `task dev`.
 
-- The stack now ships at the repository root. It previously lived in `boilerplate/`. This is a breaking change for your next `git pull upstream main`. See the release notes for migration steps.
-- Premium blocks and the website login are no longer part of the product. Nothing is revoked. `v2.2.0` and every earlier release still include all 222 blocks. They remain in the repository history and your fork.
-- For open-source UI blocks, see [shadcn-templ.com](https://shadcn-templ.com/?ref=goilerplate-changelog).
-- Bumped templ to v0.3.1020 so fresh setups no longer crash on the first `task dev`.
+### Removed
+- **Premium blocks and the website login.** Nothing is revoked: `v2.2.0` and every earlier release still include all 222 blocks, in the history and your fork. Open-source blocks are on [shadcn-templ.com](https://shadcn-templ.com/?ref=goilerplate-changelog).
+
+### Upgrade
+Pull the release into your fork: `git pull upstream main`, then move your code from `boilerplate/` to the root.
 
 ## v2.2.0
 
 June 1, 2026
 
-### Logs you can actually read
+**In short:** Logs you can actually read: pretty and colored in development, structured JSON in production, set from `.env`.
 
-Logging is now configurable from `.env`. Pretty and colored in development. Structured JSON in production. No code changes.
+### New
+- **Colored console logs** in development; color drops off when output is not a terminal.
+- **`LOG_LEVEL`**, separate from `APP_ENV`: more detail without development mode. Empty means debug in development and info in production.
+- **`LOG_FORMAT`**, `pretty` or `json`, for tools that scrape stdout. Defaults to pretty.
+- **`LOG_HTTP`** turns request logs off, for when your proxy already logs them.
 
-- Colored, human-readable console logs in development. Color drops off automatically when output is not a terminal.
-- `LOG_LEVEL` is now separate from `APP_ENV`. Turn up verbosity without switching to development mode. An empty value defaults to debug in development. Production defaults to info.
-- `LOG_FORMAT` (pretty or json) lets you switch to structured JSON when a tool scrapes your stdout. Defaults to pretty.
-- `LOG_HTTP` toggles HTTP request logging on or off, handy when your reverse proxy already logs requests.
-- Sentry stays a separate format-independent handler. Pretty console logs and Sentry reporting run side by side.
-- Static asset requests are always skipped. This includes `/assets`, `/templui`, `/uploads`, and the favicon. They never bury real traffic.
-- Updated the default UI stack to templUI v1.12.0.
+### Changed
+- **Sentry** is a separate handler, so pretty console logs and Sentry run side by side.
+- **Static assets are never logged**: `/assets`, `/templui`, `/uploads` and the favicon.
+- **templUI v1.12.0.**
+
+### Upgrade
+`git pull upstream main`.
 
 ## v2.1.0
 
 May 29, 2026
 
-### AI-ready out of the box
+**In short:** AI-ready out of the box: open the boilerplate in your coding tool and it knows its way around from minute one.
 
-Open the boilerplate in your coding tool. The project map gets it productive from minute one.
+### New
+- **`boilerplate/AGENTS.md`**: a lean project map for coding tools: the stack, the layers, the path for a new feature, goose migrations, configuration and the important code locations. It links to source instead of duplicating it.
+- **An `AGENTS.md` for the block library**, so agents know the 222+ blocks too.
+- **The developer docs ship inside the boilerplate**, for you and your agent, offline.
+- **Custom rules**: `AGENTS.md` starts with a block for your conventions, which updates keep through a normal Git merge. Works with any LLM.
 
-- New `boilerplate/AGENTS.md`. A lean project map for coding tools. It explains the stack and layered architecture. It shows the path for a new feature. It covers goose migrations, configuration, and the important code locations. It links to source instead of duplicating it.
-- A second AGENTS.md ships with the block library, so agents know how to use the 222+ blocks too.
-- The full developer docs now ship inside the boilerplate, so your agent (and you) have them offline.
-- AGENTS.md starts with a custom rules block. Add your conventions once. Future updates keep them through a normal Git merge.
-- Works with any LLM. No tool lock-in.
+### Upgrade
+`git pull upstream main`.
 
 ## v2.0.0
 
 May 22, 2026
 
-### goilerplate, unified
+**In short:** templUI Pro and goilerplate are one product now, called goilerplate.
 
-templUI Pro and goilerplate are now one product. The product is goilerplate.
+### New
+- **Everything in one**: the Go and templ boilerplate with auth, billing and dashboards, plus 222+ premium blocks in 33 categories. One license, one repository, lifetime updates.
 
-- The full Go + templ boilerplate. Auth. Billing. Dashboards. Ready to deploy.
-- 222+ premium blocks across 33 categories
-- One license. One repository. Lifetime updates on everything that ships next.
-
-No action needed. License terms unchanged.
+### Upgrade
+Nothing to do. License terms are unchanged.
 
 ## v1.9.0
 
 May 4, 2026
 
-- Stripe Managed Payments is now enabled when you select Stripe. Stripe acts as Merchant of Record. It handles VAT, GST, and US sales tax in supported countries. No extra environment flag is required.
-- To activate, accept the Managed Payments Terms of Service in your Stripe Dashboard and assign a digital-product tax code to each Stripe product.
-- Upgraded the bundled stripe-go SDK from v81 to v85.
-- Stripe Managed Payments supports digital products. This includes SaaS, software, courses, e-books, and electronically delivered services. Polar remains the default provider.
+**In short:** Stripe Managed Payments: Stripe is the merchant of record and handles VAT, GST and US sales tax.
+
+### New
+- **Stripe Managed Payments** is on when you select Stripe, in the countries Stripe supports, for digital products: SaaS, software, courses, e-books and electronically delivered services. No extra environment flag.
+
+### Changed
+- **stripe-go v85**, up from v81. Polar stays the default provider.
+
+### Upgrade
+`git pull upstream main`, then accept the Managed Payments terms in your Stripe Dashboard and give each Stripe product a digital-product tax code.
 
 ## v1.8.0
 
 May 4, 2026
 
-- Storage now uses one S3-compatible provider in development and production. One configuration gives real parity. Cloudflare R2 is recommended. Any S3-compatible service works.
-- Removed bundled MinIO and the dev docker-compose.yml. Default setup (SQLite plus cloud S3) no longer requires Docker.
-- Simpler .env.example storage block and shorter dev task flow.
-- Rewrote the storage guide as a short cloud quickstart.
+**In short:** One S3-compatible storage for development and production, and no Docker for the default setup.
+
+### Changed
+- **One storage provider** in development and production, for real parity. Cloudflare R2 is recommended; any S3-compatible service works.
+- **A simpler storage block** in `.env.example`, a shorter dev task flow and a short cloud quickstart.
+
+### Removed
+- **Bundled MinIO and the dev `docker-compose.yml`**: SQLite plus cloud S3 needs no Docker.
+
+### Upgrade
+`git pull upstream main`, then set your S3 storage in `.env`.
 
 ## v1.7.3
 
 April 15, 2026
 
-- Fixed CSS asset cache-busting so static files are properly cached by Cloudflare and browsers between deploys.
+**In short:** CSS stays cached between deploys.
+
+### Fixed
+- **Cache-busting for CSS**: Cloudflare and browsers cache static files properly between deploys.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.7.2
 
 April 1, 2026
 
-- Updated the default UI stack to templUI v1.9.3.
-- Fixed the goals flow dialogs to work with the latest templUI dialog system.
+**In short:** templUI v1.9.3 and the goals dialogs work again.
+
+### Changed
+- **templUI v1.9.3.**
+
+### Fixed
+- **Goals flow dialogs** work with the latest templUI dialog system.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.7.1
 
 March 18, 2026
 
-- Added a right-side table of contents to docs pages for faster scanning and one-click in-page navigation.
-- Updated the default UI stack to templUI v1.9.0.
+**In short:** A table of contents on docs pages.
+
+### New
+- **Table of contents** on the right of docs pages, for faster scanning and one-click in-page navigation.
+
+### Changed
+- **templUI v1.9.0.**
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.7.0
 
 March 15, 2026
 
-- Updated goilerplate to the templUI v1.8 import workflow, so shared component scripts and assets work without vendored local templUI files.
-- Improved the goilerplate Docker and dev build pipeline so Tailwind picks up imported templUI components correctly out of the box.
+**In short:** The templUI v1.8 import workflow, without vendored templUI files.
+
+### Changed
+- **templUI v1.8 imports**: shared component scripts and assets work without vendored local templUI files.
+- **The Docker and dev build** let Tailwind pick up imported templUI components out of the box.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.6.9
 
 February 16, 2026
 
-- New public changelog page in docs so users can track updates from a dedicated route.
-- Refined UI component stack with templUI v1.5.0 updates for more consistent interactive component behavior.
-- Fixed frontend asset wiring (favicon and avatar script loading) for more reliable default UX.
+**In short:** A public changelog page in the docs.
+
+### New
+- **Changelog page** in the docs, on its own route.
+
+### Changed
+- **templUI v1.5.0**, for more consistent interactive components.
+
+### Fixed
+- **Favicon and avatar scripts** load reliably.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.6.8
 
 February 10, 2026
 
-- Faster frontend feedback loop: CSS/JS changes show up immediately during development.
-- Smoother day-to-day editing with no restart friction.
+**In short:** CSS and JS changes show up right away in development.
+
+### Changed
+- **A faster frontend loop**: CSS and JS changes show immediately, with no restart.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.6.7
 
 February 5, 2026
 
-- Updated to templUI v1.4.0 for improved UI/component quality.
-- Cleaner default link behavior for safer output.
+**In short:** templUI v1.4.0 and safer links.
+
+### Changed
+- **templUI v1.4.0**, for better UI components.
+- **Safer default link behavior.**
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.6.6
 
 January 12, 2026
 
-- Improved CSP coverage for Umami Cloud setups to avoid analytics breakage in production.
+**In short:** Umami Cloud no longer breaks in production.
+
+### Fixed
+- **CSP for Umami Cloud**, so analytics keep working in production.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.6.5
 
 January 11, 2026
 
-- Clearer commercial license wording for teams and client work.
+**In short:** Clearer license wording for teams and client work.
+
+### Changed
+- **Commercial license wording** for teams and client work.
+
+### Upgrade
+Nothing to do.
 
 ## v1.6.4
 
 January 6, 2026
 
-- Updated base UI stack to templUI v1.1.0.
+**In short:** templUI v1.1.0.
+
+### Changed
+- **templUI v1.1.0.**
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.6.3
 
 December 24, 2025
 
-- Updated templUI tooling for smoother project generation and upgrades.
+**In short:** Smoother templUI tooling.
+
+### Changed
+- **templUI tooling**, for smoother project generation and upgrades.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.6.2
 
 December 10, 2025
 
-- More reliable startup when S3/MinIO is slow to become available.
-- Better local and production stability around object storage.
+**In short:** Starts reliably when storage is slow.
+
+### Fixed
+- **Startup** waits when S3 or MinIO is slow to become available, in development and production.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.6.1
 
 December 10, 2025
 
-- Correct client IP handling behind Cloudflare/nginx/proxies for more accurate logs and security checks.
+**In short:** The right client IP behind proxies.
+
+### Fixed
+- **Client IPs behind Cloudflare, nginx and other proxies**, for accurate logs and security checks.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.6.0
 
 December 9, 2025
 
-- Automatic S3 bucket creation on startup.
-- Security hardening for Umami Cloud CSP requirements.
+**In short:** The S3 bucket is created on startup.
+
+### New
+- **Automatic S3 bucket creation** on startup.
+
+### Fixed
+- **CSP for Umami Cloud.**
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.5.1
 
 December 8, 2025
 
-- Fixed anchor navigation so landing-page section links work consistently from all pages.
+**In short:** Landing page section links work from every page.
+
+### Fixed
+- **Anchor links** to landing page sections work from all pages.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.5.0
 
 December 4, 2025
 
-- Added Umami as the default analytics provider.
-- Stronger privacy-first analytics defaults for modern SaaS products.
+**In short:** Umami is the default analytics, privacy first.
+
+### New
+- **Umami** as the default analytics provider, with privacy-first defaults.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.4.0
 
 December 1, 2025
 
-- Better GDPR-related analytics guidance and defaults.
-- Improved GA CSP handling for regional domains.
+**In short:** Better GDPR guidance for analytics.
+
+### Changed
+- **GDPR guidance and defaults** for analytics.
+
+### Fixed
+- **Google Analytics CSP** for regional domains.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.3.0
 
 November 18, 2025
 
-- Faster local iteration with an improved dev workflow.
-- Easier onboarding commands for new projects.
+**In short:** A faster dev workflow and easier first commands.
+
+### Changed
+- **Faster local iteration** and easier onboarding commands for new projects.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.2.3
 
 November 14, 2025
 
-- Sharper license/readme wording for faster project setup.
-- Fixed `.env.example` payment provider typo.
+**In short:** Clearer setup docs and a fixed typo.
+
+### Changed
+- **License and README wording**, for faster setup.
+
+### Fixed
+- **A payment provider typo** in `.env.example`.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.2.2
 
 November 10, 2025
 
-- Upgraded to Go 1.25.
-- Simplified first-run setup experience.
+**In short:** Go 1.25 and a simpler first run.
+
+### Changed
+- **Go 1.25.**
+- **A simpler first-run setup.**
+
+### Upgrade
+Install Go 1.25, then `git pull upstream main`.
 
 ## v1.2.1
 
 November 10, 2025
 
-- Maintenance release for delivery reliability. No customer-facing feature changes.
+**In short:** A maintenance release, nothing changes for you.
+
+### Upgrade
+Nothing to do.
 
 ## v1.2.0
 
 November 10, 2025
 
-- More consistent local setup via modern Go tooling conventions.
-- Better out-of-the-box developer experience.
+**In short:** A more consistent local setup with modern Go tooling.
+
+### Changed
+- **Modern Go tooling conventions** for the local setup.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.1.1
 
 November 9, 2025
 
-- Improved auth/settings form UX with cleaner dialog and form behavior.
+**In short:** Cleaner auth and settings forms.
+
+### Fixed
+- **Auth and settings forms**: cleaner dialogs and form behavior.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.1.0
 
 November 9, 2025
 
-- Added Stripe as an alternative billing provider (Polar remains default).
-- Easier provider switching with a strategy-based payment architecture.
+**In short:** Stripe as a second billing provider.
+
+### New
+- **Stripe** as an alternative to Polar, which stays the default. One payment interface makes switching easy.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.0.5
 
 November 8, 2025
 
-- Added cache busting for fresher frontend assets.
-- Small branding and mobile navigation polish.
+**In short:** Fresher assets after every deploy.
+
+### New
+- **Cache busting** for frontend assets.
+
+### Changed
+- **Branding and mobile navigation polish.**
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.0.4
 
 November 10, 2025
 
-- UI polish release with fresher styles and trust-oriented branding touches.
+**In short:** A UI polish release.
+
+### Changed
+- **Fresher styles** and trust-oriented branding.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.0.3
 
 November 10, 2025
 
-- Major auth hardening with stricter validation and stronger password rules.
-- Improved inline auth UX across core flows.
+**In short:** Stronger auth.
+
+### Changed
+- **Auth hardening**: stricter validation and stronger password rules.
+- **Inline auth feedback** across the core flows.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.0.2
 
 November 10, 2025
 
-- Fixed documentation/footer links for more reliable navigation.
+**In short:** Docs and footer links work.
+
+### Fixed
+- **Documentation and footer links.**
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.0.1
 
 November 10, 2025
 
-- Better quick-start onboarding guidance.
-- Early frontend style/performance optimization pass.
+**In short:** A better quick start.
+
+### Changed
+- **Quick-start guidance** and a first frontend performance pass.
+
+### Upgrade
+`git pull upstream main`.
 
 ## v1.0
 
 October 29, 2025
 
-- Initial goilerplate launch as a production-ready Go SaaS foundation.
-- Included auth. Magic links. Passwords. OAuth. Polar billing. Docs and blog. Email. File storage. Legal pages.
-- Shipped with core security defaults plus Docker/PostgreSQL support.
+**In short:** goilerplate launches: a production-ready Go SaaS foundation.
+
+### New
+- **Auth**: magic links, passwords and OAuth.
+- **Billing** with Polar.
+- **Docs, blog, email, file storage and legal pages.**
+- **Security defaults**, Docker and PostgreSQL.
+
+### Upgrade
+Clone the repository and follow the README.
 
 <details>
 <summary>templUI Pro archive</summary>
