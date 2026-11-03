@@ -92,7 +92,7 @@
   /* ops design tokens. DESIGN.md explains them; the TUI and the CLI use the
      same brand and status colors (ops/internal/style). */
   --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
-  /* Headlines and big numbers: Geist, heavy and tight (.font-display). */
+  /* Headlines and big numbers: Geist, semibold and tight (.font-display). */
   --font-heading: "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-mono:
     "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
@@ -193,8 +193,8 @@
 
 @utility font-display {
   font-family: var(--font-heading);
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-weight: 600;
+  letter-spacing: -0.04em;
 }
 
 @layer base {
