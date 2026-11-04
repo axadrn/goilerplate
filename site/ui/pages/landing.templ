@@ -9,8 +9,6 @@ import (
 	"github.com/axadrn/goilerplate/v4/site/ui/components/badge"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/button"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/card"
-	"github.com/axadrn/goilerplate/v4/site/ui/components/checkbox"
-	"github.com/axadrn/goilerplate/v4/site/ui/components/field"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/separator"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/tabs"
@@ -42,28 +40,24 @@ const (
 	homeLead    = "text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9"
 )
 
-// homeCommand is the goilerplate new command of the stack the hero picker
-// starts with. configurator.js builds the same string when it changes.
-const homeCommand = "goilerplate new --name Acme --module example.com/acme --framework htmx --database sqlite --payment stripe --mail smtp ./acme"
-
-// Landing sells the kit: pick a stack, see what is done, see the code, see
+// Landing sells the kit: what it is, what is done, the stack, the code,
 // the proof, start.
 templ Landing() {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "The Go SaaS starter kit, free and open source",
-		Description: "Pick htmx, Datastar or SvelteKit, SQLite or PostgreSQL, Stripe or Polar. Get a Go SaaS with login, billing, emails, teams and admin already built and tested. Free and open source.",
+		Description: "A Go SaaS with login, billing, emails, teams and admin already built and tested. Pick htmx, Datastar or SvelteKit, SQLite or PostgreSQL, Stripe or Polar. Free and open source.",
 		Path:        "/",
 	}) {
 		<main>
 			@homeHero()
 			@homeDone()
+			@homeStack()
 			@homeRepo()
 			@homeAgents()
 			@homeProof()
 			@homeFAQ()
 			@homeStart()
 		</main>
-		<script src="/assets/js/configurator.js" defer></script>
 		@homeScript()
 	}
 }
@@ -77,131 +71,34 @@ templ homePrimary(class string) {
 }
 
 // ---------------------------------------------------------------- hero
-// homeHero is the pitch on the left and the stack picker on the right.
+// homeHero says what goilerplate is, in one headline, one line, one
+// command and one button.
 templ homeHero() {
-	<section class="pt-14 sm:pt-24">
-		<div class={ homeWrap, "grid grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-16" }>
-			<div>
-				<p class="text-sm font-medium text-muted-foreground">The Go SaaS starter kit</p>
-				<h1 class={ typeH1, "mt-5" }>
-					<span class="block">Pick your stack.</span>
-					<span class="block text-muted-foreground">Skip to the product.</span>
-				</h1>
-				<p class={ typeLead, "mt-7 max-w-[34rem] sm:mt-9 sm:text-xl sm:leading-9" }>
-					One command gives you a Go SaaS with login, billing, emails, teams and an admin panel. Already built, already tested. Tonight you write the part that is yours.
-				</p>
-				<ul class="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-base font-medium">
-					@heroProof("Free and open source")
-					@heroProof("No account")
-					@heroProof("Every line yours")
-				</ul>
-				<div class="mt-9 flex flex-col gap-3 sm:flex-row">
-					@homePrimary("")
-					@button.Button(button.Props{Href: "#code", Variant: button.VariantSecondary, Size: button.SizeLg}) {
-						See the code
-					}
-				</div>
+	<section class="pt-20 sm:pt-32">
+		<div class={ homeWrap, "flex flex-col items-center text-center" }>
+			<h1 class={ typeH1, "max-w-[16ch]" }>Your Go SaaS, already built.</h1>
+			<p class={ typeLead, "mt-7 max-w-[36rem] sm:mt-8 sm:text-xl sm:leading-9" }>
+				Login, billing, emails, teams and admin, tested and ready. Free and open source.
+			</p>
+			<div class="mt-10 flex w-full max-w-2xl flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+				@homeInstall("min-w-0 flex-1")
+				@homePrimary("")
 			</div>
-			@homePicker()
 		</div>
 	</section>
 }
 
-// heroProof is one promise under the hero, with a check.
-templ heroProof(text string) {
-	<li class="inline-flex items-center gap-2">
-		<span class="flex size-5 items-center justify-center rounded-full bg-live text-background">
-			@icon.Check(icon.Props{Class: "size-3 stroke-3"})
-		</span>
-		{ text }
-	</li>
-}
-
-type pickOption struct {
-	Value, Label, Note string
-}
-
-// homePicker is the stack picker: one row of tabs per choice, a workspaces
-// switch, and the command it writes. homeScript rebuilds the command with
-// configurator.js, the same code as the stack builder.
-templ homePicker() {
-	<div id="home-picker" class="min-w-0 overflow-hidden rounded-4xl bg-card" data-copy-root>
-		<div class="grid gap-6 p-6 sm:p-8">
-			<div class="flex items-center justify-between gap-4">
-				<p class={ typeH3 }>Your stack</p>
-				<a href="/new" class="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Every option</a>
-			</div>
-			@pickAxis("framework", "Frontend", []pickOption{
-				{"htmx", "htmx", "Server rendered pages with templ and htmx 4.0."},
-				{"datastar", "Datastar", "Server rendered pages with templ and Datastar 1.0."},
-				{"svelte", "SvelteKit", "A SvelteKit app on the JSON API, served by the Go binary."},
-			})
-			@pickAxis("database", "Database", []pickOption{
-				{"sqlite", "SQLite", "One file next to your app. Nothing else to run."},
-				{"postgres", "PostgreSQL", "For when you already run PostgreSQL."},
-			})
-			@pickAxis("payment", "Payments", []pickOption{
-				{"stripe", "Stripe", "Checkout, subscriptions and the customer portal."},
-				{"polar", "Polar", "A merchant of record that handles sales tax for you."},
-			})
-			@pickAxis("mail", "Email", []pickOption{
-				{"smtp", "SMTP", "Any mail server you already have."},
-				{"resend", "Resend", "Send through the Resend API."},
-			})
-			@field.Label(field.LabelProps{For: "home-workspaces"}) {
-				@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-					@checkbox.Checkbox(checkbox.Props{ID: "home-workspaces", Name: "workspaces"})
-					@field.Content() {
-						@field.Title() {
-							Workspaces
-						}
-						@field.Description() {
-							Teams with roles, invitations, seats and billing per workspace.
-						}
-					}
-				}
-			}
-		</div>
-		<div class="bg-terminal text-terminal-foreground">
-			<div class="flex items-center gap-2 border-b border-terminal-foreground/10 py-2 pr-2 pl-5 sm:pl-6">
-				<span class="text-xs text-terminal-foreground/50">macOS · Linux · WSL</span>
-				@copyButton("Copy commands")
-			</div>
-			<div class="ops-term px-5 py-5 text-sm leading-[1.75] text-terminal-foreground sm:px-6">
-				<p class="break-words whitespace-pre-wrap"><span class="text-terminal-foreground/45">$ </span><span data-copy-text>{ brand.Install }</span></p>
-				<p class="mt-3 break-words whitespace-pre-wrap"><span class="text-terminal-foreground/45">$ </span><span data-copy-text data-pick-command>{ homeCommand }</span></p>
-				<p class="text-live">✓ Created Acme in ./acme</p>
-				<p class="mt-3"><span class="text-terminal-foreground/45">$ </span>cd acme && task dev</p>
-			</div>
-		</div>
+// homeInstall is the install command with a copy button.
+templ homeInstall(class string) {
+	<div class={ homeCode, "flex items-center gap-2 py-1.5 pr-1.5 pl-5 text-left", class } data-copy-root>
+		<p class="min-w-0 flex-1 truncate"><span class="text-terminal-foreground/45">$ </span><span data-copy-text>{ brand.Install }</span></p>
+		@copyButton("Copy")
 	</div>
 }
 
-// pickAxis is one choice of the picker: a label, the options as tabs, and
-// a line on the option that is picked.
-templ pickAxis(axis, label string, options []pickOption) {
-	@tabs.Tabs(tabs.Props{DefaultValue: options[0].Value, Class: "gap-1.5", Attributes: templ.Attributes{"data-pick": axis}}) {
-		<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-			<p class="text-sm font-medium">{ label }</p>
-			@tabs.List(tabs.ListProps{Attributes: templ.Attributes{"aria-label": label}}) {
-				for _, option := range options {
-					@tabs.Trigger(tabs.TriggerProps{Value: option.Value}) {
-						{ option.Label }
-					}
-				}
-			}
-		</div>
-		for _, option := range options {
-			@tabs.Content(tabs.ContentProps{Value: option.Value, Class: "text-sm leading-6 text-muted-foreground"}) {
-				{ option.Note }
-			}
-		}
-	}
-}
-
-// copyButton copies every data-copy-text of its data-copy-root, one per line.
+// copyButton copies the data-copy-text of its data-copy-root.
 templ copyButton(label string) {
-	@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeSm, Class: "ml-auto shrink-0 gap-2 font-sans text-terminal-foreground/70 hover:bg-terminal-foreground/10 hover:text-terminal-foreground dark:hover:bg-terminal-foreground/10 dark:hover:text-terminal-foreground", Attributes: templ.Attributes{"data-copy": true}}) {
+	@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeSm, Class: "ml-auto shrink-0 gap-2 font-sans text-terminal-foreground/70 hover:bg-terminal-foreground/10 hover:text-terminal-foreground dark:hover:bg-terminal-foreground/10 dark:hover:text-terminal-foreground", Attributes: templ.Attributes{"data-copy": true, "aria-label": "Copy the install command"}}) {
 		<span data-copy-icon>
 			@icon.Copy(icon.Props{Class: "size-4"})
 		</span>
@@ -217,11 +114,10 @@ templ homeScript() {
 		document.addEventListener("click", async (event) => {
 			const button = event.target.closest("[data-copy]");
 			if (!button) return;
-			const root = button.closest("[data-copy-root]");
-			if (!root) return;
-			const text = [...root.querySelectorAll("[data-copy-text]")].map((el) => el.textContent.trim()).join("\n");
+			const text = button.closest("[data-copy-root]")?.querySelector("[data-copy-text]");
+			if (!text) return;
 			try {
-				await navigator.clipboard.writeText(text);
+				await navigator.clipboard.writeText(text.textContent.trim());
 				button.querySelector("[data-copy-icon]").classList.add("hidden");
 				button.querySelector("[data-copy-check]").classList.remove("hidden");
 				setTimeout(() => {
@@ -230,33 +126,45 @@ templ homeScript() {
 				}, 1600);
 			} catch {}
 		});
-
-		(() => {
-			const picker = document.getElementById("home-picker");
-			if (!picker) return;
-			const command = picker.querySelector("[data-pick-command]");
-			const state = {
-				name: "Acme", module: "example.com/acme", destination: "./acme",
-				framework: "htmx", database: "sqlite", payment: "stripe", mail: "smtp",
-				api: false, mcp: false, workspaces: false, oauth: [], storage: false, content: [],
-			};
-			const render = () => {
-				const builder = window.GoilerplateConfigurator;
-				if (builder) command.textContent = builder.buildCommand(state);
-			};
-			picker.addEventListener("tabs-value-change", (event) => {
-				const axis = event.target.closest("[data-pick]")?.dataset.pick;
-				if (!axis) return;
-				state[axis] = event.detail.value;
-				render();
-			});
-			picker.addEventListener("change", (event) => {
-				if (event.target.id !== "home-workspaces") return;
-				state.workspaces = event.target.checked;
-				render();
-			});
-		})();
 	</script>
+}
+
+// ---------------------------------------------------------------- stack
+// homeStack is the choice of stack, small: what you can pick, and the way
+// to the builder.
+templ homeStack() {
+	<section id="stack" class={ homeAnchor, "mt-3" }>
+		<div class={ homeWrap }>
+			@card.Card(card.Props{Class: utils.CN(homeSurface, "grid grid-cols-1 gap-8 p-7 sm:p-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-16")}) {
+				<div>
+					<h3 class={ typeH3 }>Your stack, your choice.</h3>
+					<p class={ typeText, "mt-2 max-w-sm" }>
+						What you leave out never lands in your repo.
+						<a href="/new" class={ homeLink }>Open the stack builder</a>
+					</p>
+				</div>
+				<dl class="grid gap-4 self-center">
+					@homeChoice("Frontend", []string{"htmx", "Datastar", "SvelteKit", "Headless"})
+					@homeChoice("Database", []string{"SQLite", "PostgreSQL"})
+					@homeChoice("Payments", []string{"Stripe", "Polar"})
+					@homeChoice("Email", []string{"SMTP", "Resend"})
+				</dl>
+			}
+		</div>
+	</section>
+}
+
+templ homeChoice(label string, options []string) {
+	<div class="grid gap-2 sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:items-center">
+		<dt class="text-sm text-muted-foreground">{ label }</dt>
+		<dd class="flex flex-wrap gap-2">
+			for _, option := range options {
+				@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "h-auto rounded-full px-3 py-1 text-sm font-medium"}) {
+					{ option }
+				}
+			}
+		</dd>
+	</div>
 }
 
 // ---------------------------------------------------------------- done
@@ -588,10 +496,7 @@ templ homeStart() {
 		<div class={ homeWrap, "flex flex-col items-center text-center" }>
 			<h2 class={ typeH2, "max-w-[18ch]" }>Someone will ship your idea. Make it you.</h2>
 			<p class={ typeLead, "mt-6 max-w-xl" }>Install the CLI, pick your stack, and start on the part only you can build.</p>
-			<div class={ homeCode, "mt-10 flex w-full max-w-2xl items-center gap-2 py-2 pr-2 pl-5 text-left" } data-copy-root>
-				<p class="min-w-0 flex-1 truncate"><span class="text-terminal-foreground/45">$ </span><span data-copy-text>{ brand.Install }</span></p>
-				@copyButton("Copy")
-			</div>
+			@homeInstall("mt-10 w-full max-w-2xl")
 			<div class="mt-8 flex flex-col gap-3 sm:flex-row">
 				@homePrimary("")
 				@button.Button(button.Props{Href: "/new", Variant: button.VariantSecondary, Size: button.SizeLg}) {

@@ -135,24 +135,3 @@ test("drops the MCP server without the JSON API", () => {
   state.mcp = true;
   assert.doesNotMatch(buildCommand(state), /--mcp/);
 });
-
-test("builds the command the home page picker starts with", () => {
-  assert.equal(
-    buildCommand({
-      name: "Acme",
-      module: "example.com/acme",
-      destination: "./acme",
-      framework: "htmx",
-      database: "sqlite",
-      payment: "stripe",
-      mail: "smtp",
-      api: false,
-      mcp: false,
-      workspaces: false,
-      oauth: [],
-      storage: false,
-      content: [],
-    }),
-    "goilerplate new --name Acme --module example.com/acme --framework htmx --database sqlite --payment stripe --mail smtp ./acme",
-  );
-});
