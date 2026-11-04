@@ -489,7 +489,7 @@
   }
 }
 
-/* ops docs look (Native, DESIGN.md). Overrides the shadcn defaults above. */
+/* moin docs look (Native, DESIGN.md). Overrides the shadcn defaults above. */
 @layer components {
   .typeset {
     --typeset-body: color-mix(in oklab, var(--foreground) 86%, transparent);

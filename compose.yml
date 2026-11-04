@@ -1,6 +1,6 @@
-# goilerplate.com, deployed by ops: every push to main goes live on prod-01.
-# https://ops.goilerplate.com/docs/guides/config
-x-ops:
+# goilerplate.com, deployed by moin: every push to main goes live on prod-01.
+# https://moin.run/docs/guides/config
+x-moin:
   app: goilerplate
   server: prod-01
   port: 8090

@@ -89,8 +89,8 @@
 }
 
 :root {
-  /* ops design tokens. DESIGN.md explains them; the TUI and the CLI use the
-     same brand and status colors (ops/internal/style). */
+  /* moin design tokens. DESIGN.md explains them; the TUI and the CLI use the
+     same brand and status colors (moin/internal/style). */
   --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
   /* Headlines and big numbers: Geist, semibold and tight (.font-display). */
   --font-heading: "Geist", ui-sans-serif, system-ui, sans-serif;

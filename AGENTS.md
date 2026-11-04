@@ -25,7 +25,7 @@ This repository is goilerplate, free and open source: the CLI, the generator wit
 - Keep commits attributed only to the human author. Do not add automation attribution.
 - Commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, with an optional scope like `feat(cli):`. A short first line, then a sentence or two of why when it helps.
 - Commits and pull requests carry no AI attribution: no `Co-Authored-By` for a tool, no "Generated with" line.
-- Release notes follow one format, the same in goilerplate, ops and shadcn-templ, so the eye finds things fast. The same text is the GitHub release (which `goilerplate changelog` shows) and the newest section of `CHANGELOG.md` (`## v…`, the date like `November 3, 2026`, then the notes), which `/changelog` shows:
+- Release notes follow one format, the same in goilerplate, moin and shadcn-templ, so the eye finds things fast. The same text is the GitHub release (which `goilerplate changelog` shows) and the newest section of `CHANGELOG.md` (`## v…`, the date like `November 3, 2026`, then the notes), which `/changelog` shows:
   - First line: `**In short:**` and one sentence, what is new and why to update.
   - Then these sections in this order, empty ones left out: `### New` (what you can do now), `### Changed` (what behaves differently, everything that could surprise), `### Fixed` (what was broken and works now), `### Removed` (what is gone, and what to use instead), `### Upgrade` (always there: how to update, the exact command).
   - One bullet per thing: `- **Name**: one sentence of what the user gets.` Commands in backticks. What the user sees, never internals or commit hashes.

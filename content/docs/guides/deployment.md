@@ -15,7 +15,7 @@ docker run --env-file .env -p 8090:8090 acme-app
 
 The image already contains the selected architecture and brand. Env supplies only deployment coordinates, external IDs, operator switches, and secrets. Use the generated `.env.example` as the exact checklist.
 
-Want it on your own server with HTTPS and SQLite backups in one command? [Deploy with ops](/docs/guides/deploy-with-ops).
+Want it on your own server with HTTPS and SQLite backups in one command? [Deploy with moin](/docs/guides/deploy-with-moin).
 
 ## Recommended shape
 

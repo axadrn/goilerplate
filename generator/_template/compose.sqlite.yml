@@ -1,4 +1,4 @@
-# The production container, for ops and docker compose. Develop with `task dev`.
+# The production container, for moin and docker compose. Develop with `task dev`.
 # ./data holds the SQLite database and outlives every new container.
 services:
   web:
@@ -6,7 +6,7 @@ services:
     volumes:
       - ./data:/app/data
 
-# ops reads this block. Docker ignores x- blocks.
-x-ops:
+# moin reads this block. Docker ignores x- blocks.
+x-moin:
   port: 8090
   health: /healthz

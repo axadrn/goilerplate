@@ -23,14 +23,14 @@ import (
 // GitHubURL is the open source repository of goilerplate.
 const GitHubURL = "https://github.com/" + githubstars.Repo
 
-// OpsURL is ops, which deploys and backs up the apps goilerplate makes.
-const OpsURL = "https://ops.goilerplate.com"
+// MoinURL is moin, which deploys and backs up the apps goilerplate makes.
+const MoinURL = "https://moin.run"
 
 // ShadcnTemplURL is the component library every page is built with.
 const ShadcnTemplURL = "https://shadcn-templ.com"
 
 // RefURL links another product of the same maker and tells it where on
-// goilerplate.com the link sits, such as RefURL(OpsURL, "footer").
+// goilerplate.com the link sits, such as RefURL(MoinURL, "footer").
 func RefURL(url, placement string) string {
 	return url + "/?ref=goilerplate-" + placement
 }

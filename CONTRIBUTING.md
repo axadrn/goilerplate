@@ -17,7 +17,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org):
 ```
 feat: a teams page in the starter
 fix(cli): keep the module path on update
-docs: how to deploy with ops
+docs: how to deploy with moin
 ```
 
 `feat`, `fix`, `docs`, `chore`, `refactor` or `test`, an optional scope, a short first line. Release notes list what is new, what is fixed and how to upgrade.

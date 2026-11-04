@@ -61,7 +61,7 @@ func Home(seo SEOProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = blocks.FloatingNews("ops-1", blocks.RefURL(blocks.OpsURL, "float"), "ops is out").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = blocks.FloatingNews("moin-1", blocks.RefURL(blocks.MoinURL, "float"), "moin: deploy anything, lose nothing").Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

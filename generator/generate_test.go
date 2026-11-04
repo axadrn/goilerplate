@@ -676,7 +676,7 @@ func TestGenerateOmitsUnselectedFeatures(t *testing.T) {
 		}
 	}
 	compose := string(tree["compose.yml"])
-	for _, required := range []string{"./data:/app/data", "x-ops:", "port: 8090", "health: /healthz"} {
+	for _, required := range []string{"./data:/app/data", "x-moin:", "port: 8090", "health: /healthz"} {
 		if !strings.Contains(compose, required) {
 			t.Errorf("SQLite compose.yml is missing %q", required)
 		}

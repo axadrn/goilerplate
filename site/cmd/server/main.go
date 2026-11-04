@@ -83,23 +83,26 @@ func healthcheck() int {
 
 // redirects sends the URLs of the paid site and moved docs somewhere useful.
 var redirects = map[string]string{
-	"/pricing":                     "/",
-	"/license":                     "/",
-	"/affiliates":                  "/",
-	"/legal/terms":                 "/legal/privacy",
-	"/ops":                         "https://ops.goilerplate.com",
-	"/blog":                        "/",
-	"/docs/introduction":           "/docs",
-	"/docs/introduction.md":        "/docs.md",
-	"/docs/guides/cli-accounts":    "/docs/installation",
-	"/docs/guides/cli-accounts.md": "/docs/installation.md",
+	"/pricing":                        "/",
+	"/license":                        "/",
+	"/affiliates":                     "/",
+	"/legal/terms":                    "/legal/privacy",
+	"/ops":                            "https://moin.run",
+	"/moin":                           "https://moin.run",
+	"/blog":                           "/",
+	"/docs/introduction":              "/docs",
+	"/docs/introduction.md":           "/docs.md",
+	"/docs/guides/cli-accounts":       "/docs/installation",
+	"/docs/guides/cli-accounts.md":    "/docs/installation.md",
+	"/docs/guides/deploy-with-ops":    "/docs/guides/deploy-with-moin",
+	"/docs/guides/deploy-with-ops.md": "/docs/guides/deploy-with-moin.md",
 }
 
 // prefixRedirects covers whole old sections.
 var prefixRedirects = []struct{ prefix, target string }{
 	{"/checkout/", "/"},
 	{"/blog/", "/"},
-	{"/ops/", "https://ops.goilerplate.com"},
+	{"/ops/", "https://moin.run"},
 }
 
 type site struct {
