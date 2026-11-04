@@ -37,24 +37,22 @@ var navItems = []navItem{
 	{"/changelog", "Changelog"},
 }
 
-// Navbar is the floating pill with the egg emblem, the main links, GitHub,
-// the theme and the way in.
+// Navbar is the floating pill: the emblem and name on the left, the main
+// links in the middle, GitHub, the theme and the way in on the right.
 templ Navbar() {
 	<header class="sticky top-0 z-50 px-3 pt-3 sm:px-6">
-		<nav class="mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-4 rounded-full border border-border bg-card/80 shadow-sm backdrop-blur-xl pr-2 pl-5 sm:h-16 sm:pl-7" aria-label="Main">
-			<div class="flex items-center gap-6">
-				<a href="/" class="text-[1.3rem] leading-none transition-opacity hover:opacity-75 sm:text-[1.45rem]" aria-label={ brand.Name + " home" }>
-					@Brand("navbar", "")
-				</a>
-				<div class="hidden items-center gap-0.5 lg:flex">
-					for _, item := range navItems {
-						@button.Button(button.Props{Href: item.Href, Variant: button.VariantGhost, Class: "text-muted-foreground"}) {
-							{ item.Label }
-						}
+		<nav class="mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-4 rounded-full border border-border bg-card/80 shadow-sm backdrop-blur-xl pr-2 pl-5 sm:h-16 sm:pl-7 lg:grid lg:grid-cols-[1fr_auto_1fr]" aria-label="Main">
+			<a href="/" class="justify-self-start text-lg leading-none transition-opacity hover:opacity-75 sm:text-xl" aria-label={ brand.Name + " home" }>
+				@Brand("navbar", "")
+			</a>
+			<div class="hidden items-center gap-0.5 lg:flex">
+				for _, item := range navItems {
+					@button.Button(button.Props{Href: item.Href, Variant: button.VariantGhost, Class: "text-muted-foreground"}) {
+						{ item.Label }
 					}
-				</div>
+				}
 			</div>
-			<div class="flex items-center gap-1">
+			<div class="flex items-center justify-self-end gap-1">
 				@button.Button(button.Props{Href: GitHubURL, Target: "_blank", Variant: button.VariantGhost, Class: "hidden text-muted-foreground lg:inline-flex", Attributes: templ.Attributes{"rel": "noopener", "aria-label": brand.Name + " on GitHub"}}) {
 					@icons.GitHub(18)
 					if stars := sitectx.Stars(ctx); stars > 0 {
@@ -89,7 +87,7 @@ templ MobileLink(href, label string) {
 
 templ MobileNav() {
 	<div class="flex h-full flex-col">
-		<div class="flex h-16 shrink-0 items-center border-b px-6 text-[1.45rem] leading-none">
+		<div class="flex h-16 shrink-0 items-center border-b px-6 text-xl leading-none">
 			@Brand("mobile-nav", "")
 		</div>
 		<div class="flex-1 overflow-y-auto px-6 pt-1">

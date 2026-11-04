@@ -2,12 +2,16 @@ package pages
 
 import (
 	"github.com/axadrn/goilerplate/v4/site/brand"
+	"github.com/axadrn/goilerplate/v4/site/githubstars"
+	"github.com/axadrn/goilerplate/v4/site/sitectx"
 	"github.com/axadrn/goilerplate/v4/site/ui/blocks"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/accordion"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/badge"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/button"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/card"
 	"github.com/axadrn/goilerplate/v4/site/ui/components/icon"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/separator"
+	"github.com/axadrn/goilerplate/v4/site/ui/components/tabs"
 	"github.com/axadrn/goilerplate/v4/site/ui/layouts"
 	"github.com/axadrn/goilerplate/v4/site/ui/utils"
 )
@@ -15,12 +19,11 @@ import (
 const (
 	homeWrap = "mx-auto w-full max-w-[1240px] px-4 sm:px-8"
 	// The type scale of the home page: five sizes, two weights.
-	typeH1     = "font-semibold tracking-[-0.045em] leading-[1.02] text-[clamp(2.6rem,6vw,4.5rem)] text-balance"
-	typeH2     = "font-semibold tracking-[-0.04em] leading-[1.05] text-[clamp(2rem,4.5vw,3.25rem)] text-balance"
-	typeH3     = "text-xl font-semibold tracking-[-0.02em]"
-	typeLead   = "text-lg leading-8 text-muted-foreground"
-	typeText   = "text-base leading-7 text-muted-foreground"
-	typeNumber = "font-semibold tracking-[-0.04em] text-5xl tabular-nums"
+	typeH1   = "font-semibold tracking-[-0.045em] leading-[1.02] text-[clamp(2.6rem,6vw,4.5rem)] text-balance"
+	typeH2   = "font-semibold tracking-[-0.04em] leading-[1.05] text-[clamp(2rem,4.5vw,3.25rem)] text-balance"
+	typeH3   = "text-xl font-semibold tracking-[-0.02em]"
+	typeLead = "text-lg leading-8 text-muted-foreground"
+	typeText = "text-base leading-7 text-muted-foreground"
 	// homeSurface is a grouped surface: the card gray, no border, no shadow.
 	homeSurface = "gap-0 py-0 text-base rounded-4xl bg-card shadow-none ring-0"
 	// homeSection is the one gap between the sections of the home page.
@@ -29,28 +32,33 @@ const (
 	homeAnchor = "scroll-mt-24 sm:scroll-mt-28"
 	// homeLink is a link inside running text.
 	homeLink = "text-foreground underline underline-offset-4"
+	// homeCode is a dark code panel.
+	homeCode = "ops-term min-w-0 rounded-3xl bg-terminal text-sm leading-[1.75] text-terminal-foreground"
 	// homeDisplay and homeLead are the page titles of the changelog, the
 	// builder and the legal pages.
 	homeDisplay = "font-display leading-[0.95]"
 	homeLead    = "text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9"
 )
 
+// Landing sells the kit: what it is, what is done, the stack, the code,
+// the proof, start.
 templ Landing() {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "The Go SaaS starter kit, free and open source",
-		Description: "Login, Stripe billing, teams, admin, API and tests. Already built in Go, already tested, free and open source, and every line yours.",
+		Description: "A Go SaaS with login, billing, emails, teams and admin already built and tested. Pick htmx, Datastar or SvelteKit, SQLite or PostgreSQL, Stripe or Polar. Free and open source.",
 		Path:        "/",
 	}) {
 		<main>
 			@homeHero()
-			@homeInside()
-			@homeAI()
-			@homeFree()
-			@homeOps()
+			@homeDone()
+			@homeStack()
+			@homeRepo()
+			@homeAgents()
+			@homeProof()
 			@homeFAQ()
 			@homeStart()
 		</main>
-		@homeCopyScript()
+		@homeScript()
 	}
 }
 
@@ -63,80 +71,45 @@ templ homePrimary(class string) {
 }
 
 // ---------------------------------------------------------------- hero
+// homeHero says what goilerplate is, in one headline, one line, one
+// command and one button.
 templ homeHero() {
-	<section class="pt-16 sm:pt-28">
-		<div class={ homeWrap, "grid grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16" }>
-			<div>
-				@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "h-auto rounded-full px-3 py-1 text-sm font-medium text-muted-foreground"}) {
-					Go, templ, Tailwind CSS and shadcn-templ.
-				}
-				<h1 class={ typeH1, "mt-6" }>
-					<span class="block">Your SaaS.</span>
-					<span class="block text-live">Without the boring part.</span>
-				</h1>
-				<p class={ typeLead, "mt-7 max-w-[34rem] sm:mt-9 sm:text-xl sm:leading-9" }>
-					Login, billing, teams, admin, an API and tests. Built in Go, tested, and every line is yours.
-				</p>
-				<ul class="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-base font-medium">
-					@heroProof("Free and open source")
-					@heroProof("No account")
-					@heroProof("Updates with Git")
-				</ul>
-				<div class="mt-9 flex flex-col gap-3 sm:flex-row">
-					@homePrimary("")
-					@button.Button(button.Props{Href: "/docs", Variant: button.VariantSecondary, Size: button.SizeLg}) {
-						Read the docs
-					}
-				</div>
+	<section class="pt-20 sm:pt-32">
+		<div class={ homeWrap, "flex flex-col items-center text-center" }>
+			<h1 class={ typeH1, "max-w-[16ch]" }>Your Go SaaS, already built.</h1>
+			<p class={ typeLead, "mt-7 max-w-[36rem] sm:mt-8 sm:text-xl sm:leading-9" }>
+				Login, billing, emails, teams and admin, tested and ready. Free and open source.
+			</p>
+			<div class="mt-10 flex w-full max-w-[54rem] flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+				@homeInstall("min-w-0 flex-1")
+				@homePrimary("")
 			</div>
-			@homeTerminal()
 		</div>
 	</section>
 }
 
-// heroProof is one promise under the hero, with a check.
-templ heroProof(text string) {
-	<li class="inline-flex items-center gap-2">
-		<span class="flex size-5 items-center justify-center rounded-full bg-live text-background">
-			@icon.Check(icon.Props{Class: "size-3 stroke-3"})
-		</span>
-		{ text }
-	</li>
-}
-
-// homeTerminal is the whole start: install, generate, run. The button in
-// its title bar copies the install command.
-templ homeTerminal() {
-	<div class="ops-term min-w-0 overflow-hidden rounded-4xl bg-terminal text-sm leading-[1.75] text-terminal-foreground" aria-label="A terminal session with goilerplate" data-copy-root>
-		<div class="flex items-center gap-2 border-b border-terminal-foreground/10 py-2 pr-2 pl-5">
-			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
-			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
-			<span class="size-3 rounded-full bg-terminal-foreground/20"></span>
-			<span class="ml-3 text-xs text-terminal-foreground/50">~/dev</span>
-			@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeSm, Class: "ml-auto gap-2 font-sans text-terminal-foreground/70 hover:bg-terminal-foreground/10 hover:text-terminal-foreground dark:hover:bg-terminal-foreground/10 dark:hover:text-terminal-foreground", Attributes: templ.Attributes{"data-copy": true}}) {
-				<span data-copy-icon>
-					@icon.Copy(icon.Props{Class: "size-4"})
-				</span>
-				<span data-copy-check class="hidden">
-					@icon.Check(icon.Props{Class: "size-4"})
-				</span>
-				Copy install
-			}
-		</div>
-		<div class="overflow-x-auto px-5 py-5 whitespace-pre sm:px-6">
-			<p><span class="text-terminal-foreground/45">$ </span><span data-copy-text>{ brand.Install }</span></p>
-			<p class="mt-4"><span class="text-terminal-foreground/45">$ </span>goilerplate new --name Acme --module example.com/acme \</p>
-			<p>{ "    --framework htmx --database postgres --payment stripe \\" }</p>
-			<p>{ "    --workspaces ./acme" }</p>
-			<p class="text-live">✓ Created Acme in ./acme with v4.0.0</p>
-			<p class="text-terminal-foreground/60">› Git is ready on main with an initial commit</p>
-			<p class="mt-4"><span class="text-terminal-foreground/45">$ </span>cd acme && cp .env.example .env</p>
-			<p><span class="text-terminal-foreground/45">$ </span>task dev</p>
-		</div>
+// homeInstall is the install command with a copy button.
+templ homeInstall(class string) {
+	<div class={ homeCode, "flex items-center gap-2 py-1.5 pr-1.5 pl-5 text-left", class } data-copy-root>
+		<p class="min-w-0 flex-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none]"><span class="text-terminal-foreground/45">$ </span><span data-copy-text>{ brand.Install }</span></p>
+		@copyButton("Copy")
 	</div>
 }
 
-templ homeCopyScript() {
+// copyButton copies the data-copy-text of its data-copy-root.
+templ copyButton(label string) {
+	@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeSm, Class: "ml-auto shrink-0 gap-2 font-sans text-terminal-foreground/70 hover:bg-terminal-foreground/10 hover:text-terminal-foreground dark:hover:bg-terminal-foreground/10 dark:hover:text-terminal-foreground", Attributes: templ.Attributes{"data-copy": true, "aria-label": "Copy the install command"}}) {
+		<span data-copy-icon>
+			@icon.Copy(icon.Props{Class: "size-4"})
+		</span>
+		<span data-copy-check class="hidden">
+			@icon.Check(icon.Props{Class: "size-4"})
+		</span>
+		{ label }
+	}
+}
+
+templ homeScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
 		document.addEventListener("click", async (event) => {
 			const button = event.target.closest("[data-copy]");
@@ -156,127 +129,32 @@ templ homeCopyScript() {
 	</script>
 }
 
-// ---------------------------------------------------------------- inside
-// homeInside is what every project has, and the choices that shape it.
-templ homeInside() {
-	<section id="product" class={ homeAnchor, homeSection }>
+// ---------------------------------------------------------------- done
+// homeDone is what every SaaS needs, already built: six cards, then the
+// modules you add when you need them.
+templ homeDone() {
+	<section id="done" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			<h2 class={ typeH2, "max-w-[18ch]" }>Everything before your first customer.</h2>
-			<p class={ typeLead, "mt-6 max-w-2xl" }>Built, tested and wired together. You start on the product.</p>
-			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 sm:grid-cols-2 lg:grid-cols-3">
-				@homeTile("Auth", "Passwords, magic links, Google and GitHub. Sessions you can revoke.")
-				@homeTile("Billing", "Stripe or Polar. Subscriptions, trials, a customer portal and signed webhooks.")
-				@homeTile("Teams", "Workspaces with roles, invitations and seat limits.")
-				@homeTile("Admin", "Find users, see metrics, revoke sessions. Help as the user, read only.")
-				@homeTile("API and MCP", "A JSON API with personal tokens. An MCP server for your customers' agents.")
-				@homeTile("Production", "Tests, CI, a Dockerfile, Sentry and migrations.")
+			<div class="flex flex-col items-center text-center">
+				<h2 class={ typeH2, "max-w-[18ch]" }>The boring parts, done.</h2>
+				<p class={ typeLead, "mt-6 max-w-xl" }>Every SaaS needs them. No customer pays for them. Built, tested and wired together.</p>
 			</div>
-			@card.Card(card.Props{Class: utils.CN(homeSurface, "mt-3 grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16")}) {
-				<div>
-					<h3 class={ typeH3 }>Your stack. Your choice.</h3>
-					<p class={ typeText, "mt-3 max-w-md" }>
-						Pick what you need. The rest stays out of your repo.
-						<a href="/new" class={ homeLink }>Open the stack builder</a>
-					</p>
-				</div>
-				<div class="grid gap-5 self-center">
-					@homeChoice("Frontend", []string{"htmx 4.0", "Datastar 1.0", "SvelteKit", "Headless"})
-					@homeChoice("Database", []string{"SQLite", "PostgreSQL"})
-					@homeChoice("Payments", []string{"Stripe", "Polar"})
-					@homeChoice("Email", []string{"SMTP", "Resend"})
-				</div>
-			}
-		</div>
-	</section>
-}
-
-templ homeTile(title, text string) {
-	@card.Card(card.Props{Class: utils.CN(homeSurface, "block p-7 sm:p-8")}) {
-		<h3 class={ typeH3 }>{ title }</h3>
-		<p class={ typeText, "mt-2" }>{ text }</p>
-	}
-}
-
-templ homeChoice(label string, options []string) {
-	<div class="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
-		<p class="text-sm text-muted-foreground">{ label }</p>
-		<div class="flex flex-wrap gap-2">
-			for _, option := range options {
-				@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "h-auto rounded-full px-3 py-1 text-sm font-medium"}) {
-					{ option }
+			<div class="mt-14 grid grid-cols-1 gap-3 sm:mt-20 sm:grid-cols-2 lg:grid-cols-3">
+				for _, part := range homeParts {
+					@card.Card(card.Props{Class: utils.CN(homeSurface, "p-7 sm:p-8")}) {
+						<span class="flex size-11 items-center justify-center rounded-2xl bg-background text-foreground">
+							@part.Icon
+						</span>
+						<h3 class={ typeH3, "mt-8" }>{ part.Title }</h3>
+						<p class={ typeText, "mt-2" }>{ part.Text }</p>
+					}
 				}
-			}
-		</div>
-	</div>
-}
-
-// ---------------------------------------------------------------- ai
-templ homeAI() {
-	<section id="ai" class={ homeAnchor, homeSection }>
-		<div class={ homeWrap }>
-			<h2 class={ typeH2, "max-w-[20ch]" }>
-				AI writes the easy 80%.
-				<span class="text-muted-foreground">The last 20% costs you weeks.</span>
-			</h2>
-			<p class={ typeLead, "mt-6 max-w-2xl" }>
-				Every project ships a stack aware <code class="font-mono text-foreground">AGENTS.md</code>. Claude, Cursor or Codex build on tested code, not on a new guess each session.
-			</p>
-			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
-				@homeTile("Billing that holds up", "Retried webhooks, events out of order, failed renewals, seat changes. Solved once and tested.")
-				@homeTile("Tenant isolation", "Every query scoped to the right workspace. The bug an agent writes quietly and a customer finds loudly.")
-				@homeTile("Updates that keep coming", "Fixes like templ v0.3.1100 land in your project with goilerplate update. Your own code stays yours.")
 			</div>
-		</div>
-	</section>
-}
-
-// ---------------------------------------------------------------- free
-// homeFree is where a price would be: everything is in it, for free.
-templ homeFree() {
-	<section id="free" class={ homeAnchor, homeSection }>
-		<div class={ homeWrap }>
-			<h2 class={ typeH2 }>Free. Everything in it.</h2>
-			<p class={ typeLead, "mt-6 max-w-2xl" }>Every frontend, database, payment and mail provider. Every module.</p>
-			<div class="mt-12 grid grid-cols-1 items-start gap-3 sm:mt-16 lg:grid-cols-2">
-				@card.Card(card.Props{Class: utils.CN(homeSurface, "flex flex-col p-8 sm:p-10")}) {
-					<div class="flex items-center justify-between gap-3">
-						<h3 class={ typeH3 }>Everything</h3>
-						@badge.Badge(badge.Props{Class: "h-auto rounded-full bg-live/15 px-3 py-1 text-sm font-medium text-live"}) {
-							MIT and 0BSD
-						}
-					</div>
-					<p class="mt-8 flex items-baseline gap-2">
-						<span class={ typeNumber }>$0</span>
-						<span class="text-base text-muted-foreground">/ forever</span>
-					</p>
-					<p class={ typeText, "mt-2" }>Unlimited projects. Every future release.</p>
-					<div class="mt-8">
-						@homePrimary("w-full")
-					</div>
-					<ul class="mt-8 grid grid-cols-1 gap-3 text-base sm:grid-cols-2">
-						for _, feature := range homeFeatures {
-							@homeCheck(feature)
-						}
-					</ul>
-				}
-				@card.Card(card.Props{Class: utils.CN(homeSurface, "block p-3 sm:p-4")}) {
-					<div class="px-4 pt-5 pb-2 sm:px-6 sm:pt-6">
-						<h3 class={ typeH3 }>Every feature</h3>
-						<p class={ typeText, "mt-2" }>By area. Each module is yours to pick or leave out.</p>
-					</div>
-					@accordion.Accordion(accordion.Props{Multiple: true}) {
-						for _, group := range homeFeatureGroups {
-							@accordion.Item() {
-								@homeTrigger(group.Title)
-								@accordion.Content(accordion.ContentProps{Class: "pb-0"}) {
-									<ul class="grid gap-3 px-4 pb-6 text-base text-muted-foreground sm:px-6">
-										for _, feature := range group.Features {
-											@homeCheck(feature)
-										}
-									</ul>
-								}
-							}
-						}
+			<div class="mt-8 flex flex-wrap items-center justify-center gap-2 text-center">
+				<span class="mr-1 text-sm text-muted-foreground">Add when you need it</span>
+				for _, module := range homeModules {
+					@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "h-auto rounded-full px-3 py-1 text-sm font-medium"}) {
+						{ module }
 					}
 				}
 			</div>
@@ -284,169 +162,300 @@ templ homeFree() {
 	</section>
 }
 
-var homeFeatures = []string{
-	"No account, no license key",
-	"No telemetry",
-	"Unlimited projects",
-	"Every future release",
-	"Every frontend and database",
-	"Stripe or Polar",
-	"Tests, CI and Docker",
-	"Stack aware AGENTS.md",
+type homePart struct {
+	Icon        templ.Component
+	Title, Text string
 }
 
-type homeFeatureGroup struct {
-	Title    string
-	Features []string
+var homeParts = []homePart{
+	{icon.KeyRound(icon.Props{Class: "size-5"}), "Sign in", "Passwords, magic links, email verification and resets. Sessions you can revoke."},
+	{icon.CreditCard(icon.Props{Class: "size-5"}), "Billing", "Stripe or Polar. Checkout, monthly and yearly plans, trials and a customer portal."},
+	{icon.Gauge(icon.Props{Class: "size-5"}), "Plans and limits", "Free, Pro and Enterprise in one catalog, with feature gates and limits."},
+	{icon.Mail(icon.Props{Class: "size-5"}), "Emails", "Welcome, magic link, password reset and email change, through SMTP or Resend."},
+	{icon.LayoutDashboard(icon.Props{Class: "size-5"}), "Admin", "Find users, see the numbers, revoke sessions, look at an account read only."},
+	{icon.ShieldCheck(icon.Props{Class: "size-5"}), "Production", "Migrations, CSRF, rate limits, security headers, logs, a Dockerfile and CI."},
 }
 
-var homeFeatureGroups = []homeFeatureGroup{
-	{"Core stack", []string{
-		"Go, templ, Tailwind CSS, and shadcn-templ",
-		"htmx 4.0, Datastar 1.0, SvelteKit or Headless",
-		"JSON API for every selected module",
-		"MCP server with curated agent tools",
-		"SQLite or PostgreSQL",
-		"Stripe or Polar",
-		"SMTP or Resend",
-		"Dark mode and accessible UI components",
-	}},
-	{"Authentication and security", []string{
-		"Passwords and magic links",
-		"Email verification and secure email changes",
-		"Password and account recovery",
-		"Revocable database sessions",
-		"Active session management",
-		"Google and GitHub OAuth",
-		"CSRF protection, security headers, and rate limits",
-		"Tenant isolation, validation, and database constraints",
-	}},
-	{"Product modules", []string{
-		"Workspaces with roles, seats, and billing per workspace",
-		"Owner, Admin, and Member roles",
-		"Invitations and seat limits",
-		"Tenant audit history",
-		"S3 compatible file storage",
-		"Signed file access and upload validation",
-		"Markdown blog with tags, SEO, and newsletter capture",
-		"Markdown documentation with copyable code blocks",
-		"Public llms.txt and Markdown docs",
-		"Stack aware AGENTS.md",
-	}},
-	{"Billing", []string{
-		"Hosted checkout",
-		"Signed and idempotent webhooks",
-		"Monthly and yearly subscriptions",
-		"Customer billing portal",
-		"Local subscription state",
-		"Freemium, trials, and paid only access",
-		"Feature and resource gates",
-		"Atomic seat and resource limits",
-		"Grace periods and cancellation lifecycle",
-		"Order safe provider synchronization",
-	}},
-	{"Operations", []string{
-		"Global Admin panel",
-		"User search and operational metrics",
-		"Session revocation",
-		"Read only support impersonation",
-		"Durable operator audit history",
-		"Plausible, Umami, and Google Analytics",
-		"Structured logging and Sentry",
-		"Migrations, health checks, and graceful shutdown",
-		"Dockerfile and Taskfile",
-		"Selection aware Go tests and race detector CI",
-	}},
-	{"Ownership", []string{
-		"Complete generated source ownership",
-		"Deterministic generated repositories",
-		"Unselected code stays out",
-		"Git native updates",
-		"Every future goilerplate release",
-		"MIT CLI, 0BSD template and projects",
-	}},
+// homeModules are the parts you pick in the builder.
+var homeModules = []string{"Teams", "Google and GitHub", "API and MCP", "Blog", "Docs", "Uploads"}
+
+// ---------------------------------------------------------------- stack
+// homeStack is the choice of stack: four columns, and the way to the builder.
+templ homeStack() {
+	<section id="stack" class={ homeAnchor, homeSection }>
+		<div class={ homeWrap }>
+			@card.Card(card.Props{Class: utils.CN(homeSurface, "p-8 sm:p-12")}) {
+				<div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+					<div>
+						<h2 class={ typeH2 }>Your stack.</h2>
+						<p class={ typeLead, "mt-4 max-w-md" }>Pick what you like. What you leave out never lands in your repo.</p>
+					</div>
+					@button.Button(button.Props{Href: "/new", Variant: button.VariantOutline, Size: button.SizeLg, Class: "gap-2 self-start bg-background sm:self-auto"}) {
+						Open the builder
+						@icon.ArrowRight(icon.Props{Class: "size-4"})
+					}
+				</div>
+				@separator.Separator(separator.Props{Class: "my-10 sm:my-12"})
+				<dl class="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4">
+					@homeChoice("Frontend", []string{"htmx", "Datastar", "SvelteKit", "Headless"})
+					@homeChoice("Database", []string{"SQLite", "PostgreSQL"})
+					@homeChoice("Payments", []string{"Stripe", "Polar"})
+					@homeChoice("Email", []string{"SMTP", "Resend"})
+				</dl>
+			}
+		</div>
+	</section>
 }
 
-// homeCheck is one line of a list, with a check.
-templ homeCheck(text string) {
-	<li class="flex min-w-0 items-start gap-3">
-		<span class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-live/15 text-live">
-			@icon.Check(icon.Props{Class: "size-3 stroke-3"})
-		</span>
-		<span class="min-w-0">{ text }</span>
+templ homeChoice(label string, options []string) {
+	<div>
+		<dt class="text-sm text-muted-foreground">{ label }</dt>
+		<dd class="mt-4 space-y-2">
+			for _, option := range options {
+				<p class="text-lg font-semibold tracking-[-0.02em]">{ option }</p>
+			}
+		</dd>
+	</div>
+}
+
+// ---------------------------------------------------------------- repo
+// homeRepo shows what lands on disk: the tree, the agent rules, the tests.
+templ homeRepo() {
+	<section id="code" class={ homeAnchor, homeSection }>
+		<div class={ homeWrap, "grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16" }>
+			<div>
+				<h2 class={ typeH2, "max-w-[14ch]" }>It's just a Go repo.</h2>
+				<p class={ typeLead, "mt-6 max-w-lg" }>Handlers, services, repositories and raw SQL. No framework to learn, and nothing at runtime depends on goilerplate.</p>
+				<ul class="mt-10 grid gap-6">
+					@homeFact("Only what you picked", "A Stripe project has no Polar code. A SQLite project has no PostgreSQL driver.")
+					@homeFact("Yours to change", "Every file is plain source in your repository, with Git and a first commit ready.")
+					@homeFact("Rules for your agent", "AGENTS.md knows your exact stack and how the code is laid out.")
+				</ul>
+			</div>
+			@card.Card(card.Props{Class: utils.CN(homeSurface, "block min-w-0 p-3 sm:p-4")}) {
+				@tabs.Tabs(tabs.Props{DefaultValue: "files", Class: "gap-3"}) {
+					<div class="px-2 pt-2 sm:px-3">
+						@tabs.List(tabs.ListProps{Attributes: templ.Attributes{"aria-label": "The generated project"}}) {
+							@tabs.Trigger(tabs.TriggerProps{Value: "files"}) {
+								Files
+							}
+							@tabs.Trigger(tabs.TriggerProps{Value: "agents"}) {
+								AGENTS.md
+							}
+							@tabs.Trigger(tabs.TriggerProps{Value: "tests"}) {
+								Tests
+							}
+						}
+					</div>
+					@tabs.Content(tabs.ContentProps{Value: "files"}) {
+						@homeCodePanel(homeTree)
+					}
+					@tabs.Content(tabs.ContentProps{Value: "agents"}) {
+						@homeCodePanel(homeAgentsFile)
+					}
+					@tabs.Content(tabs.ContentProps{Value: "tests"}) {
+						@homeCodePanel(homeTests)
+					}
+				}
+			}
+		</div>
+	</section>
+}
+
+templ homeFact(title, text string) {
+	<li>
+		<h3 class="text-lg font-semibold tracking-[-0.02em]">{ title }</h3>
+		<p class={ typeText, "mt-1" }>{ text }</p>
 	</li>
 }
 
-// ---------------------------------------------------------------- ops
-// homeOps is the way to production: ops, by the same maker, deploys a
-// goilerplate app and backs up its SQLite database.
-templ homeOps() {
-	<section id="ops" class={ homeAnchor, homeSection }>
+// codeLine is one line of a code panel. Kind dims it ("dim"), greens it
+// ("ok") or puts a prompt before it ("cmd").
+type codeLine struct {
+	Text, Kind string
+}
+
+templ homeCodePanel(lines []codeLine) {
+	<div class={ homeCode, "overflow-x-auto px-5 py-5 whitespace-pre sm:px-6" }>
+		for _, line := range lines {
+			switch line.Kind {
+				case "dim":
+					<p class="text-terminal-foreground/50">{ line.Text }</p>
+				case "ok":
+					<p class="text-live">{ line.Text }</p>
+				case "cmd":
+					<p><span class="text-terminal-foreground/45">$ </span>{ line.Text }</p>
+				default:
+					<p>{ line.Text }</p>
+			}
+		}
+	</div>
+}
+
+// homeTree is the real tree of a project made with htmx, SQLite, Stripe,
+// Resend and workspaces, shortened.
+var homeTree = []codeLine{
+	{"acme/", ""},
+	{"├── AGENTS.md              rules for your coding agent", ""},
+	{"├── Dockerfile", ""},
+	{"├── Taskfile.yml           task dev", ""},
+	{"├── goilerplate.lock       your stack, for updates", ""},
+	{"├── .github/workflows/ci.yml", ""},
+	{"├── cmd/server/main.go", ""},
+	{"└── internal/", ""},
+	{"    ├── access/            what each plan unlocks", ""},
+	{"    ├── db/migrations/     001_initial_schema.sql", ""},
+	{"    ├── handler/           auth.go  billing.go  admin.go", ""},
+	{"    ├── middleware/        csrf.go  ratelimit.go", ""},
+	{"    ├── repository/        raw SQL", ""},
+	{"    ├── service/           subscription.go  workspace.go", ""},
+	{"    │   ├── mailer/        resend.go", ""},
+	{"    │   └── payment/       stripe.go", ""},
+	{"    └── ui/                templ pages, shadcn-templ components", ""},
+}
+
+// homeAgentsFile is the start of AGENTS.md in that project.
+var homeAgentsFile = []codeLine{
+	{"## Stack", ""},
+	{"", ""},
+	{"- Go 1.26 with the standard library `net/http` router.", ""},
+	{"- templ, htmx 4.0, vanilla JavaScript, and Tailwind CSS.", ""},
+	{"- sqlx with raw SQL and SQLite.", ""},
+	{"- Resend for transactional email.", ""},
+	{"- Stripe for subscription billing.", ""},
+	{"", ""},
+	{"## House rules", ""},
+	{"", ""},
+	{"- Keep handlers thin. Put business rules in services", ""},
+	{"  and SQL in repositories.", ""},
+	{"- Enforce resource, seat, and quota increments in the", ""},
+	{"  same database transaction as the protected write.", ""},
+	{"- Never edit generated `*_templ.go` files.", ""},
+	{"…", "dim"},
+}
+
+// homeTests is real output of go test in that project, shortened.
+var homeTests = []codeLine{
+	{"go test ./...", "cmd"},
+	{"ok   example.com/acme/internal/access", "ok"},
+	{"ok   example.com/acme/internal/handler", "ok"},
+	{"ok   example.com/acme/internal/middleware", "ok"},
+	{"ok   example.com/acme/internal/repository", "ok"},
+	{"ok   example.com/acme/internal/service", "ok"},
+	{"ok   example.com/acme/internal/service/payment", "ok"},
+	{"…", "dim"},
+	{"", ""},
+	{"go test ./internal/service/payment -run Stripe -v", "cmd"},
+	{"--- PASS: TestStripeStatusPreservesVisibleBillingStates", ""},
+	{"--- PASS: TestStripeRejectsInvalidWebhookSignature", ""},
+	{"--- PASS: TestStripeWebhookBindsCustomerToWorkspace", ""},
+	{"ok   example.com/acme/internal/service/payment", "ok"},
+}
+
+// ---------------------------------------------------------------- agents
+// homeAgents is the case for a kit when an agent writes the code.
+templ homeAgents() {
+	<section id="ai" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			@card.Card(card.Props{Class: utils.CN(homeSurface, "grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-16")}) {
+			<h2 class={ typeH2, "max-w-[22ch]" }>
+				Your agent writes a login page in a minute.
+				<span class="text-muted-foreground">Billing is where it gets you.</span>
+			</h2>
+			<p class={ typeLead, "mt-6 max-w-2xl" }>Claude, Cursor or Codex start on code that already handles the hard cases, and the tests tell them when they break one.</p>
+			<ol class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
+				@homeCase("01", "Webhooks out of order", "Stripe and Polar retry and reorder events. An older event never overwrites a newer state.")
+				@homeCase("02", "Limits under load", "Two requests at once cannot pass a seat limit. The check runs in the same transaction as the write.")
+				@homeCase("03", "The wrong tenant", "Workspace data is scoped by its workspace, and the member's role decides what they may do.")
+			</ol>
+		</div>
+	</section>
+}
+
+templ homeCase(number, title, text string) {
+	<li>
+		@card.Card(card.Props{Class: utils.CN(homeSurface, "block h-full p-7 sm:p-8")}) {
+			<span class="font-mono text-sm text-muted-foreground">{ number }</span>
+			<h3 class={ typeH3, "mt-6" }>{ title }</h3>
+			<p class={ typeText, "mt-2" }>{ text }</p>
+		}
+	</li>
+}
+
+// ---------------------------------------------------------------- proof
+// homeProof is what anyone can check: stars, tests, licenses, releases.
+templ homeProof() {
+	<section id="proof" class={ homeAnchor, homeSection }>
+		<div class={ homeWrap }>
+			<h2 class={ typeH2 }>Out in the open.</h2>
+			<p class={ typeLead, "mt-6 max-w-2xl" }>Read every line before you run it. The CLI, the template and this website live in one public repository.</p>
+			<div class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 sm:grid-cols-3">
+				if stars := sitectx.Stars(ctx); stars > 0 {
+					@homeStat(githubstars.Short(stars), "stars on GitHub", blocks.GitHubURL)
+				} else {
+					@homeStat("GitHub", "The whole source, in public", blocks.GitHubURL)
+				}
+				@homeStat("91+", "Go tests in the smallest project, over 300 with every module", "")
+				@homeStat("$0", "MIT for the CLI, 0BSD for your project", "")
+			</div>
+			@card.Card(card.Props{Class: utils.CN(homeSurface, "mt-3 grid grid-cols-1 gap-10 p-7 sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:p-14")}) {
 				<div>
-					<h2 class={ typeH2 }>Ship it with ops.</h2>
-					<p class={ typeLead, "mt-6 max-w-lg" }>
-						<span class="text-foreground">Live with HTTPS on your own server.</span>
-						Every change of your SQLite database goes to your bucket. Go back to any second.
+					<h3 class={ typeH3 }>Fixes keep coming after day one.</h3>
+					<p class={ typeText, "mt-3 max-w-md" }>
+						<code class="font-mono text-foreground">goilerplate update</code> puts the next release on its own Git branch. You review it and merge it like any other branch. Your own code stays yours.
 					</p>
-					<p class={ typeText, "mt-6" }>
-						<a href={ templ.SafeURL(blocks.RefURL(blocks.OpsURL, "card")) } target="_blank" rel="noopener" class={ homeLink }>Try ops free</a>: 30 days, no card. Or <a href="/docs/guides/deploy-with-ops" class={ homeLink }>read the guide</a>.
+					<p class={ typeText, "mt-4" }>
+						<a href="/changelog" class={ homeLink }>Read the changelog</a>
 					</p>
 				</div>
-				<div class="ops-term self-center overflow-x-auto rounded-3xl bg-terminal px-6 py-5 text-sm leading-6 whitespace-pre text-terminal-foreground" aria-label="Three commands that put a goilerplate app live with ops">
-					<p class="text-terminal-foreground/45"># 1. install ops</p>
-					<p><span class="text-terminal-foreground/45">$ </span>curl -fsSL https://ops.goilerplate.com/cli.sh | sh</p>
-					<p class="mt-4 text-terminal-foreground/45"># 2. add your server</p>
-					<p><span class="text-terminal-foreground/45">$ </span>ops servers add web-1</p>
-					<p class="mt-4 text-terminal-foreground/45"># 3. deploy</p>
-					<p><span class="text-terminal-foreground/45">$ </span>ops deploy</p>
-					<p class="text-terminal-foreground/60">→ snapshot of /app/data/app.db: 20261102T091500Z-before-v2</p>
-					<p class="text-live">✓ v2 of acme is live</p>
+				<div class={ homeCode, "self-center overflow-x-auto px-6 py-5 whitespace-pre" } aria-label="goilerplate update in a terminal">
+					<p><span class="text-terminal-foreground/45">$ </span>goilerplate update</p>
+					<p class="text-live">✓ Created goilerplate-update-v4.1.0</p>
+					<p class="mt-3"><span class="text-terminal-foreground/45">$ </span>git switch goilerplate-update-v4.1.0</p>
+					<p><span class="text-terminal-foreground/45">$ </span>git show --stat</p>
 				</div>
 			}
 		</div>
 	</section>
 }
 
+templ homeStat(number, label, href string) {
+	@card.Card(card.Props{Class: utils.CN(homeSurface, "block p-7 sm:p-8")}) {
+		<p class="text-5xl font-semibold tracking-[-0.04em] tabular-nums">
+			if href != "" {
+				<a href={ templ.SafeURL(href) } target="_blank" rel="noopener" class="hover:underline hover:underline-offset-8">{ number }</a>
+			} else {
+				{ number }
+			}
+		</p>
+		<p class={ typeText, "mt-3" }>{ label }</p>
+	}
+}
+
 // ---------------------------------------------------------------- faq
 templ homeFAQ() {
-	<section id="support" class={ homeAnchor, homeSection }>
-		<div class={ homeWrap }>
-			<h2 class={ typeH2 }>Questions.</h2>
-			@accordion.Accordion(accordion.Props{Multiple: true, Class: "mt-10 rounded-4xl bg-card px-2 sm:px-4"}) {
+	<section id="faq" class={ homeAnchor, homeSection }>
+		<div class={ homeWrap, "grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] lg:gap-16" }>
+			<div>
+				<h2 class={ typeH2 }>Questions.</h2>
+				<p class={ typeText, "mt-4 max-w-xs" }>
+					More in <a href="/docs" class={ homeLink }>the docs</a>, or ask on <a href={ templ.SafeURL(blocks.GitHubURL) } target="_blank" rel="noopener" class={ homeLink }>GitHub</a>.
+				</p>
+			</div>
+			@accordion.Accordion(accordion.Props{Multiple: true, Class: "min-w-0 rounded-4xl bg-card px-2 sm:px-4"}) {
 				@homeQuestion("Is it really free?") {
-					Yes. The CLI, the template and every project it makes are open source. No account, no license key, nothing to unlock.
-				}
-				@homeQuestion("What do I need?") {
-					Go 1.26 or newer, Git and Task, on macOS, Linux or WSL. <a href="/docs/installation" class={ homeLink }>The setup guide</a>
-				}
-				@homeQuestion("Why a starter kit if AI writes my code?") {
-					Agents copy what they find. In an empty folder they invent auth and billing anew every session. On goilerplate they extend tested code, follow <code class="font-mono">AGENTS.md</code> and hit tests when they break something.
-				}
-				@homeQuestion("Which coding agents does it work with?") {
-					Any agent that reads your repository. <code class="font-mono">AGENTS.md</code> is plain Markdown, the code is plain Go, the checks are <code class="font-mono">go vet</code> and <code class="font-mono">go test</code>.
-				}
-				@homeQuestion("Is this a framework?") {
-					No. You get an ordinary Go repository. Nothing depends on the generator at runtime, and there is no framework to learn.
-				}
-				@homeQuestion("Does goilerplate see my code?") {
-					No. <code class="font-mono">goilerplate new</code> runs on your machine. <code class="font-mono">goilerplate update</code> downloads the public template from the Go module proxy, and Git merges it on your machine.
-				}
-				@homeQuestion("Can I use React, Svelte or a mobile app?") {
-					Yes. SvelteKit gives you a static app on the JSON API, in the same Go binary. Headless fits React, a mobile app or any other client. For a server rendered app, pick htmx or Datastar. <a href="/docs/features/json-api" class={ homeLink }>The JSON API</a>
+					Yes. The CLI, the template and every project it makes are open source. No account, no license key, no paid tier.
 				}
 				@homeQuestion("Can I sell what I build?") {
 					Yes. The CLI is MIT. The template and your projects are 0BSD and ship without a LICENSE file. Use, change and sell them, with no notice to keep.
 				}
-				@homeQuestion("Are updates included?") {
-					Yes. <code class="font-mono">goilerplate update</code> brings every later release into projects made with v4 or newer. Projects made with v3 keep working as they are. <a href="/docs/guides/updating" class={ homeLink }>How updates work</a>
+				@homeQuestion("Why a kit if AI writes my code?") {
+					An agent in an empty folder invents auth and billing anew every session. On goilerplate it extends tested code, follows <code class="font-mono">AGENTS.md</code> and hits a failing test when it breaks something.
 				}
-				@homeQuestion("Who builds it?") {
-					<a href="https://x.com/axadrn" target="_blank" rel="me noopener" class={ homeLink }>Axel Adrian</a>. He maintains <a href={ templ.SafeURL(blocks.RefURL(blocks.ShadcnTemplURL, "faq")) } target="_blank" rel="noopener" class={ homeLink }>shadcn-templ</a>, the Go port of shadcn/ui, and every component in your project comes from it. He runs his own products on goilerplate and deploys them with ops.
+				@homeQuestion("Is this a framework?") {
+					No. You get an ordinary Go repository. Nothing depends on the generator at runtime.
 				}
-				@homeQuestion("Where do I get help?") {
-					On GitHub, in public, so the next person finds it too. Calls, custom work and debugging your own code are not included. <a href="/docs/support" class={ homeLink }>What support covers</a>
+				@homeQuestion("What do I need?") {
+					Go 1.26 or newer, Git and Task, on macOS, Linux or WSL. SvelteKit also needs Node.js 22.17 or newer and pnpm. <a href="/docs/installation" class={ homeLink }>The setup guide</a>
 				}
 			}
 		</div>
@@ -474,30 +483,23 @@ templ homeQuestion(question string) {
 }
 
 // ---------------------------------------------------------------- start
-// homeStart is the last call to action, after the questions.
+// homeStart is the last call to action: the install, the way in, and the
+// one line on ops.
 templ homeStart() {
 	<section id="start" class={ homeAnchor, homeSection, "pb-28 sm:pb-36" }>
-		<div class={ homeWrap }>
-			<h2 class={ typeH2, "max-w-[16ch]" }>Stop building login pages.</h2>
-			<ol class="mt-12 grid grid-cols-1 gap-3 sm:mt-16 lg:grid-cols-3">
-				@homeStep("1", "Install", "One go install, with Go 1.26 or newer.")
-				@homeStep("2", "Generate", "goilerplate new asks what you need.")
-				@homeStep("3", "Build", "task dev, and you work on your product.")
-			</ol>
-			<div class="mt-10 flex flex-col items-start gap-3">
+		<div class={ homeWrap, "flex flex-col items-center text-center" }>
+			<h2 class={ typeH2, "max-w-[18ch]" }>Someone will ship your idea. Make it you.</h2>
+			<p class={ typeLead, "mt-6 max-w-xl" }>Install the CLI, pick your stack, and start on the part only you can build.</p>
+			@homeInstall("mt-10 w-full max-w-[44rem]")
+			<div class="mt-8 flex flex-col gap-3 sm:flex-row">
 				@homePrimary("")
-				<p class="text-sm text-muted-foreground">Free and open source. No account.</p>
+				@button.Button(button.Props{Href: "/new", Variant: button.VariantSecondary, Size: button.SizeLg}) {
+					Open the stack builder
+				}
 			</div>
+			<p class={ typeText, "mt-10" }>
+				Ready to go live? <a href="/docs/guides/deploy-with-ops" class={ homeLink }>Deploy it with ops</a> on your own server.
+			</p>
 		</div>
 	</section>
-}
-
-templ homeStep(number, title, text string) {
-	<li>
-		@card.Card(card.Props{Class: utils.CN(homeSurface, "block h-full p-7 sm:p-8")}) {
-			<span class="flex size-9 items-center justify-center rounded-full bg-foreground text-base font-semibold text-background">{ number }</span>
-			<h3 class={ typeH3, "mt-6" }>{ title }</h3>
-			<p class={ typeText, "mt-2" }>{ text }</p>
-		}
-	</li>
 }
