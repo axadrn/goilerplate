@@ -1,5 +1,6 @@
 # Builds goilerplate.com: one server that renders the pages.
-# Build from the repository root: docker build -f site/Dockerfile .
+# Build from the repository root: docker build -f site/Dockerfile . ops builds it
+# from compose.yml in the root on every push to main.
 FROM golang:1.26 AS build
 WORKDIR /src
 

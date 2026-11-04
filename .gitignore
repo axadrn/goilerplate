@@ -13,6 +13,7 @@
 !/LICENSE-0BSD
 !/README.md
 !/Taskfile.yml
+!/compose.yml
 !/cmd/
 !/content/
 !/generator/
