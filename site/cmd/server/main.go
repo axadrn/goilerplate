@@ -87,7 +87,6 @@ var redirects = map[string]string{
 	"/license":                        "/",
 	"/affiliates":                     "/",
 	"/legal/terms":                    "/legal/privacy",
-	"/ops":                            "https://moin.run",
 	"/moin":                           "https://moin.run",
 	"/blog":                           "/",
 	"/docs/introduction":              "/docs",
@@ -102,7 +101,6 @@ var redirects = map[string]string{
 var prefixRedirects = []struct{ prefix, target string }{
 	{"/checkout/", "/"},
 	{"/blog/", "/"},
-	{"/ops/", "https://moin.run"},
 }
 
 type site struct {

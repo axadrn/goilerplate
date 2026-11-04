@@ -45,7 +45,6 @@ func TestSiteRendersPagesRedirectsAndTheRetiredAPI(t *testing.T) {
 		{method: "GET", path: "/docs/", status: 301, location: "/docs"},
 		{method: "GET", path: "/pricing", status: 301, location: "/"},
 		{method: "GET", path: "/blog/some-post", status: 301, location: "/"},
-		{method: "GET", path: "/ops", status: 301, location: "https://moin.run"},
 		{method: "GET", path: "/docs/guides/deploy-with-moin", status: 200, body: "moin deploy"},
 		{method: "GET", path: "/docs/guides/deploy-with-ops", status: 301, location: "/docs/guides/deploy-with-moin"},
 		{method: "GET", path: "/docs/guides/deploy-with-ops.md", status: 301, location: "/docs/guides/deploy-with-moin.md"},
