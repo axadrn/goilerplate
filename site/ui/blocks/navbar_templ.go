@@ -46,8 +46,8 @@ var navItems = []navItem{
 	{"/changelog", "Changelog"},
 }
 
-// Navbar is the floating pill with the egg emblem, the main links, GitHub,
-// the theme and the way in.
+// Navbar is the floating pill: the emblem and name on the left, the main
+// links in the middle, GitHub, the theme and the way in on the right.
 func Navbar() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -65,14 +65,14 @@ func Navbar() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header class=\"sticky top-0 z-50 px-3 pt-3 sm:px-6\"><nav class=\"mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-4 rounded-full border border-border bg-card/80 shadow-sm backdrop-blur-xl pr-2 pl-5 sm:h-16 sm:pl-7\" aria-label=\"Main\"><div class=\"flex items-center gap-6\"><a href=\"/\" class=\"text-[1.3rem] leading-none transition-opacity hover:opacity-75 sm:text-[1.45rem]\" aria-label=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header class=\"sticky top-0 z-50 px-3 pt-3 sm:px-6\"><nav class=\"mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-4 rounded-full border border-border bg-card/80 shadow-sm backdrop-blur-xl pr-2 pl-5 sm:h-16 sm:pl-7 lg:grid lg:grid-cols-[1fr_auto_1fr]\" aria-label=\"Main\"><a href=\"/\" class=\"justify-self-start text-lg leading-none transition-opacity hover:opacity-75 sm:text-xl\" aria-label=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(brand.Name + " home").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 46, Col: 138}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 45, Col: 143}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -106,7 +106,7 @@ func Navbar() templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 52, Col: 19}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 51, Col: 18}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -119,7 +119,7 @@ func Navbar() templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div></div><div class=\"flex items-center gap-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><div class=\"flex items-center justify-self-end gap-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -147,7 +147,7 @@ func Navbar() templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(githubstars.Short(stars))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 61, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 59, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -296,7 +296,7 @@ func MobileLink(href, label string) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(href)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 84, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 82, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 			if templ_7745c5c3_Err != nil {
@@ -327,7 +327,7 @@ func MobileLink(href, label string) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 85, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/blocks/navbar.templ`, Line: 83, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -362,7 +362,7 @@ func MobileNav() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"flex h-full flex-col\"><div class=\"flex h-16 shrink-0 items-center border-b px-6 text-[1.45rem] leading-none\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"flex h-full flex-col\"><div class=\"flex h-16 shrink-0 items-center border-b px-6 text-xl leading-none\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

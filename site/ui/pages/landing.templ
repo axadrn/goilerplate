@@ -80,7 +80,7 @@ templ homeHero() {
 			<p class={ typeLead, "mt-7 max-w-[36rem] sm:mt-8 sm:text-xl sm:leading-9" }>
 				Login, billing, emails, teams and admin, tested and ready. Free and open source.
 			</p>
-			<div class="mt-10 flex w-full max-w-2xl flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+			<div class="mt-10 flex w-full max-w-[54rem] flex-col items-stretch gap-3 sm:flex-row sm:items-center">
 				@homeInstall("min-w-0 flex-1")
 				@homePrimary("")
 			</div>
@@ -91,7 +91,7 @@ templ homeHero() {
 // homeInstall is the install command with a copy button.
 templ homeInstall(class string) {
 	<div class={ homeCode, "flex items-center gap-2 py-1.5 pr-1.5 pl-5 text-left", class } data-copy-root>
-		<p class="min-w-0 flex-1 truncate"><span class="text-terminal-foreground/45">$ </span><span data-copy-text>{ brand.Install }</span></p>
+		<p class="min-w-0 flex-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none]"><span class="text-terminal-foreground/45">$ </span><span data-copy-text>{ brand.Install }</span></p>
 		@copyButton("Copy")
 	</div>
 }
@@ -129,21 +129,74 @@ templ homeScript() {
 	</script>
 }
 
-// ---------------------------------------------------------------- stack
-// homeStack is the choice of stack, small: what you can pick, and the way
-// to the builder.
-templ homeStack() {
-	<section id="stack" class={ homeAnchor, "mt-3" }>
+// ---------------------------------------------------------------- done
+// homeDone is what every SaaS needs, already built: six cards, then the
+// modules you add when you need them.
+templ homeDone() {
+	<section id="done" class={ homeAnchor, homeSection }>
 		<div class={ homeWrap }>
-			@card.Card(card.Props{Class: utils.CN(homeSurface, "grid grid-cols-1 gap-8 p-7 sm:p-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-16")}) {
-				<div>
-					<h3 class={ typeH3 }>Your stack, your choice.</h3>
-					<p class={ typeText, "mt-2 max-w-sm" }>
-						What you leave out never lands in your repo.
-						<a href="/new" class={ homeLink }>Open the stack builder</a>
-					</p>
+			<div class="flex flex-col items-center text-center">
+				<h2 class={ typeH2, "max-w-[18ch]" }>The boring parts, done.</h2>
+				<p class={ typeLead, "mt-6 max-w-xl" }>Every SaaS needs them. No customer pays for them. Built, tested and wired together.</p>
+			</div>
+			<div class="mt-14 grid grid-cols-1 gap-3 sm:mt-20 sm:grid-cols-2 lg:grid-cols-3">
+				for _, part := range homeParts {
+					@card.Card(card.Props{Class: utils.CN(homeSurface, "p-7 sm:p-8")}) {
+						<span class="flex size-11 items-center justify-center rounded-2xl bg-background text-foreground">
+							@part.Icon
+						</span>
+						<h3 class={ typeH3, "mt-8" }>{ part.Title }</h3>
+						<p class={ typeText, "mt-2" }>{ part.Text }</p>
+					}
+				}
+			</div>
+			<div class="mt-8 flex flex-wrap items-center justify-center gap-2 text-center">
+				<span class="mr-1 text-sm text-muted-foreground">Add when you need it</span>
+				for _, module := range homeModules {
+					@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "h-auto rounded-full px-3 py-1 text-sm font-medium"}) {
+						{ module }
+					}
+				}
+			</div>
+		</div>
+	</section>
+}
+
+type homePart struct {
+	Icon        templ.Component
+	Title, Text string
+}
+
+var homeParts = []homePart{
+	{icon.KeyRound(icon.Props{Class: "size-5"}), "Sign in", "Passwords, magic links, email verification and resets. Sessions you can revoke."},
+	{icon.CreditCard(icon.Props{Class: "size-5"}), "Billing", "Stripe or Polar. Checkout, monthly and yearly plans, trials and a customer portal."},
+	{icon.Gauge(icon.Props{Class: "size-5"}), "Plans and limits", "Free, Pro and Enterprise in one catalog, with feature gates and limits."},
+	{icon.Mail(icon.Props{Class: "size-5"}), "Emails", "Welcome, magic link, password reset and email change, through SMTP or Resend."},
+	{icon.LayoutDashboard(icon.Props{Class: "size-5"}), "Admin", "Find users, see the numbers, revoke sessions, look at an account read only."},
+	{icon.ShieldCheck(icon.Props{Class: "size-5"}), "Production", "Migrations, CSRF, rate limits, security headers, logs, a Dockerfile and CI."},
+}
+
+// homeModules are the parts you pick in the builder.
+var homeModules = []string{"Teams", "Google and GitHub", "API and MCP", "Blog", "Docs", "Uploads"}
+
+// ---------------------------------------------------------------- stack
+// homeStack is the choice of stack: four columns, and the way to the builder.
+templ homeStack() {
+	<section id="stack" class={ homeAnchor, homeSection }>
+		<div class={ homeWrap }>
+			@card.Card(card.Props{Class: utils.CN(homeSurface, "p-8 sm:p-12")}) {
+				<div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+					<div>
+						<h2 class={ typeH2 }>Your stack.</h2>
+						<p class={ typeLead, "mt-4 max-w-md" }>Pick what you like. What you leave out never lands in your repo.</p>
+					</div>
+					@button.Button(button.Props{Href: "/new", Variant: button.VariantOutline, Size: button.SizeLg, Class: "gap-2 self-start bg-background sm:self-auto"}) {
+						Open the builder
+						@icon.ArrowRight(icon.Props{Class: "size-4"})
+					}
 				</div>
-				<dl class="grid gap-4 self-center">
+				@separator.Separator(separator.Props{Class: "my-10 sm:my-12"})
+				<dl class="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4">
 					@homeChoice("Frontend", []string{"htmx", "Datastar", "SvelteKit", "Headless"})
 					@homeChoice("Database", []string{"SQLite", "PostgreSQL"})
 					@homeChoice("Payments", []string{"Stripe", "Polar"})
@@ -155,70 +208,14 @@ templ homeStack() {
 }
 
 templ homeChoice(label string, options []string) {
-	<div class="grid gap-2 sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:items-center">
+	<div>
 		<dt class="text-sm text-muted-foreground">{ label }</dt>
-		<dd class="flex flex-wrap gap-2">
+		<dd class="mt-4 space-y-2">
 			for _, option := range options {
-				@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "h-auto rounded-full px-3 py-1 text-sm font-medium"}) {
-					{ option }
-				}
+				<p class="text-lg font-semibold tracking-[-0.02em]">{ option }</p>
 			}
 		</dd>
 	</div>
-}
-
-// ---------------------------------------------------------------- done
-// homeDone is the list of the parts every SaaS needs, each already done.
-templ homeDone() {
-	<section id="done" class={ homeAnchor, homeSection }>
-		<div class={ homeWrap }>
-			<h2 class={ typeH2, "max-w-[20ch]" }>Auth, billing, emails, admin. Done.</h2>
-			<p class={ typeLead, "mt-6 max-w-2xl" }>The parts every SaaS needs and no customer pays for. Built once, tested, and wired together before you open the editor.</p>
-			@card.Card(card.Props{Class: utils.CN(homeSurface, "mt-12 block px-6 sm:mt-16 sm:px-10")}) {
-				<ul>
-					for i, part := range homeParts {
-						if i > 0 {
-							@separator.Separator()
-						}
-						<li class="grid grid-cols-1 gap-2 py-6 sm:grid-cols-[12rem_minmax(0,1fr)_auto] sm:items-baseline sm:gap-8 sm:py-7">
-							<h3 class="text-lg font-semibold tracking-[-0.02em]">{ part.Title }</h3>
-							<p class={ typeText }>{ part.Text }</p>
-							<div class="order-first sm:order-none">
-								if part.Optional {
-									@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "h-auto rounded-full px-3 py-0.5 text-sm font-medium text-muted-foreground"}) {
-										If you pick it
-									}
-								} else {
-									@badge.Badge(badge.Props{Class: "h-auto gap-1.5 rounded-full bg-live/15 px-3 py-0.5 text-sm font-medium text-live"}) {
-										@icon.Check(icon.Props{Class: "size-3.5 stroke-3"})
-										Done
-									}
-								}
-							</div>
-						</li>
-					}
-				</ul>
-			}
-		</div>
-	</section>
-}
-
-type homePart struct {
-	Title, Text string
-	Optional    bool
-}
-
-var homeParts = []homePart{
-	{"Sign in", "Passwords, magic links, email verification and password resets. Sessions live in your database, so you can revoke them.", false},
-	{"Billing", "Stripe or Polar. Hosted checkout, monthly and yearly plans, trials and a customer portal. Signed webhooks, and an older event never overwrites a newer one.", false},
-	{"Plans and limits", "Free, Pro and Enterprise in one catalog. Feature gates and limits, checked in the same transaction as the write.", false},
-	{"Emails", "Welcome, magic link, password reset and email change, through SMTP or Resend.", false},
-	{"Admin", "Find users, see the numbers, revoke sessions. Look at an account as the user, read only.", false},
-	{"Production", "Migrations, security headers, CSRF, rate limits, structured logs, Sentry, a Dockerfile and CI.", false},
-	{"Teams", "Workspaces with Owner, Admin and Member roles, invitations and seat limits.", true},
-	{"Google and GitHub", "Sign in with OAuth next to passwords and magic links.", true},
-	{"API and MCP", "A JSON API with personal tokens, and an MCP server so your users' agents can work in your app.", true},
-	{"Blog, docs, uploads", "Markdown blog and docs, and S3 compatible file storage.", true},
 }
 
 // ---------------------------------------------------------------- repo
@@ -460,9 +457,6 @@ templ homeFAQ() {
 				@homeQuestion("What do I need?") {
 					Go 1.26 or newer, Git and Task, on macOS, Linux or WSL. SvelteKit also needs Node.js 22.17 or newer and pnpm. <a href="/docs/installation" class={ homeLink }>The setup guide</a>
 				}
-				@homeQuestion("Who builds it?") {
-					<a href="https://x.com/axadrn" target="_blank" rel="me noopener" class={ homeLink }>Axel Adrian</a>. He also maintains <a href={ templ.SafeURL(blocks.RefURL(blocks.ShadcnTemplURL, "faq")) } target="_blank" rel="noopener" class={ homeLink }>shadcn-templ</a>, the Go port of shadcn/ui that every component in your project comes from.
-				}
 			}
 		</div>
 	</section>
@@ -496,7 +490,7 @@ templ homeStart() {
 		<div class={ homeWrap, "flex flex-col items-center text-center" }>
 			<h2 class={ typeH2, "max-w-[18ch]" }>Someone will ship your idea. Make it you.</h2>
 			<p class={ typeLead, "mt-6 max-w-xl" }>Install the CLI, pick your stack, and start on the part only you can build.</p>
-			@homeInstall("mt-10 w-full max-w-2xl")
+			@homeInstall("mt-10 w-full max-w-[44rem]")
 			<div class="mt-8 flex flex-col gap-3 sm:flex-row">
 				@homePrimary("")
 				@button.Button(button.Props{Href: "/new", Variant: button.VariantSecondary, Size: button.SizeLg}) {

@@ -1,13 +1,13 @@
 package blocks
 
-import "github.com/axadrn/goilerplate/v4/site/ui/icons"
+import "github.com/axadrn/goilerplate/v4/site/brand"
 
-// Brand is the emblem next to the wordmark. id makes the mask of the emblem
-// unique, so the mark can show more than once on a page.
+// Brand is the emblem next to the name, set in wide capitals. id makes the mask of
+// the emblem unique, so the mark can show more than once on a page.
 templ Brand(id, class string) {
-	<span class={ "inline-flex items-center gap-[0.25em] " + class }>
-		@BrandMark(id, "h-[1.13em] w-auto")
-		@icons.GoilerplateWordmark("h-[0.9em] w-auto")
+	<span class={ "inline-flex items-center gap-[0.5em] " + class }>
+		@BrandMark(id, "h-[1.3em] w-auto")
+		<span class="text-[0.72em] font-semibold uppercase tracking-[0.2em]">{ brand.Name }</span>
 	</span>
 }
 
