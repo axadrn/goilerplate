@@ -2,6 +2,19 @@
 
 What shipped in goilerplate, newest first.
 
+## v4.0.1
+
+November 4, 2026
+
+**In short:** new projects deploy with moin, the new name of ops, so they keep working after the old name goes on December 4.
+
+### Changed
+- **compose.yml speaks moin**: new projects get an `x-moin` block instead of `x-ops`. Projects you already made keep working until December 4; rename `x-ops:` to `x-moin:` in their compose.yml before then.
+- **Deploy with moin**: the guide moved to [Deploy with moin](https://goilerplate.com/docs/guides/deploy-with-moin); the old address leads there.
+
+### Upgrade
+Install the new CLI: `go install github.com/axadrn/goilerplate/v4/cmd/goilerplate@latest`.
+
 ## v4.0.0
 
 November 2, 2026
