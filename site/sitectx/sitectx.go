@@ -11,6 +11,7 @@ type key struct{}
 type Page struct {
 	Path  string
 	Stars int
+	Dev   bool
 }
 
 // With returns a context for rendering the page.
@@ -25,6 +26,9 @@ func from(ctx context.Context) Page {
 
 // URLPath is the path the page is rendered for, such as /docs/installation.
 func URLPath(ctx context.Context) string { return from(ctx).Path }
+
+// Dev reports a page of the dev server, which leaves out the analytics.
+func Dev(ctx context.Context) bool { return from(ctx).Dev }
 
 // Stars is the number of GitHub stars of the repo at build time.
 func Stars(ctx context.Context) int { return from(ctx).Stars }

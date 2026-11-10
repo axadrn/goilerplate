@@ -2,6 +2,7 @@ package layouts
 
 import (
 	"github.com/axadrn/goilerplate/v4/site/brand"
+	"github.com/axadrn/goilerplate/v4/site/sitectx"
 	"github.com/axadrn/goilerplate/v4/site/ui/components"
 	"github.com/axadrn/goilerplate/v4/site/ui/utils"
 )
@@ -33,6 +34,10 @@ templ Base(props ...SEOProps) {
 			// A new version on every start, so no cache keeps an old stylesheet.
 			<link href={ utils.ScriptURL("/assets/css/output.css") } rel="stylesheet"/>
 			@components.Scripts()
+			// Umami Analytics
+			if !sitectx.Dev(ctx) {
+				<script defer data-website-id="fc73fc11-017e-47a6-91af-e92bc1b541f1" src="https://umami.axeladrian.com/script.js" nonce={ templ.GetNonce(ctx) }></script>
+			}
 			@themeScript()
 		</head>
 		<body class="style-nova min-h-screen">
