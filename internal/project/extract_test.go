@@ -21,7 +21,7 @@ func TestCreatePublishesGitRepositoryWithInitialCommit(t *testing.T) {
 	for arguments, want := range map[string]string{
 		"branch --show-current":        "main",
 		"log -1 --format=%s":           "Initial commit",
-		"log -1 --format=%an%x20<%ae>": "goilerplate <noreply@example.com>",
+		"log -1 --format=%an%x20<%ae>": "goilerplate <>",
 		"status --porcelain":           "",
 	} {
 		fields := strings.Fields(arguments)
