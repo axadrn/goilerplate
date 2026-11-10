@@ -1,7 +1,6 @@
 package docs
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,19 +14,16 @@ import (
 )
 
 type DocsService struct {
-	parser       *markdown.Parser
-	contentPath  string
-	supportEmail string
-	docsTree     *DocPage
+	parser      *markdown.Parser
+	contentPath string
+	docsTree    *DocPage
 }
 
-// NewDocsService reads the pages in <contentPath>/docs. {{support_email}} in
-// a page becomes supportEmail.
-func NewDocsService(contentPath, supportEmail string) *DocsService {
+// NewDocsService reads the pages in <contentPath>/docs.
+func NewDocsService(contentPath string) *DocsService {
 	return &DocsService{
-		parser:       markdown.NewParser(),
-		contentPath:  contentPath,
-		supportEmail: supportEmail,
+		parser:      markdown.NewParser(),
+		contentPath: contentPath,
 	}
 }
 
@@ -89,7 +85,6 @@ func (s *DocsService) loadDocPage(fullPath, relPath string) (*DocPage, error) {
 	if err != nil {
 		return nil, err
 	}
-	content = bytes.ReplaceAll(content, []byte("{{support_email}}"), []byte(s.supportEmail))
 
 	htmlContent, meta, err := s.parser.ParseWithFrontmatter(content)
 	if err != nil {

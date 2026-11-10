@@ -187,8 +187,8 @@ func writeTemplateCommits(destination io.Writer, importRef, oldRoot string, oldF
 func writeTemplateCommit(writer *bufio.Writer, importRef, root string, files []string, mark, parent, message string) error {
 	fmt.Fprintln(writer, "commit", importRef)
 	fmt.Fprintln(writer, "mark", mark)
-	fmt.Fprintln(writer, "author goilerplate <noreply@goilerplate.com> 0 +0000")
-	fmt.Fprintln(writer, "committer goilerplate <noreply@goilerplate.com> 0 +0000")
+	fmt.Fprintln(writer, "author goilerplate <noreply@example.com> 0 +0000")
+	fmt.Fprintln(writer, "committer goilerplate <noreply@example.com> 0 +0000")
 	fmt.Fprintf(writer, "data %d\n%s\n", len(message), message)
 	if parent != "" {
 		fmt.Fprintln(writer, "from", parent)
@@ -397,8 +397,8 @@ func gitEnvironment() []string {
 	}
 	return append(environment,
 		"GIT_AUTHOR_NAME=goilerplate",
-		"GIT_AUTHOR_EMAIL=updates@goilerplate.com",
+		"GIT_AUTHOR_EMAIL=noreply@example.com",
 		"GIT_COMMITTER_NAME=goilerplate",
-		"GIT_COMMITTER_EMAIL=updates@goilerplate.com",
+		"GIT_COMMITTER_EMAIL=noreply@example.com",
 	)
 }

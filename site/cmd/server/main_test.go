@@ -36,7 +36,6 @@ func TestSiteRendersPagesRedirectsAndTheRetiredAPI(t *testing.T) {
 		{method: "GET", path: "/docs", status: 200, body: "<html"},
 		{method: "GET", path: "/docs/installation", status: 200, body: "<html"},
 		{method: "GET", path: "/docs/installation.md", status: 200, body: "#"},
-		{method: "GET", path: "/legal/privacy", status: 200, body: "<html"},
 		{method: "GET", path: "/sitemap.xml", status: 200, body: "/docs/installation</loc>"},
 		{method: "GET", path: "/llms.txt", status: 200, body: "/docs/installation.md"},
 		{method: "GET", path: "/robots.txt", status: 200, body: "Sitemap:"},

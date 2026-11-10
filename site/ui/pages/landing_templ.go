@@ -44,7 +44,7 @@ const (
 	// homeCode is a dark code panel.
 	homeCode = "ops-term min-w-0 rounded-3xl bg-terminal text-sm leading-[1.75] text-terminal-foreground"
 	// homeDisplay and homeLead are the page titles of the changelog, the
-	// builder and the legal pages.
+	// builder.
 	homeDisplay = "font-display leading-[0.95]"
 	homeLead    = "text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9"
 )

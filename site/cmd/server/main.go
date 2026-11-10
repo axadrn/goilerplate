@@ -40,11 +40,11 @@ func main() {
 		os.Exit(healthcheck())
 	}
 	addr := flag.String("addr", ":8090", "address to listen on")
-	content := flag.String("content", "content", "directory with the docs and legal Markdown")
+	content := flag.String("content", "content", "directory with the docs Markdown")
 	changelog := flag.String("changelog", "CHANGELOG.md", "the changelog to publish")
 	assets := flag.String("assets", "site/assets", "directory with the built assets")
 	stars := flag.Bool("stars", true, "ask GitHub for the star count of the repo every hour")
-	dev := flag.Bool("dev", false, "read the Markdown again on every request and leave out the analytics")
+	dev := flag.Bool("dev", false, "read the Markdown again on every request")
 	flag.Parse()
 
 	site, err := newSite(*content, *changelog, *assets, *dev)
@@ -86,7 +86,8 @@ var redirects = map[string]string{
 	"/pricing":                        "/",
 	"/license":                        "/",
 	"/affiliates":                     "/",
-	"/legal/terms":                    "/legal/privacy",
+	"/legal/terms":                    "/",
+	"/legal/privacy":                  "/",
 	"/moin":                           "https://moin.run",
 	"/blog":                           "/",
 	"/docs/introduction":              "/docs",
@@ -116,7 +117,6 @@ type site struct {
 type markdown struct {
 	docs      map[string]docsPage
 	tree      *docs.DocPage
-	privacy   *docs.LegalPage
 	changelog string
 	llms      string
 	sitemap   []byte
@@ -168,7 +168,7 @@ func (s *site) read() (*markdown, error) {
 	}
 	result.changelog = rendered.String()
 
-	service := docs.NewDocsService(s.content, brand.SupportEmail)
+	service := docs.NewDocsService(s.content)
 	result.tree, err = service.DocsTree()
 	if err != nil {
 		return nil, fmt.Errorf("read docs: %w", err)
@@ -189,16 +189,6 @@ func (s *site) read() (*markdown, error) {
 	}
 	fmt.Fprintf(&llms, "\n## Product\n\n- [Stack builder](%s/new): Choose the stack and copy the matching goilerplate new command.\n- [Changelog](%s/changelog): What shipped, newest first.\n- [Source](https://github.com/%s): The CLI, the generator and this website.\n", brand.URL, brand.URL, githubstars.Repo)
 	result.llms = llms.String()
-
-	legal := docs.NewLegalService(s.content, brand.SupportEmail)
-	if err := legal.LoadPages(); err != nil {
-		return nil, fmt.Errorf("read legal pages: %w", err)
-	}
-	result.privacy, err = legal.Page("privacy")
-	if err != nil {
-		return nil, fmt.Errorf("read privacy policy: %w", err)
-	}
-	paths = append(paths, "/legal/privacy")
 
 	result.sitemap, err = sitemap(paths)
 	if err != nil {
@@ -303,9 +293,6 @@ func (s *site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/changelog":
 		s.render(w, r, http.StatusOK, pages.Changelog(md.changelog))
 		return
-	case "/legal/privacy":
-		s.render(w, r, http.StatusOK, pages.Legal(md.privacy))
-		return
 	case "/favicon.ico":
 		// Browsers, link previews and analytics ask for it at the root.
 		s.asset(w, r, "img/favicon.ico")
@@ -332,7 +319,7 @@ func (s *site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *site) render(w http.ResponseWriter, r *http.Request, status int, component templ.Component) {
-	ctx := sitectx.With(r.Context(), sitectx.Page{Path: r.URL.Path, Stars: int(s.stars.Load()), Dev: s.dev})
+	ctx := sitectx.With(r.Context(), sitectx.Page{Path: r.URL.Path, Stars: int(s.stars.Load())})
 	var buffer bytes.Buffer
 	if err := component.Render(ctx, &buffer); err != nil {
 		log.Printf("render %s: %v", r.URL.Path, err)

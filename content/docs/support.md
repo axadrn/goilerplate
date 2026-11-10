@@ -1,6 +1,6 @@
 ---
 title: Support
-description: GitHub for everything public. One email for private reports.
+description: All support happens on GitHub. Security reports stay private there.
 order: 90
 ---
 
@@ -14,9 +14,9 @@ Pull requests are welcome. Contributions come in under the license of the files 
 
 Never post credentials, tokens, private source code, or security vulnerabilities in a public issue.
 
-## Email
+## Security reports
 
-Email [{{support_email}}](mailto:{{support_email}}) for private security reports.
+Report a vulnerability [privately on GitHub](https://github.com/axadrn/goilerplate/security/advisories/new).
 
 Replies are best effort. There is no guaranteed response time.
 

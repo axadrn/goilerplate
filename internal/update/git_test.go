@@ -57,7 +57,7 @@ func TestMergeCreatesUpdateBranchWithoutTouchingCurrentWorktree(t *testing.T) {
 	if branch := strings.TrimSpace(runTestGit(t, repositoryRoot, "branch", "--show-current")); branch != "main" {
 		t.Fatalf("current branch = %q", branch)
 	}
-	if author := strings.TrimSpace(runTestGit(t, repositoryRoot, "show", "-s", "--format=%an <%ae>", result.Branch)); author != "goilerplate <updates@goilerplate.com>" {
+	if author := strings.TrimSpace(runTestGit(t, repositoryRoot, "show", "-s", "--format=%an <%ae>", result.Branch)); author != "goilerplate <noreply@example.com>" {
 		t.Fatalf("update author = %q", author)
 	}
 	if content := runTestGit(t, repositoryRoot, "show", result.Branch+":app.txt"); content != "new title\nkeep one\nkeep two\nkeep three\ncustom: customer\nfooter\n" {
