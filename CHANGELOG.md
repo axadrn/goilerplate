@@ -2,6 +2,19 @@
 
 What shipped in goilerplate, newest first.
 
+## v4.0.2
+
+November 10, 2026
+
+**In short:** goilerplate needs no mail address any more. Support happens on GitHub.
+
+### Changed
+- **Commits from the CLI**: `goilerplate new` and `goilerplate update` commit as `goilerplate` with no email address.
+- **Support on GitHub**: questions and bugs go to GitHub Issues. Security reports go through GitHub's private reporting.
+
+### Upgrade
+Install the new CLI: `go install github.com/axadrn/goilerplate/v4/cmd/goilerplate@latest`.
+
 ## v4.0.1
 
 November 4, 2026
