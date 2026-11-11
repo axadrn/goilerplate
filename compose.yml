@@ -1,8 +1,7 @@
-# goilerplate.com, deployed by moin: every push to main goes live on prod-01.
+# goilerplate.com, deployed by moin: every push to main goes live.
 # https://moin.run/docs/guides/config
 x-moin:
   app: goilerplate
-  server: prod-01
   port: 8090
   health: /healthz
   domains: [goilerplate.com, www.goilerplate.com]
