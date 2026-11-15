@@ -1,4 +1,5 @@
-# goilerplate.com, deployed by moin: every push to main goes live.
+# goilerplate.com, run by moin. CI builds the image and its deploy hook
+# ships each new tag (.github/workflows/deploy.yml).
 # https://moin.run/docs/guides/config
 x-moin:
   app: goilerplate
@@ -9,6 +10,4 @@ x-moin:
 
 services:
   site:
-    build:
-      context: .
-      dockerfile: site/Dockerfile
+    image: ghcr.io/axadrn/goilerplate.com:latest

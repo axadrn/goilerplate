@@ -1,0 +1,50 @@
+# Builds the image and hands it to moin, which deploys it: no way into the
+# server from here. The secret MOIN_DEPLOY_HOOK deploys only new tags of
+# this image. https://moin.run/docs/guides/ci
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: site/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ghcr.io/axadrn/goilerplate.com:${{ github.sha }}
+            ghcr.io/axadrn/goilerplate.comatest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy with moin
+        env:
+          MOIN_DEPLOY_HOOK: ${{ secrets.MOIN_DEPLOY_HOOK }}
+        run: curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=ghcr.io/axadrn/goilerplate.com:${GITHUB_SHA}"
