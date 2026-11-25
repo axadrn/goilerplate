@@ -58,6 +58,10 @@ goilerplate new --module example.com/acme --framework htmx --database sqlite --p
 
 SvelteKit projects also need Node.js 22.17+ and pnpm.
 
+## Deploy it
+
+Ship your app to a server you own with [moin](https://moin.run), by the same author: `moin deploy`, and its database is backed up.
+
 ## License
 
 - The CLI and this repository are [MIT](LICENSE).
