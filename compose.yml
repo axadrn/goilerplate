@@ -1,13 +1,7 @@
 # goilerplate.com, run by moin. CI builds the image and its deploy hook
 # ships each new tag (.github/workflows/deploy.yml).
-# https://moin.run/docs/guides/config
-x-moin:
-  app: goilerplate
-  port: 8090
-  health: /healthz
-  domains: [goilerplate.com, www.goilerplate.com]
-  canonical: goilerplate.com
-
+# https://moin.run/docs/guides/compose
 services:
   site:
     image: ghcr.io/axadrn/goilerplate.com:latest
+    expose: ["8090"]
