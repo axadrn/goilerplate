@@ -10,8 +10,9 @@ Pick one provider during generation:
 
 - Stripe.
 - Polar.
+- Creem.
 
-Only that provider enters the project. Both adapters produce the same local subscription states. Product access remains provider-agnostic.
+Only that provider enters the project. All adapters produce the same local subscription states. Product access remains provider-agnostic.
 
 ## What is included
 
@@ -50,6 +51,25 @@ STRIPE_PRICE_ID_ENTERPRISE_YEARLY=price_xxx
 Polar is useful when you want a developer-focused Merchant of Record. Test and production resources are separate. Before going live, create the production products and prices. Add the production API keys and webhook secrets too.
 
 The in-app Manage subscription button creates a short-lived Polar Customer Portal session for the selected workspace. Customers change plans, payment methods, invoices, and cancellations there. The generated app does not duplicate those controls.
+
+## Creem
+
+Select Creem with `goilerplate new --payment creem` or in the builder. In [Creem Test Mode](https://docs.creem.io/getting-started/test-mode), create one recurring product per plan and interval you offer. The default catalog has Pro and Enterprise, each with monthly and yearly billing. Set up the same products in live mode before going to production.
+
+Register `https://your-app.example/webhooks/payment` in Creem and copy the signing secret. If you select individual [webhook events](https://docs.creem.io/code/webhooks), enable `checkout.completed`, `subscription.active`, `subscription.paid`, `subscription.trialing`, `subscription.update`, `subscription.scheduled_cancel`, `subscription.canceled`, `subscription.past_due`, `subscription.unpaid`, `subscription.expired`, and `subscription.paused`.
+
+```env
+CREEM_API_KEY=creem_test_xxx
+CREEM_WEBHOOK_SECRET=your_signing_secret
+CREEM_PRODUCT_ID_PRO_MONTHLY=prod_pro_monthly_xxx
+CREEM_PRODUCT_ID_PRO_YEARLY=prod_pro_yearly_xxx
+CREEM_PRODUCT_ID_ENTERPRISE_MONTHLY=prod_enterprise_monthly_xxx
+CREEM_PRODUCT_ID_ENTERPRISE_YEARLY=prod_enterprise_yearly_xxx
+```
+
+Development uses the test API, and production uses the live API. Set `CREEM_SANDBOX_MODE` to override the default. Use credentials, webhook secrets, and product IDs from the same mode.
+
+The in-app Manage subscription button opens the [Creem Customer Portal](https://docs.creem.io/features/customer-portal). Customers sign in with the email they used at checkout to manage cards, view invoices, and cancel. Enable self-service upgrades in a Creem product bundle if you want customers to switch plans there.
 
 ## Local source of truth
 

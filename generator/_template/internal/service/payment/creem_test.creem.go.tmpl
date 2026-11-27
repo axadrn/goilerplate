@@ -1,0 +1,225 @@
+package payment
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/repository"
+	"{{.ModulePath}}/internal/service"
+	"{{.ModulePath}}/internal/testutil"
+)
+
+func TestCreemCheckoutAndSubscriptionLifecycle(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "creem-user"})
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(database){{ if .Workspaces }}, repository.NewAdminRepository(database){{ end }})
+{{- if .Workspaces }}
+	accountID := fixture.Workspace.ID
+	wantReturnURL := "https://app.example.com/app/" + fixture.Workspace.Slug + "/billing"
+{{- else }}
+	accountID := fixture.User.ID
+	wantReturnURL := "https://app.example.com/app/billing"
+{{- end }}
+	cfg := &config.Config{
+		AppURL: "https://app.example.com",
+		CreemAPIKey: "creem_test_key",
+		CreemWebhookSecret: "signing-secret",
+		CreemSandboxMode: true,
+		CreemProductIDProMonthly: "prod_pro",
+		CreemProductIDEnterpriseYearly: "prod_enterprise",
+	}
+	provider := NewCreemProvider(cfg, subscriptions)
+	if provider.baseURL != creemTestAPI {
+		t.Fatalf("sandbox base URL = %q, want %q", provider.baseURL, creemTestAPI)
+	}
+
+	const checkoutURL = "https://checkout.creem.io/ch_test"
+	requests := make(chan creemCheckoutRequest, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/checkouts" || r.Header.Get("x-api-key") != cfg.CreemAPIKey {
+			t.Errorf("unexpected checkout request %s %s", r.Method, r.URL.Path)
+		}
+		var checkout creemCheckoutRequest
+		if err := json.NewDecoder(r.Body).Decode(&checkout); err != nil {
+			t.Errorf("decode checkout request: %v", err)
+		}
+		requests <- checkout
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"checkout_url":"` + checkoutURL + `"}`))
+	}))
+	defer server.Close()
+	provider.baseURL = server.URL
+
+	checkout := func() {
+		t.Helper()
+		url, err := provider.CreateCheckoutURL(accountID, {{ if .Workspaces }}fixture.Workspace.Slug, {{ end }}model.SubscriptionPlanPro, model.SubscriptionIntervalMonthly, fixture.User.Email, fixture.User.Name)
+		if err != nil || url != checkoutURL {
+			t.Fatalf("CreateCheckoutURL() = %q, %v", url, err)
+		}
+	}
+	checkout()
+	request := <-requests
+	if request.ProductID != "prod_pro" || request.SuccessURL != wantReturnURL || request.Customer["email"] != fixture.User.Email ||
+		request.Metadata.AccountID != accountID || request.Metadata.SubscriptionID == "" {
+		t.Fatalf("checkout request = %#v", request)
+	}
+{{- if .Workspaces }}
+	if request.RequestID == "" || request.Metadata.AttemptID != request.RequestID {
+		t.Fatalf("checkout request has no matching attempt: %#v", request)
+	}
+	checkout()
+	if len(requests) != 0 {
+		t.Fatal("repeated checkout reached Creem")
+	}
+{{- end }}
+
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	monthEnd := now.AddDate(0, 1, 0)
+	obj := map[string]any{
+		"id": "sub_test", "customer": map[string]string{"id": "cust_test"},
+		"product": map[string]string{"id": "prod_pro"}, "metadata": request.Metadata,
+		"created_at": now, "updated_at": now, "current_period_end_date": monthEnd, "status": "active",
+	}
+	deliver := func(eventType string, object map[string]any) {
+		t.Helper()
+		payload, err := json.Marshal(map[string]any{"eventType": eventType, "object": object})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := provider.HandleWebhook(payload, signCreemWebhook(payload, cfg.CreemWebhookSecret)); err != nil {
+			t.Fatalf("handle %s: %v", eventType, err)
+		}
+	}
+	stored := func() *model.Subscription {
+		t.Helper()
+		sub, err := subscriptions.Subscription(accountID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sub
+	}
+
+	deliver("subscription.active", obj)
+	if sub := stored(); sub.Provider == model.ProviderCreem {
+		t.Fatalf("active event alone granted access: %#v", sub)
+	}
+
+	// Checkout webhooks can carry the payer and product as bare IDs.
+	nested := map[string]any{
+		"id": "sub_test", "customer": "cust_test", "product": "prod_pro",
+		"created_at": now, "updated_at": now, "current_period_end_date": monthEnd, "status": "trialing",
+	}
+	deliver("checkout.completed", map[string]any{"metadata": request.Metadata, "subscription": nested})
+	if sub := stored(); sub.Status != model.SubscriptionStatusTrialing || sub.PlanID != model.SubscriptionPlanPro {
+		t.Fatalf("trial subscription = %#v", sub)
+	}
+
+	obj["updated_at"] = now.Add(time.Second)
+	obj["last_transaction"] = map[string]any{"amount": 1200, "currency": "EUR", "created_at": now.Add(time.Second).UnixMilli()}
+	delete(obj, "metadata")
+	deliver("subscription.paid", obj)
+	deliver("subscription.paid", obj)
+	if sub := stored(); sub.Provider != model.ProviderCreem || stringValue(sub.ProviderCustomerID) != "cust_test" ||
+		sub.Status != model.SubscriptionStatusActive || sub.Amount == nil || *sub.Amount != 1200 || sub.Currency != "eur" {
+		t.Fatalf("paid subscription = %#v", sub)
+	}
+{{- if .Workspaces }}
+	portal, err := provider.BillingManagementURL(accountID, fixture.Workspace.Slug)
+{{- else }}
+	portal, err := provider.CustomerPortalURL(accountID)
+{{- end }}
+	if err != nil || portal != creemPortal {
+		t.Fatalf("billing management = %q, %v", portal, err)
+	}
+
+	obj["updated_at"] = now.Add(2 * time.Second)
+	obj["items"] = []map[string]string{
+		{"product_id": "prod_enterprise"},
+	}
+	deliver("subscription.update", obj)
+	if sub := stored(); sub.PlanID != model.SubscriptionPlanEnterprise || stringValue(sub.Interval) != model.SubscriptionIntervalYearly {
+		t.Fatalf("updated subscription = %#v", sub)
+	}
+
+	obj["updated_at"] = now.Add(3 * time.Second)
+	obj["status"] = "scheduled_cancel"
+	deliver("subscription.scheduled_cancel", obj)
+	obj["updated_at"] = now.Add(2 * time.Second)
+	obj["status"] = "active"
+	deliver("subscription.paid", obj)
+	if sub := stored(); sub.Status != model.SubscriptionStatusCancelled || sub.CurrentPeriodEnd == nil || !sub.CurrentPeriodEnd.Equal(monthEnd) {
+		t.Fatalf("scheduled cancellation after stale payment = %#v", sub)
+	}
+
+	obj["updated_at"] = now.Add(4 * time.Second)
+	obj["status"] = "canceled"
+	deliver("subscription.canceled", obj)
+	obj["updated_at"] = now.Add(time.Second)
+	obj["status"] = "active"
+	obj["metadata"] = request.Metadata
+	deliver("subscription.paid", obj)
+	if sub := stored(); sub.HasProviderSubscription() || sub.PlanID != model.SubscriptionPlanFree || sub.Status != model.SubscriptionStatusInactive {
+		t.Fatalf("canceled subscription after stale payment = %#v", sub)
+	}
+	checkout()
+	replacement := <-requests
+	obj["id"] = "sub_replacement"
+	obj["created_at"] = now.Add(5 * time.Second)
+	obj["updated_at"] = now.Add(5 * time.Second)
+	obj["metadata"] = replacement.Metadata
+	obj["product"] = "prod_pro"
+	delete(obj, "items")
+	deliver("subscription.paid", obj)
+	if sub := stored(); stringValue(sub.ProviderSubscriptionID) != "sub_replacement" || sub.PlanID != model.SubscriptionPlanPro || sub.Status != model.SubscriptionStatusActive {
+		t.Fatalf("replacement subscription = %#v", sub)
+	}
+
+	// Creem may send an expiration with an unchanged object revision.
+	obj["current_period_end_date"] = now.Add(6 * time.Second)
+	deliver("subscription.expired", obj)
+	if sub := stored(); sub.Status != model.SubscriptionStatusPastDue {
+		t.Fatalf("expired subscription = %#v", sub)
+	}
+
+	obj["updated_at"] = now.Add(7 * time.Second)
+	obj["current_period_end_date"] = monthEnd
+	deliver("subscription.paid", obj)
+	if sub := stored(); sub.Status != model.SubscriptionStatusActive {
+		t.Fatalf("recovered subscription = %#v", sub)
+	}
+}
+
+func TestCreemWebhookRequiresValidSignature(t *testing.T) {
+	payload := []byte(`{"eventType":"ignored","object":{}}`)
+	provider := NewCreemProvider(&config.Config{CreemWebhookSecret: "signing-secret"}, nil)
+	valid := signCreemWebhook(payload, provider.cfg.CreemWebhookSecret)
+	if err := provider.HandleWebhook(payload, valid); err != nil {
+		t.Fatalf("valid signature: %v", err)
+	}
+	if err := provider.HandleWebhook(append(payload, ' '), valid); err == nil {
+		t.Fatal("accepted altered body")
+	}
+	if err := provider.HandleWebhook(payload, http.Header{}); err == nil {
+		t.Fatal("accepted missing signature")
+	}
+	provider.cfg.CreemWebhookSecret = ""
+	if err := provider.HandleWebhook(payload, signCreemWebhook(payload, "")); err == nil {
+		t.Fatal("accepted an empty signing secret")
+	}
+}
+
+func signCreemWebhook(payload []byte, secret string) http.Header {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	headers := make(http.Header)
+	headers.Set("creem-signature", hex.EncodeToString(mac.Sum(nil)))
+	return headers
+}

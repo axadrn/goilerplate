@@ -338,7 +338,7 @@ func configuratorFrontends(config Config) []Framework {
 func configuratorSelections() []Config {
 	var selections []Config
 	for _, database := range []Database{DatabaseSQLite, DatabasePostgres} {
-		for _, payment := range []Payment{PaymentStripe, PaymentPolar} {
+		for _, payment := range []Payment{PaymentStripe, PaymentPolar, PaymentCreem} {
 			for _, mail := range []Mail{MailSMTP, MailResend} {
 				for _, workspaces := range []bool{false, true} {
 					for _, oauth := range [][]OAuth{nil, {OAuthGoogle}, {OAuthGitHub}, {OAuthGoogle, OAuthGitHub}} {

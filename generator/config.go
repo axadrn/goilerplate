@@ -27,6 +27,7 @@ const (
 	DatabaseSQLite   Database = "sqlite"
 	DatabasePostgres Database = "postgres"
 
+	PaymentCreem  Payment = "creem"
 	PaymentPolar  Payment = "polar"
 	PaymentStripe Payment = "stripe"
 
@@ -110,7 +111,7 @@ func (c Config) normalized() (Config, error) {
 	}
 	if c.Payment == "" {
 		validationErrors = append(validationErrors, errors.New("a payment provider is required"))
-	} else if c.Payment != PaymentPolar && c.Payment != PaymentStripe {
+	} else if c.Payment != PaymentPolar && c.Payment != PaymentStripe && c.Payment != PaymentCreem {
 		validationErrors = append(validationErrors, fmt.Errorf("unsupported payment provider %q", c.Payment))
 	}
 	if c.Mail != MailSMTP && c.Mail != MailResend {

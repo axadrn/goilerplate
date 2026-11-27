@@ -8,7 +8,7 @@ A source is selected when every condition word in its file or directory path mat
 |---|---|
 | `framework` | `htmx`, `datastar`, `headless`, `svelte` |
 | `database` | `sqlite`, `postgres` |
-| `payment` | `polar`, `stripe` |
+| `payment` | `polar`, `stripe`, `creem` |
 | `mail` | `smtp`, `resend` |
 | `workspaces` | `workspaces`, `no_workspaces` |
 | `storage` | `storage`, `no_storage` |

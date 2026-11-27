@@ -552,7 +552,7 @@ func Configurator() templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = configuratorSelect("payment", "Payments", []configuratorChoice{{string(generator.PaymentStripe), "Stripe"}, {string(generator.PaymentPolar), "Polar"}}).Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = configuratorSelect("payment", "Payments", []configuratorChoice{{string(generator.PaymentStripe), "Stripe"}, {string(generator.PaymentPolar), "Polar"}, {string(generator.PaymentCreem), "Creem"}}).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

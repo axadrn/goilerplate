@@ -147,6 +147,9 @@ func TestLoadRequiresSelectedPaymentProviderCredentials(t *testing.T) {
 	t.Setenv("STRIPE_WEBHOOK_SECRET", "")
 {{- else if eq .Payment "polar" }}
 	t.Setenv("POLAR_API_KEY", "")
+{{- else if eq .Payment "creem" }}
+	t.Setenv("CREEM_API_KEY", "")
+	t.Setenv("CREEM_WEBHOOK_SECRET", "")
 {{- end }}
 
 	_, err := Load()
@@ -166,6 +169,10 @@ func TestLoadRequiresSelectedPaymentProviderCredentials(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "STRIPE_") {
 		t.Fatalf("Load() error = %q, contains unused Stripe configuration", err)
+	}
+{{- else if eq .Payment "creem" }}
+	if !strings.Contains(err.Error(), "CREEM_API_KEY") || !strings.Contains(err.Error(), "CREEM_WEBHOOK_SECRET") {
+		t.Fatalf("Load() error = %q, want missing Creem credentials", err)
 	}
 {{- end }}
 }
@@ -320,6 +327,10 @@ func setCoreEnvironment(t *testing.T) {
 		"POLAR_API_KEY",
 		"POLAR_WEBHOOK_SECRET",
 		"POLAR_SANDBOX_MODE",
+{{- else if eq .Payment "creem" }}
+		"CREEM_API_KEY",
+		"CREEM_WEBHOOK_SECRET",
+		"CREEM_SANDBOX_MODE",
 {{- else if eq .Payment "stripe" }}
 		"STRIPE_SECRET_KEY",
 		"STRIPE_WEBHOOK_SECRET",
@@ -346,6 +357,9 @@ func setCoreEnvironment(t *testing.T) {
 	t.Setenv("STRIPE_WEBHOOK_SECRET", "whsec_test")
 {{- else if eq .Payment "polar" }}
 	t.Setenv("POLAR_API_KEY", "polar_test")
+{{- else if eq .Payment "creem" }}
+	t.Setenv("CREEM_API_KEY", "creem_test_key")
+	t.Setenv("CREEM_WEBHOOK_SECRET", "webhook_secret")
 {{- end }}
 {{- if .Storage }}
 	t.Setenv("S3_REGION", "auto")

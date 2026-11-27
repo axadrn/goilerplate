@@ -227,11 +227,11 @@ func TestBackgroundMessageSelectsReadableLightTheme(t *testing.T) {
 	}
 }
 
-func TestPaymentOffersStripeAndPolar(t *testing.T) {
+func TestPaymentOffersStripePolarAndCreem(t *testing.T) {
 	selection := newModel()
 	selection.setStep(stepPayment)
 	options := selection.options()
-	if len(options) != 2 || options[0].value != "stripe" || options[1].value != "polar" || selection.cursor != 0 {
+	if len(options) != 3 || options[0].value != "stripe" || options[1].value != "polar" || options[2].value != "creem" || selection.cursor != 0 {
 		t.Fatalf("payment options = %#v, cursor = %d", options, selection.cursor)
 	}
 	title, _ := selection.question()

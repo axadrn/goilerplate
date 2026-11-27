@@ -1,0 +1,1 @@
+{"project_name":"Headless Creem","module_path":"example.com/headless-creem","framework":"headless","database":"sqlite","payment":"creem","mail":"smtp","workspaces":false,"api":true}

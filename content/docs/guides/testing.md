@@ -29,6 +29,7 @@ The suite follows the generated selection. Provider and optional-feature tests s
 | PostgreSQL | The same database suite on temporary PostgreSQL 17 containers, including PostgreSQL migrations, queries, transactions, and locks |
 | Stripe | Selected factory, status mapping, invalid signatures, and webhook subscription behavior |
 | Polar | Selected factory, status mapping, invalid signatures, and webhook subscription behavior |
+| Creem | Hosted checkout requests, signed subscription events, and stale event handling |
 | Workspaces | Membership scope, invitations, roles, tenant isolation, seat limits, billing ownership, and concurrency races |
 | Google or GitHub OAuth | Selected provider state cookies and account provisioning |
 | SMTP or Resend | Only the selected mail adapter behavior |

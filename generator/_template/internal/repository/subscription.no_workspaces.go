@@ -130,7 +130,7 @@ func (r *subscriptionRepository) UpdateIfProviderStateNewer(
 ) (bool, error) {
 	paymentReset := ""
 	if subscriptionCreatedAt != nil {
-		paymentReset = "provider_payment_updated_at = NULL,"
+		paymentReset = "provider_payment_updated_at = CASE WHEN provider_subscription_id = $5 THEN provider_payment_updated_at ELSE NULL END,"
 	}
 	query := `
 		UPDATE subscriptions

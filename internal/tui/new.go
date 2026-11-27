@@ -434,7 +434,7 @@ func (m model) options() []option {
 	case stepDatabase:
 		return []option{{label: "SQLite", value: "sqlite"}, {label: "PostgreSQL", value: "postgres"}}
 	case stepPayment:
-		return []option{{label: "Stripe", value: "stripe"}, {label: "Polar", value: "polar"}}
+		return []option{{label: "Stripe", value: "stripe"}, {label: "Polar", value: "polar"}, {label: "Creem", value: "creem"}}
 	case stepMail:
 		return []option{{label: "SMTP", value: "smtp"}, {label: "Resend", value: "resend"}}
 	case stepAPI, stepMCP, stepWorkspaces, stepStorage:
@@ -716,6 +716,8 @@ func displayValue(value string) string {
 		return "Stripe"
 	case "polar":
 		return "Polar"
+	case "creem":
+		return "Creem"
 	case "smtp":
 		return "SMTP"
 	case "resend":

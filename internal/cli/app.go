@@ -67,7 +67,7 @@ func (a *App) help(arguments []string) error {
 			"--name \"Acme\" is the project name. Defaults to the directory name.",
 			"--framework htmx, datastar, svelte or headless. htmx by default.",
 			"--database sqlite or postgres. sqlite by default.",
-			"--payment stripe or polar. stripe by default.",
+			"--payment stripe, polar or creem. stripe by default.",
 			"--mail smtp or resend. smtp by default.",
 			"--workspaces adds teams with roles, invitations and seats.",
 			"--oauth google,github adds sign-in providers.",

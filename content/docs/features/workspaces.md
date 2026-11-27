@@ -59,7 +59,7 @@ Invitation acceptance checks the current plan and member count in one transactio
 
 With Workspaces selected, the workspace owns the subscription. Only Owners may start checkout or open billing management.
 
-Provider metadata carries `workspace_id`. Stripe and Polar create billing management sessions for the selected workspace's provider customer. The app never exposes a local cross-workspace billing management surface.
+Provider metadata carries `workspace_id`. Stripe and Polar create billing management sessions for the selected workspace's provider customer. Creem opens its customer portal sign-in page, where customers authenticate with the email they used at checkout. The app never exposes a local cross-workspace billing management surface.
 
 A workspace with active external billing or a live checkout attempt cannot be deleted. This prevents a local deletion from leaving an external subscription charging without recovery data.
 

@@ -260,7 +260,7 @@ func TestNewRejectsUnknownPaymentBeforeGenerating(t *testing.T) {
 		err := app.Run(context.Background(), []string{
 			"new", "--module", "example.com/acme", "--payment", payment, filepath.Join(t.TempDir(), "acme"),
 		})
-		if err == nil || !strings.Contains(err.Error(), "use stripe or polar") {
+		if err == nil || !strings.Contains(err.Error(), "use stripe, polar or creem") {
 			t.Fatalf("new --payment %s error = %v", payment, err)
 		}
 	}
@@ -381,7 +381,7 @@ func TestHelpNewListsTheFrontendsAndTheJSONAPI(t *testing.T) {
 	if strings.Contains(output.String(), "edition") || strings.Contains(output.String(), "Free") {
 		t.Fatalf("output = %q mentions the removed edition", output.String())
 	}
-	for _, want := range []string{"No account and no network needed", "--payment stripe or polar", "--framework htmx, datastar, svelte or headless", "--framework svelte", "Node.js 22.17 or newer and pnpm", "--api", "--headless", "--mcp"} {
+	for _, want := range []string{"No account and no network needed", "--payment stripe, polar or creem", "--framework htmx, datastar, svelte or headless", "--framework svelte", "Node.js 22.17 or newer and pnpm", "--api", "--headless", "--mcp"} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("output = %q, want %q", output.String(), want)
 		}

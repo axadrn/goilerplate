@@ -1,0 +1,425 @@
+package payment
+
+import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/model"
+	"{{.ModulePath}}/internal/repository"
+	"{{.ModulePath}}/internal/service"
+)
+
+const (
+	creemAPI = "https://api.creem.io"
+	creemTestAPI = "https://test-api.creem.io"
+	creemPortal = "https://creem.io/portal/login"
+{{- if .Workspaces }}
+	// Creem's checkout response does not include an expiration time.
+	creemCheckoutReuseWindow = 48 * time.Hour
+{{- end }}
+)
+
+type CreemProvider struct {
+	cfg *config.Config
+	subscriptions *service.SubscriptionService
+	client *http.Client
+	baseURL string
+}
+
+func NewCreemProvider(cfg *config.Config, subscriptions *service.SubscriptionService) *CreemProvider {
+	baseURL := creemAPI
+	if cfg.CreemSandboxMode {
+		baseURL = creemTestAPI
+	}
+	return &CreemProvider{
+		cfg: cfg,
+		subscriptions: subscriptions,
+		client: &http.Client{
+			Timeout: 10 * time.Second,
+			// Keep the API key on Creem's API origin.
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		},
+		baseURL: baseURL,
+	}
+}
+
+func (p *CreemProvider) Name() string {
+	return model.ProviderCreem
+}
+
+type creemProduct struct {
+	id string
+	plan string
+	interval string
+}
+
+func (p *CreemProvider) products() [4]creemProduct {
+	return [4]creemProduct{
+		{p.cfg.CreemProductIDProMonthly, model.SubscriptionPlanPro, model.SubscriptionIntervalMonthly},
+		{p.cfg.CreemProductIDProYearly, model.SubscriptionPlanPro, model.SubscriptionIntervalYearly},
+		{p.cfg.CreemProductIDEnterpriseMonthly, model.SubscriptionPlanEnterprise, model.SubscriptionIntervalMonthly},
+		{p.cfg.CreemProductIDEnterpriseYearly, model.SubscriptionPlanEnterprise, model.SubscriptionIntervalYearly},
+	}
+}
+
+func (p *CreemProvider) checkoutProduct(plan, interval string) string {
+	for _, product := range p.products() {
+		if product.plan == plan && product.interval == interval {
+			return product.id
+		}
+	}
+	return ""
+}
+
+func (p *CreemProvider) product(id string) creemProduct {
+	for _, product := range p.products() {
+		if id != "" && id == product.id {
+			return product
+		}
+	}
+	return creemProduct{}
+}
+
+type creemMetadata struct {
+{{- if .Workspaces }}
+	AccountID string `json:"workspace_id"`
+	AttemptID string `json:"checkout_attempt_id,omitempty"`
+{{- else }}
+	AccountID string `json:"user_id"`
+{{- end }}
+	SubscriptionID string `json:"subscription_id"`
+}
+
+type creemCheckoutRequest struct {
+	ProductID string `json:"product_id"`
+	RequestID string `json:"request_id,omitempty"`
+	SuccessURL string `json:"success_url"`
+	Customer map[string]string `json:"customer,omitempty"`
+	Metadata creemMetadata `json:"metadata"`
+}
+
+{{- if .Workspaces }}
+func (p *CreemProvider) CreateCheckoutURL(accountID, workspaceSlug, planID, interval, email, _ string) (string, error) {
+	successURL := fmt.Sprintf("%s/app/%s/billing", p.cfg.AppURL, workspaceSlug)
+{{- else }}
+func (p *CreemProvider) CreateCheckoutURL(accountID, planID, interval, email, _ string) (string, error) {
+	successURL := p.cfg.AppURL + "/app/billing"
+{{- end }}
+	productID := p.checkoutProduct(planID, interval)
+	if productID == "" {
+		return "", fmt.Errorf("no Creem product configured for %s (%s)", planID, interval)
+	}
+
+	sub, err := p.subscriptions.Subscription(accountID)
+	if err != nil {
+		return "", err
+	}
+
+	{{- if not .Workspaces }}
+	if sub.HasProviderSubscription() {
+		return "", errors.New("manage the existing Creem subscription before starting another checkout")
+	}
+{{- end }}
+
+	checkout := creemCheckoutRequest{
+		ProductID: productID,
+		SuccessURL: successURL,
+		Metadata: creemMetadata{AccountID: accountID, SubscriptionID: sub.ID},
+	}
+	if email != "" {
+		checkout.Customer = map[string]string{"email": email}
+	}
+{{- if .Workspaces }}
+	expiresAt := time.Now().Add(creemCheckoutReuseWindow)
+	pendingUntil := expiresAt.Add(checkoutWebhookGrace)
+	checkoutURL, attemptID, reused, err := p.subscriptions.BeginCheckout(accountID, p.Name(), planID, interval, expiresAt, pendingUntil)
+	if err != nil {
+		return "", err
+	}
+	if reused {
+		return checkoutURL, nil
+	}
+	checkout.RequestID = attemptID
+	checkout.Metadata.AttemptID = attemptID
+	checkoutURL, status, err := p.createCheckout(checkout)
+	if err != nil {
+		switch status {
+		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusUnprocessableEntity:
+			p.subscriptions.RejectCheckout(accountID, attemptID)
+		}
+		return "", err
+	}
+	if err := p.subscriptions.FinishCheckout(accountID, attemptID, checkoutURL, expiresAt, pendingUntil); err != nil {
+		return "", err
+	}
+	return checkoutURL, nil
+{{- else }}
+	checkoutURL, _, err := p.createCheckout(checkout)
+	return checkoutURL, err
+{{- end }}
+}
+
+func (p *CreemProvider) createCheckout(checkout creemCheckoutRequest) (string, int, error) {
+	body, err := json.Marshal(checkout)
+	if err != nil {
+		return "", 0, fmt.Errorf("encode Creem checkout: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, p.baseURL+"/v1/checkouts", bytes.NewReader(body))
+	if err != nil {
+		return "", 0, fmt.Errorf("build Creem checkout request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", p.cfg.CreemAPIKey)
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return "", 0, fmt.Errorf("create Creem checkout: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", resp.StatusCode, fmt.Errorf("create Creem checkout: HTTP %d", resp.StatusCode)
+	}
+	var result struct {
+		URL string `json:"checkout_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", resp.StatusCode, fmt.Errorf("decode Creem checkout: %w", err)
+	}
+	if result.URL == "" {
+		return "", resp.StatusCode, errors.New("Creem checkout response has no URL")
+	}
+	return result.URL, resp.StatusCode, nil
+}
+
+{{- if .Workspaces }}
+func (p *CreemProvider) BillingManagementURL(accountID, _ string) (string, error) {
+{{- else }}
+func (p *CreemProvider) CustomerPortalURL(accountID string) (string, error) {
+{{- end }}
+	sub, err := p.subscriptions.Subscription(accountID)
+	if err != nil {
+		return "", err
+	}
+	if sub.Provider != p.Name() || sub.ProviderCustomerID == nil || *sub.ProviderCustomerID == "" {
+		return "", errors.New("no Creem customer for this subscription")
+	}
+
+	// A Creem customer can have multiple purchases under the same email.
+	// Let Creem authenticate the payer before showing their purchase history.
+	return creemPortal, nil
+}
+
+// Creem expands customer and product references in subscription events.
+// The subscription nested in checkout.completed can contain bare IDs.
+type creemReference struct {
+	ID string `json:"id"`
+}
+
+func (r *creemReference) UnmarshalJSON(data []byte) error {
+	if len(data) > 0 && data[0] == '"' {
+		return json.Unmarshal(data, &r.ID)
+	}
+	type expanded creemReference
+	return json.Unmarshal(data, (*expanded)(r))
+}
+
+type creemSubscription struct {
+	ID string `json:"id"`
+	Status string `json:"status"`
+	Customer creemReference `json:"customer"`
+	Product creemReference `json:"product"`
+	Items []struct {
+		ProductID string `json:"product_id"`
+	} `json:"items"`
+	Metadata creemMetadata `json:"metadata"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	PeriodEnd *time.Time `json:"current_period_end_date"`
+	LastTransaction *struct {
+		Amount int `json:"amount"`
+		Currency string `json:"currency"`
+		CreatedAt int64 `json:"created_at"`
+	} `json:"last_transaction"`
+}
+
+func (p *CreemProvider) HandleWebhook(payload []byte, headers http.Header) error {
+	signature, err := hex.DecodeString(headers.Get("creem-signature"))
+	mac := hmac.New(sha256.New, []byte(p.cfg.CreemWebhookSecret))
+	mac.Write(payload)
+	if p.cfg.CreemWebhookSecret == "" || err != nil || !hmac.Equal(signature, mac.Sum(nil)) {
+		return errors.New("invalid Creem webhook signature")
+	}
+
+	var event struct {
+		Type string `json:"eventType"`
+		Object json.RawMessage `json:"object"`
+	}
+	if err := json.Unmarshal(payload, &event); err != nil {
+		return fmt.Errorf("decode Creem webhook: %w", err)
+	}
+	var subscription creemSubscription
+	switch event.Type {
+	case "checkout.completed":
+		// The checkout carries the metadata even if a trialing event omits it.
+		var checkout struct {
+			Metadata creemMetadata `json:"metadata"`
+			Subscription json.RawMessage `json:"subscription"`
+		}
+		if err := json.Unmarshal(event.Object, &checkout); err != nil {
+			return fmt.Errorf("decode completed Creem checkout: %w", err)
+		}
+		if len(checkout.Subscription) == 0 || checkout.Subscription[0] != '{' {
+			return nil
+		}
+		if err := json.Unmarshal(checkout.Subscription, &subscription); err != nil {
+			return fmt.Errorf("decode Creem checkout subscription: %w", err)
+		}
+		if subscription.Status != "trialing" {
+			return nil
+		}
+		subscription.Metadata = checkout.Metadata
+	case "subscription.active", "subscription.paid", "subscription.trialing", "subscription.update",
+		"subscription.scheduled_cancel", "subscription.canceled", "subscription.past_due",
+		"subscription.unpaid", "subscription.expired", "subscription.paused":
+		if err := json.Unmarshal(event.Object, &subscription); err != nil {
+			return fmt.Errorf("decode Creem subscription: %w", err)
+		}
+	default:
+		return nil
+	}
+	return p.syncSubscription(event.Type, subscription)
+}
+
+func (p *CreemProvider) syncSubscription(eventType string, remote creemSubscription) error {
+	if remote.ID == "" || remote.UpdatedAt.IsZero() {
+		return errors.New("Creem subscription event is missing its ID or update time")
+	}
+
+	status := remote.Status
+	stateAt := remote.UpdatedAt
+	var paymentAt time.Time
+	if payment := remote.LastTransaction; eventType == "subscription.paid" && payment != nil && payment.CreatedAt > 0 {
+		paymentAt = time.UnixMilli(payment.CreatedAt).UTC()
+		if paymentAt.After(stateAt) {
+			stateAt = paymentAt
+		}
+	}
+	if eventType == "subscription.expired" && status == "active" {
+		status = "past_due"
+		// Expiration can be emitted without modifying the subscription object.
+		if remote.PeriodEnd != nil && remote.PeriodEnd.After(stateAt) {
+			stateAt = *remote.PeriodEnd
+		}
+	}
+
+	var localStatus string
+	switch status {
+	case "active":
+		localStatus = model.SubscriptionStatusActive
+	case "trialing":
+		localStatus = model.SubscriptionStatusTrialing
+	case "scheduled_cancel":
+		localStatus = model.SubscriptionStatusCancelled
+	case "past_due":
+		localStatus = model.SubscriptionStatusPastDue
+	case "canceled", "expired", "paused", "unpaid":
+		localStatus = model.SubscriptionStatusInactive
+	default:
+		return nil
+	}
+
+	sub, err := p.subscriptions.ByProviderSubscriptionID(remote.ID)
+	var createdAt *time.Time
+	if errors.Is(err, repository.ErrSubscriptionNotFound) {
+		if remote.Metadata.AccountID == "" || remote.Metadata.SubscriptionID == "" {
+			return nil
+		}
+		sub, err = p.subscriptions.Subscription(remote.Metadata.AccountID)
+		if errors.Is(err, repository.ErrSubscriptionNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if sub.ID != remote.Metadata.SubscriptionID || sub.HasProviderSubscription() {
+			return nil
+		}
+		if sub.ProviderSubscriptionCreatedAt != nil && !remote.CreatedAt.After(*sub.ProviderSubscriptionCreatedAt) {
+			return nil
+		}
+		if localStatus == model.SubscriptionStatusPastDue {
+			// An unbound subscription has no locally confirmed paid access.
+			localStatus = model.SubscriptionStatusInactive
+		}
+		if localStatus == model.SubscriptionStatusActive && eventType != "subscription.paid" {
+			return nil
+		}
+{{- if .Workspaces }}
+		if sub.CheckoutAttemptID == nil || *sub.CheckoutAttemptID != remote.Metadata.AttemptID || sub.CheckoutProvider != p.Name() {
+			return nil
+		}
+{{- end }}
+		if remote.CreatedAt.IsZero() || remote.Customer.ID == "" {
+			return errors.New("Creem subscription event is missing its creation time or customer")
+		}
+		createdAt = &remote.CreatedAt
+		sub.ProviderSubscriptionCreatedAt = createdAt
+	} else if err != nil {
+		return err
+	} else if sub.Provider != p.Name() {
+		return nil
+	}
+
+	// Creem recommends granting paid access on subscription.paid.
+	if localStatus == model.SubscriptionStatusActive && eventType != "subscription.paid" &&
+		sub.Status == model.SubscriptionStatusTrialing {
+		return nil
+	}
+
+	productID := remote.Product.ID
+	if len(remote.Items) == 1 && remote.Items[0].ProductID != "" {
+		productID = remote.Items[0].ProductID
+	}
+	product := p.product(productID)
+	if product.id == "" && status != "canceled" {
+		return fmt.Errorf("Creem subscription %s has an unconfigured product", remote.ID)
+	}
+
+	sub.Provider = p.Name()
+	if remote.Customer.ID != "" {
+		sub.ProviderCustomerID = &remote.Customer.ID
+	}
+	sub.ProviderSubscriptionID = &remote.ID
+	sub.ProviderStateUpdatedAt = &stateAt
+	sub.Status = localStatus
+	sub.CurrentPeriodEnd = remote.PeriodEnd
+	sub.PlanID = product.plan
+	sub.Interval = &product.interval
+	if status == "canceled" {
+		sub.PlanID = model.SubscriptionPlanFree
+		sub.ProviderSubscriptionID = nil
+		sub.CurrentPeriodEnd = nil
+		sub.Interval = nil
+	}
+	if _, err := p.subscriptions.UpdateProviderState(sub, remote.ID, stateAt, createdAt); err != nil {
+		return err
+	}
+
+	if !paymentAt.IsZero() {
+		sub.ProviderPaymentUpdatedAt = &paymentAt
+		sub.Amount = &remote.LastTransaction.Amount
+		sub.Currency = strings.ToLower(remote.LastTransaction.Currency)
+		_, err := p.subscriptions.UpdateProviderPayment(sub, remote.ID, paymentAt)
+		return err
+	}
+	return nil
+}

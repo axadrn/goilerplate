@@ -113,12 +113,14 @@ jobs:
       fail-fast: false
       matrix:
         config:
+          - headless-creem-sqlite
           - headless-stripe-sqlite
           - headless-workspaces-polar-postgres-resend
           - postgres-resend-datastar
           - sqlite-htmx
           - svelte-stripe-sqlite
           - svelte-workspaces-polar-postgres-resend
+          - workspaces-creem-htmx
           - workspaces-polar-resend-htmx
           - workspaces-stripe-postgres-datastar
           - workspaces-stripe-postgres-htmx
