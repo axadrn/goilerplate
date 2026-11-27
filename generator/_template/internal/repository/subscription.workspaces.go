@@ -155,7 +155,7 @@ func (r *subscriptionRepository) UpdateIfProviderStateNewer(
 ) (bool, error) {
 	paymentReset := ""
 	if subscriptionCreatedAt != nil {
-		paymentReset = "provider_payment_updated_at = NULL,"
+		paymentReset = "provider_payment_updated_at = CASE WHEN provider_subscription_id = $5 THEN provider_payment_updated_at ELSE NULL END,"
 	}
 	query := `
 		UPDATE subscriptions
@@ -199,6 +199,12 @@ func (r *subscriptionRepository) UpdateIfProviderStateNewer(
 			 OR (provider_subscription_created_at = $12
 			     AND (provider_state_updated_at IS NULL OR provider_state_updated_at < $13)))`
 		args = append(args, *subscriptionCreatedAt, stateUpdatedAt)
+		if sub.CheckoutAttemptID != nil {
+			// The attempt may have changed since it was read. A concurrent
+			// webhook for the same provider subscription may also have bound it.
+			query += ` AND (checkout_attempt_id = $14 OR provider_subscription_id = $15)`
+			args = append(args, *sub.CheckoutAttemptID, providerSubID)
+		}
 		return r.execConditionalUpdate(sub.WorkspaceID, query, args...)
 	}
 	query += `provider_subscription_id = $12

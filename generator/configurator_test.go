@@ -25,8 +25,8 @@ func TestConfiguratorManifestContainsEveryValidSelection(t *testing.T) {
 			headlessSelections++
 		}
 	}
-	if len(selections) != 1536 || mcpSelections != 512 || headlessSelections != 128 || len(manifest.Trees) != len(selections)-mcpSelections+headlessSelections {
-		t.Fatalf("selections = %d, mcp = %d, headless = %d, trees = %d, want 1536, 512, 128 and 1152", len(selections), mcpSelections, headlessSelections, len(manifest.Trees))
+	if len(selections) != 2304 || mcpSelections != 768 || headlessSelections != 192 || len(manifest.Trees) != len(selections)-mcpSelections+headlessSelections {
+		t.Fatalf("selections = %d, mcp = %d, headless = %d, trees = %d, want 2304, 768, 192 and 1728", len(selections), mcpSelections, headlessSelections, len(manifest.Trees))
 	}
 	if len(manifest.Frontends) != 4 {
 		t.Fatalf("frontends = %d, want 4", len(manifest.Frontends))

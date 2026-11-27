@@ -84,6 +84,15 @@ type Config struct {
 	PolarProductIDProYearly         string
 	PolarProductIDEnterpriseMonthly string
 	PolarProductIDEnterpriseYearly  string
+{{- else if eq .Payment "creem" }}
+	// Payment, Creem
+	CreemAPIKey                     string
+	CreemWebhookSecret              string
+	CreemSandboxMode                bool
+	CreemProductIDProMonthly        string
+	CreemProductIDProYearly         string
+	CreemProductIDEnterpriseMonthly string
+	CreemProductIDEnterpriseYearly  string
 {{- else if eq .Payment "stripe" }}
 	// Payment, Stripe
 	StripeSecretKey                string
@@ -142,6 +151,8 @@ func Load() (*Config, error) {
 {{- if eq .Payment "polar" }}
 	polarSandboxMode := appEnv == EnvironmentDevelopment
 	polarSandboxMode = r.boolean("POLAR_SANDBOX_MODE", polarSandboxMode)
+{{- else if eq .Payment "creem" }}
+	creemSandboxMode := r.boolean("CREEM_SANDBOX_MODE", appEnv == EnvironmentDevelopment)
 {{- end }}
 {{- if .Storage }}
 	s3PresignExpiryPublic := 168 * time.Hour
@@ -194,6 +205,14 @@ func Load() (*Config, error) {
 		PolarProductIDProYearly:                r.string("POLAR_PRODUCT_ID_PRO_YEARLY", ""),
 		PolarProductIDEnterpriseMonthly:        r.string("POLAR_PRODUCT_ID_ENTERPRISE_MONTHLY", ""),
 		PolarProductIDEnterpriseYearly:         r.string("POLAR_PRODUCT_ID_ENTERPRISE_YEARLY", ""),
+{{- else if eq .Payment "creem" }}
+		CreemAPIKey:                            r.string("CREEM_API_KEY", ""),
+		CreemWebhookSecret:                     r.string("CREEM_WEBHOOK_SECRET", ""),
+		CreemSandboxMode:                       creemSandboxMode,
+		CreemProductIDProMonthly:               r.string("CREEM_PRODUCT_ID_PRO_MONTHLY", ""),
+		CreemProductIDProYearly:                r.string("CREEM_PRODUCT_ID_PRO_YEARLY", ""),
+		CreemProductIDEnterpriseMonthly:        r.string("CREEM_PRODUCT_ID_ENTERPRISE_MONTHLY", ""),
+		CreemProductIDEnterpriseYearly:         r.string("CREEM_PRODUCT_ID_ENTERPRISE_YEARLY", ""),
 {{- else if eq .Payment "stripe" }}
 		StripeSecretKey:                        r.string("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:                    r.string("STRIPE_WEBHOOK_SECRET", ""),
@@ -349,6 +368,28 @@ func (c *Config) validatePayments() []error {
 			require("POLAR_PRODUCT_ID_PRO_YEARLY", c.PolarProductIDProYearly)
 			require("POLAR_PRODUCT_ID_ENTERPRISE_MONTHLY", c.PolarProductIDEnterpriseMonthly)
 			require("POLAR_PRODUCT_ID_ENTERPRISE_YEARLY", c.PolarProductIDEnterpriseYearly)
+		}
+{{- else if eq .Payment "creem" }}
+		require("CREEM_API_KEY", c.CreemAPIKey)
+		require("CREEM_WEBHOOK_SECRET", c.CreemWebhookSecret)
+		products := []struct{ key, id string }{
+			{"CREEM_PRODUCT_ID_PRO_MONTHLY", c.CreemProductIDProMonthly},
+			{"CREEM_PRODUCT_ID_PRO_YEARLY", c.CreemProductIDProYearly},
+			{"CREEM_PRODUCT_ID_ENTERPRISE_MONTHLY", c.CreemProductIDEnterpriseMonthly},
+			{"CREEM_PRODUCT_ID_ENTERPRISE_YEARLY", c.CreemProductIDEnterpriseYearly},
+		}
+		seen := make(map[string]string)
+		for _, product := range products {
+			if c.IsProduction() {
+				require(product.key, product.id)
+			}
+			if product.id == "" {
+				continue
+			}
+			if previous, exists := seen[product.id]; exists {
+				errs = append(errs, fmt.Errorf("%s and %s must use different Creem products", previous, product.key))
+			}
+			seen[product.id] = product.key
 		}
 {{- else if eq .Payment "stripe" }}
 		require("STRIPE_SECRET_KEY", c.StripeSecretKey)

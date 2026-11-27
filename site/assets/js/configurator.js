@@ -99,6 +99,7 @@
     resend: "Resend",
     stripe: "Stripe",
     polar: "Polar",
+    creem: "Creem",
     google: "Google OAuth",
     github: "GitHub OAuth",
     blog: "Blog",

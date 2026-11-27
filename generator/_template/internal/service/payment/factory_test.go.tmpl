@@ -12,6 +12,9 @@ func TestNewProviderBuildsSelectedProvider(t *testing.T) {
 {{- if eq .Payment "polar" }}
 		PolarAPIKey:      "polar-secret",
 		PolarSandboxMode: true,
+{{- else if eq .Payment "creem" }}
+		CreemAPIKey: "creem_test_key",
+		CreemWebhookSecret: "webhook-secret",
 {{- else }}
 		StripeSecretKey:     "stripe-secret",
 		StripeWebhookSecret: "webhook-secret",
@@ -24,6 +27,10 @@ func TestNewProviderBuildsSelectedProvider(t *testing.T) {
 {{- if eq .Payment "polar" }}
 	if provider.Name() != model.ProviderPolar {
 		t.Fatalf("provider name = %q, want %q", provider.Name(), model.ProviderPolar)
+	}
+{{- else if eq .Payment "creem" }}
+	if provider.Name() != model.ProviderCreem {
+		t.Fatalf("provider name = %q, want %q", provider.Name(), model.ProviderCreem)
 	}
 {{- else }}
 	if provider.Name() != model.ProviderStripe {

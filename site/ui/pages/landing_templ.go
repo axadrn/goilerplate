@@ -128,7 +128,7 @@ func Landing() templ.Component {
 		})
 		templ_7745c5c3_Err = layouts.Home(layouts.SEOProps{
 			Title:       "The Go SaaS starter kit, free and open source",
-			Description: "A Go SaaS with login, billing, emails, teams and admin already built and tested. Pick htmx, Datastar or SvelteKit, SQLite or PostgreSQL, Stripe or Polar. Free and open source.",
+			Description: "A Go SaaS with login, billing, emails, teams and admin already built and tested. Pick htmx, Datastar or SvelteKit, SQLite or PostgreSQL, Stripe, Polar or Creem. Free and open source.",
 			Path:        "/",
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
@@ -902,7 +902,7 @@ type homePart struct {
 
 var homeParts = []homePart{
 	{icon.KeyRound(icon.Props{Class: "size-5"}), "Sign in", "Passwords, magic links, email verification and resets. Sessions you can revoke."},
-	{icon.CreditCard(icon.Props{Class: "size-5"}), "Billing", "Stripe or Polar. Checkout, monthly and yearly plans, trials and a customer portal."},
+	{icon.CreditCard(icon.Props{Class: "size-5"}), "Billing", "Stripe, Polar or Creem. Checkout, monthly and yearly plans, trials and a customer portal."},
 	{icon.Gauge(icon.Props{Class: "size-5"}), "Plans and limits", "Free, Pro and Enterprise in one catalog, with feature gates and limits."},
 	{icon.Mail(icon.Props{Class: "size-5"}), "Emails", "Welcome, magic link, password reset and email change, through SMTP or Resend."},
 	{icon.LayoutDashboard(icon.Props{Class: "size-5"}), "Admin", "Find users, see the numbers, revoke sessions, look at an account read only."},
@@ -1153,7 +1153,7 @@ func homeStack() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = homeChoice("Payments", []string{"Stripe", "Polar"}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = homeChoice("Payments", []string{"Stripe", "Polar", "Creem"}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -2114,7 +2114,7 @@ func homeAgents() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = homeCase("01", "Webhooks out of order", "Stripe and Polar retry and reorder events. An older event never overwrites a newer state.").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = homeCase("01", "Webhooks out of order", "Payment providers can deliver events more than once and out of order. An older event never overwrites a newer state.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

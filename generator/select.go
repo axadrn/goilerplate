@@ -17,7 +17,7 @@ type wordRow struct {
 var wordTable = []wordRow{
 	{Axis: "framework", Words: []string{"htmx", "datastar", "headless", "svelte"}},
 	{Axis: "database", Words: []string{"sqlite", "postgres"}},
-	{Axis: "payment", Words: []string{"polar", "stripe"}},
+	{Axis: "payment", Words: []string{"polar", "stripe", "creem"}},
 	{Axis: "mail", Words: []string{"smtp", "resend"}},
 	{Axis: "workspaces", Words: []string{"workspaces", "no_workspaces"}},
 	{Axis: "storage", Words: []string{"storage", "no_storage"}},
@@ -286,6 +286,7 @@ func (t Template) requireAxes(config Config) error {
 		{enabled: config.IsSvelte(), word: string(FrameworkSvelte), message: fmt.Sprintf("SvelteKit needs goilerplate %s or newer", SvelteFirstVersion)},
 		{enabled: config.API, axis: "api", message: fmt.Sprintf("The JSON API and Headless need goilerplate %s or newer", APIFirstVersion)},
 		{enabled: config.MCP, axis: "mcp", message: fmt.Sprintf("The MCP server needs goilerplate %s or newer", MCPFirstVersion)},
+		{enabled: config.Payment == PaymentCreem, word: string(PaymentCreem), message: "Choose a newer template version to use Creem"},
 	}
 	for _, check := range checks {
 		if !check.enabled {

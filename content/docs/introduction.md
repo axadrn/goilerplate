@@ -72,4 +72,4 @@ After generation, it is your Go repository.
 
 goilerplate is open source. The CLI is MIT. The template and every project it generates are 0BSD: use, change and sell what you build, with no notice to keep. Generated projects ship without a LICENSE file, so you choose your own.
 
-Every frontend, both databases, both payment providers, both mail providers and every optional module are included. `goilerplate update` brings later template versions into your project.
+Every frontend, both databases, all three payment providers, both mail providers and every optional module are included. `goilerplate update` brings later template versions into your project.

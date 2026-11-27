@@ -103,7 +103,7 @@ templ Configurator() {
 									}
 									<div class="grid gap-4 sm:grid-cols-3">
 										@configuratorSelect("database", "Database", []configuratorChoice{{string(generator.DatabaseSQLite), "SQLite"}, {string(generator.DatabasePostgres), "PostgreSQL"}})
-										@configuratorSelect("payment", "Payments", []configuratorChoice{{string(generator.PaymentStripe), "Stripe"}, {string(generator.PaymentPolar), "Polar"}})
+										@configuratorSelect("payment", "Payments", []configuratorChoice{{string(generator.PaymentStripe), "Stripe"}, {string(generator.PaymentPolar), "Polar"}, {string(generator.PaymentCreem), "Creem"}})
 										@configuratorSelect("mail", "Email", []configuratorChoice{{string(generator.MailSMTP), "SMTP"}, {string(generator.MailResend), "Resend"}})
 									</div>
 								}

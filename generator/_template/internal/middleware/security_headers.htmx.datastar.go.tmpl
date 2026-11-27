@@ -222,7 +222,11 @@ func SecurityHeaders(cfg SecurityHeadersConfig, next http.Handler) http.Handler 
 			"connect-src 'self' " + umamiCsp + " https://" + plausibleHost + " https://*.google-analytics.com https://analytics.google.com",
 			"frame-ancestors 'none'",
 			"base-uri 'self'",
+			{{- if eq .Payment "creem" }}
+			"form-action 'self' https://checkout.creem.io https://www.creem.io https://creem.io",
+{{- else }}
 			"form-action 'self' https://sandbox.polar.sh https://polar.sh https://checkout.stripe.com",
+{{- end }}
 		}, "; ")
 
 		w.Header().Set("Content-Security-Policy", cspPolicy)

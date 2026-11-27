@@ -399,6 +399,28 @@ func TestOlderTemplatesRejectTheMCPServer(t *testing.T) {
 	}
 }
 
+func TestOlderTemplatesRejectCreem(t *testing.T) {
+	older := fstest.MapFS{
+		"_template/README.md": {Data: []byte("older\n")},
+		"_template/internal/service/payment/stripe.stripe.go": {Data: []byte("package payment\n")},
+	}
+	template, err := NewTemplate("v4.0.0", older)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := Config{
+		ProjectName: "Acme",
+		ModulePath:  "github.com/example/acme",
+		Framework:   FrameworkHTMX,
+		Database:    DatabaseSQLite,
+		Payment:     PaymentCreem,
+		Mail:        MailSMTP,
+	}
+	if err := template.Generate(t.TempDir(), config); !errors.Is(err, ErrUnsupportedForVersion) || !strings.Contains(err.Error(), "Creem") {
+		t.Fatalf("template without Creem sources error = %v, want ErrUnsupportedForVersion for Creem", err)
+	}
+}
+
 func TestOlderTemplatesRejectSvelteKit(t *testing.T) {
 	config := Config{
 		ProjectName: "Acme",
@@ -951,8 +973,8 @@ func TestCuratedConfigsMatchGoldenTrees(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(configs) != 16 {
-		t.Fatalf("curated configs have %d combinations, want 16", len(configs))
+	if len(configs) != 18 {
+		t.Fatalf("curated configs have %d combinations, want 18", len(configs))
 	}
 	for _, configPath := range configs {
 		configPath := configPath

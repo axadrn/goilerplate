@@ -29,7 +29,7 @@ func (a *App) newProject(ctx context.Context, arguments []string) error {
 	modulePath := flags.String("module", "", "Go module path")
 	framework := flags.String("framework", "htmx", "htmx, datastar, svelte or headless")
 	database := flags.String("database", "sqlite", "sqlite or postgres")
-	payment := flags.String("payment", "stripe", "stripe or polar")
+	payment := flags.String("payment", "stripe", "stripe, polar or creem")
 	mail := flags.String("mail", "smtp", "smtp or resend")
 	workspaces := flags.Bool("workspaces", false, "include shared workspaces")
 	oauth := flags.String("oauth", "", "comma-separated OAuth providers")
@@ -159,9 +159,9 @@ func validateSelection(answers generator.Config) error {
 		return errors.New("MCP requires the JSON API")
 	}
 	switch answers.Payment {
-	case "stripe", "polar":
+	case "stripe", "polar", "creem":
 	default:
-		return fmt.Errorf("unsupported payment provider %q, use stripe or polar", answers.Payment)
+		return fmt.Errorf("unsupported payment provider %q, use stripe, polar or creem", answers.Payment)
 	}
 	return nil
 }

@@ -8,7 +8,7 @@ order: 3
 
 Payments confirm what happened at the provider. The generated access package decides what that unlocks in your product.
 
-One local catalog defines plans, features, resource limits, seat limits, quota limits, and signup policy. Stripe and Polar both update the same local subscription model. Product services never depend on either provider.
+One local catalog defines plans, features, resource limits, seat limits, quota limits, and signup policy. Stripe, Polar and Creem update the same local subscription model. Product services never depend on the payment provider.
 
 ## The two layers
 

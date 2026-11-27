@@ -28,6 +28,8 @@ Add project-specific rules here. Keep generated defaults below this section easy
 {{- end }}
 {{- if eq .Payment "polar" }}
 - Polar for subscription billing.
+{{- else if eq .Payment "creem" }}
+- Creem for subscription billing.
 {{- else }}
 - Stripe for subscription billing.
 {{- end }}
@@ -38,7 +40,7 @@ Add project-specific rules here. Keep generated defaults below this section easy
 ## House rules
 
 - Keep handlers thin. Put business rules in services and SQL in repositories.
-- Keep product access provider-agnostic. Stripe or Polar updates local subscription state. `internal/access` decides what that state unlocks.
+- Keep product access provider-agnostic. {{ if eq .Payment "creem" }}Creem{{ else }}Stripe or Polar{{ end }} updates local subscription state. `internal/access` decides what that state unlocks.
 {{- if .HasHTMLFrontend }}
 - Templates may mirror access for presentation. Services must enforce every protected operation with explicit early returns.
 {{- else }}

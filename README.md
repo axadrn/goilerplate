@@ -7,7 +7,7 @@
 ## What you get
 
 - **Auth:** passwords, magic links, Google and GitHub OAuth, revocable sessions
-- **Billing:** Stripe or Polar, subscriptions, customer portal, signed webhooks
+- **Billing:** Stripe, Polar or Creem, with subscriptions, a customer portal, and signed webhooks
 - **Teams:** workspaces, roles, invitations, seat limits
 - **Admin:** user search, metrics, session revocation, support impersonation
 - **API:** JSON API, personal API tokens, MCP server for your customers' agents
@@ -46,7 +46,7 @@ goilerplate new --module example.com/acme --framework htmx --database sqlite --p
 |---|---|---|
 | `--framework` | `htmx`, `datastar`, `svelte`, `headless` | `htmx` |
 | `--database` | `sqlite`, `postgres` | `sqlite` |
-| `--payment` | `stripe`, `polar` | `stripe` |
+| `--payment` | `stripe`, `polar`, `creem` | `stripe` |
 | `--mail` | `smtp`, `resend` | `smtp` |
 | `--oauth` | `google`, `github` (comma separated) | none |
 | `--content` | `blog`, `docs` (comma separated) | none |
