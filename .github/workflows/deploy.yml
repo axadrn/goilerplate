@@ -1,6 +1,4 @@
-# Builds the image and hands it to moin, which deploys it: no way into the
-# server from here. The secret MOIN_DEPLOY_HOOK deploys only new tags of
-# this image. https://moin.run/docs/guides/ci
+# Builds the image and pushes it to ghcr.io. The server follows the image.
 name: deploy
 
 on:
@@ -40,11 +38,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/axadrn/goilerplate.com:${{ github.sha }}
-            ghcr.io/axadrn/goilerplate.comatest
+            ghcr.io/axadrn/goilerplate.com:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Deploy with moin
-        env:
-          MOIN_DEPLOY_HOOK: ${{ secrets.MOIN_DEPLOY_HOOK }}
-        run: curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=ghcr.io/axadrn/goilerplate.com:${GITHUB_SHA}"
